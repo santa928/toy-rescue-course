@@ -9,6 +9,7 @@ import {
   groupVoxelsByPalette,
 } from '../vehicle-lab/model/voxelModel';
 
+/** 指定座標にある消防車ボクセルのパレットIDを返す。 */
 function paletteAt(x: number, y: number, z: number): string | undefined {
   return FIRE_TRUCK_VOXELS.find((cell) => cell.x === x && cell.y === y && cell.z === z)?.paletteId;
 }
@@ -16,6 +17,7 @@ function paletteAt(x: number, y: number, z: number): string | undefined {
 describe('FIRE_TRUCK_VOXELS', () => {
   it('有効かつ800セル以下の消防車である', () => {
     expect(() => assertValidVoxelModel(FIRE_TRUCK_VOXELS, FIRE_TRUCK_PALETTE_IDS)).not.toThrow();
+    expect(FIRE_TRUCK_VOXELS).toHaveLength(640);
     expect(FIRE_TRUCK_VOXELS.length).toBeGreaterThan(500);
     expect(FIRE_TRUCK_VOXELS.length).toBeLessThanOrEqual(800);
   });
