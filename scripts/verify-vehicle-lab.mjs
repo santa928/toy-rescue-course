@@ -26,6 +26,29 @@ function assert(condition, message) {
   }
 }
 
+/** 実測fpsがviewportの性能下限を満たすか判定する。 */
+function meetsFrameRateTarget(measuredFps, minimumFps) {
+  return measuredFps >= minimumFps;
+}
+
+/** 性能下限の直前と一致値を検証し、丸めによる誤判定を防ぐ。 */
+function verifyFrameRateBoundaryPolicy() {
+  const cases = [
+    { measuredFps: 59.99, minimumFps: 60, expected: false },
+    { measuredFps: 60, minimumFps: 60, expected: true },
+    { measuredFps: 29.99, minimumFps: 30, expected: false },
+    { measuredFps: 30, minimumFps: 30, expected: true },
+  ];
+
+  for (const boundaryCase of cases) {
+    const actual = meetsFrameRateTarget(boundaryCase.measuredFps, boundaryCase.minimumFps);
+    assert(
+      actual === boundaryCase.expected,
+      `Frame-rate boundary mismatch: ${JSON.stringify({ ...boundaryCase, actual })}`,
+    );
+  }
+}
+
 /** Vite開発サーバーが応答するまで最大30秒待つ。 */
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
@@ -432,7 +455,7 @@ async function verifyVehicleLab() {
       assert(!loadedResources.some((resourceUrl) => /rapier/i.test(resourceUrl)), `Vehicle Lab loaded Rapier: ${loadedResources.join(' | ')}`);
 
       const performance = await measureRenderFps(page);
-      if (Math.round(performance.fps) < target.minimumFps) {
+      if (!meetsFrameRateTarget(performance.fps, target.minimumFps)) {
         const message = `Frame rate below target at ${target.name}: ${performance.fps.toFixed(2)} < ${target.minimumFps}`;
         const rendererName = rendererInfo.unmaskedRenderer ?? rendererInfo.renderer;
         if (/swiftshader/i.test(rendererName)) {
@@ -505,4 +528,9 @@ async function verifyVehicleLab() {
   }
 }
 
-await verifyVehicleLab();
+verifyFrameRateBoundaryPolicy();
+if (process.argv.includes('--self-check')) {
+  console.log('Frame-rate boundary self-check passed: 4 cases');
+} else {
+  await verifyVehicleLab();
+}
