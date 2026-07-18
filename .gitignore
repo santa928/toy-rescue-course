@@ -5,3 +5,5 @@ output/
 npm-debug.log*
 progress.md
 docs/superpowers/
+.playwright-cli/
+.superpowers/
