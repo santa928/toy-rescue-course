@@ -3,7 +3,6 @@ import { chromium } from 'playwright';
 
 const baseUrl = process.env.VEHICLE_LAB_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/vehicle-lab';
-const runManifestPath = `${outputDirectory}/run-manifest.json`;
 const cameraEpsilon = 0.08;
 const targets = [
   { name: 'desktop', width: 1280, height: 720, minimumFps: 60 },
@@ -32,18 +31,32 @@ function meetsFrameRateTarget(measuredFps, minimumFps) {
   return measuredFps >= minimumFps;
 }
 
-/** WebGL renderer名から既知のsoftware rasterizerか判定する。 */
-function isSoftwareRenderer(rendererName) {
-  return /swiftshader|llvmpipe|softpipe|software rasterizer|basic render driver/i.test(rendererName);
+/** WebGL renderer名を既知software、明示physical、unknownへ保守的に分類する。 */
+function classifyRenderer(rendererName) {
+  const normalizedRendererName = typeof rendererName === 'string' ? rendererName.trim() : '';
+  if (/swiftshader|llvmpipe|softpipe|lavapipe|swrast|software (?:renderer|rasterizer|adapter)|basic render (?:driver|adapter)/i.test(normalizedRendererName)) {
+    return 'software';
+  }
+  if (
+    /\bNVIDIA\b|\bAMD\b|\bRadeon\b/i.test(normalizedRendererName)
+    || /\bIntel(?:\(R\))?\b.*(?:Arc|Iris|UHD|HD Graphics|Graphics|GPU)/i.test(normalizedRendererName)
+    || /(?:\bApple\b.*(?:Metal|M[1-9]\d*|GPU|Silicon)|Metal.*\bApple\b)/i.test(normalizedRendererName)
+    || /\bAdreno\b|\bMali\b|\bPowerVR\b/i.test(normalizedRendererName)
+  ) {
+    return 'physical';
+  }
+  return 'unknown';
 }
 
 /** fps下限とrenderer分類を性能認証フィールドへ変換する。 */
 function evaluatePerformancePolicy(measuredFps, minimumFps, rendererName) {
   const thresholdMet = meetsFrameRateTarget(measuredFps, minimumFps);
-  const physicalGpu = !isSoftwareRenderer(rendererName);
+  const rendererClass = classifyRenderer(rendererName);
+  const physicalGpu = rendererClass === 'physical';
   return {
     certified: thresholdMet && physicalGpu,
     physicalGpu,
+    rendererClass,
     thresholdMet,
   };
 }
@@ -67,25 +80,97 @@ function verifyPerformancePolicySelfCheck() {
 
   const policyCases = [
     {
-      expected: { certified: false, physicalGpu: false, thresholdMet: true },
+      expected: { certified: false, physicalGpu: false, rendererClass: 'software', thresholdMet: true },
       measuredFps: 120,
       minimumFps: 60,
       rendererName: 'ANGLE (SwiftShader Device)',
     },
     {
-      expected: { certified: false, physicalGpu: false, thresholdMet: false },
+      expected: { certified: false, physicalGpu: false, rendererClass: 'software', thresholdMet: false },
       measuredFps: 59.99,
       minimumFps: 60,
       rendererName: 'llvmpipe (LLVM 15.0.7)',
     },
     {
-      expected: { certified: true, physicalGpu: true, thresholdMet: true },
+      expected: { certified: false, physicalGpu: false, rendererClass: 'software', thresholdMet: true },
+      measuredFps: 120,
+      minimumFps: 60,
+      rendererName: 'Microsoft Basic Render Driver software adapter',
+    },
+    {
+      expected: { certified: false, physicalGpu: false, rendererClass: 'software', thresholdMet: true },
+      measuredFps: 120,
+      minimumFps: 60,
+      rendererName: 'Mesa Software Renderer',
+    },
+    {
+      expected: { certified: false, physicalGpu: false, rendererClass: 'unknown', thresholdMet: true },
+      measuredFps: 120,
+      minimumFps: 60,
+      rendererName: 'WebKit WebGL',
+    },
+    {
+      expected: { certified: false, physicalGpu: false, rendererClass: 'unknown', thresholdMet: true },
+      measuredFps: 120,
+      minimumFps: 60,
+      rendererName: '',
+    },
+    {
+      expected: { certified: false, physicalGpu: false, rendererClass: 'unknown', thresholdMet: true },
+      measuredFps: 120,
+      minimumFps: 60,
+      rendererName: null,
+    },
+    {
+      expected: { certified: false, physicalGpu: false, rendererClass: 'unknown', thresholdMet: true },
+      measuredFps: 120,
+      minimumFps: 60,
+      rendererName: 'ANGLE (Mystery Vulkan Backend)',
+    },
+    {
+      expected: { certified: true, physicalGpu: true, rendererClass: 'physical', thresholdMet: true },
       measuredFps: 60,
       minimumFps: 60,
       rendererName: 'ANGLE (NVIDIA GeForce RTX 4080)',
     },
     {
-      expected: { certified: false, physicalGpu: true, thresholdMet: false },
+      expected: { certified: true, physicalGpu: true, rendererClass: 'physical', thresholdMet: true },
+      measuredFps: 30,
+      minimumFps: 30,
+      rendererName: 'AMD Radeon RX 7900 XT',
+    },
+    {
+      expected: { certified: true, physicalGpu: true, rendererClass: 'physical', thresholdMet: true },
+      measuredFps: 60,
+      minimumFps: 60,
+      rendererName: 'ANGLE (Intel(R) Iris Xe Graphics)',
+    },
+    {
+      expected: { certified: true, physicalGpu: true, rendererClass: 'physical', thresholdMet: true },
+      measuredFps: 30,
+      minimumFps: 30,
+      rendererName: 'ANGLE Metal Renderer: Apple M3 Pro',
+    },
+    {
+      expected: { certified: true, physicalGpu: true, rendererClass: 'physical', thresholdMet: true },
+      measuredFps: 30,
+      minimumFps: 30,
+      rendererName: 'Qualcomm Adreno 740',
+    },
+    {
+      expected: { certified: true, physicalGpu: true, rendererClass: 'physical', thresholdMet: true },
+      measuredFps: 30,
+      minimumFps: 30,
+      rendererName: 'ARM Mali-G715',
+    },
+    {
+      expected: { certified: true, physicalGpu: true, rendererClass: 'physical', thresholdMet: true },
+      measuredFps: 30,
+      minimumFps: 30,
+      rendererName: 'PowerVR Rogue GE8320',
+    },
+    {
+      expected: { certified: false, physicalGpu: true, rendererClass: 'physical', thresholdMet: false },
       measuredFps: 59.99,
       minimumFps: 60,
       rendererName: 'ANGLE (NVIDIA GeForce RTX 4080)',
@@ -105,16 +190,16 @@ function verifyPerformancePolicySelfCheck() {
   }
 }
 
-/** 前回runの既知artifactを完全削除し、空の出力directoryを作る。 */
-function resetOutputArtifacts() {
-  fs.rmSync(outputDirectory, { force: true, recursive: true });
-  fs.mkdirSync(outputDirectory, { recursive: true });
+/** 指定runの既知artifactを完全削除し、空の出力directoryを作る。 */
+function resetOutputArtifacts(artifactDirectory) {
+  fs.rmSync(artifactDirectory, { force: true, recursive: true });
+  fs.mkdirSync(artifactDirectory, { recursive: true });
 }
 
-/** 現在runの状態をmanifestへ記録し、途中失敗を前回成功と区別可能にする。 */
-function writeRunManifest(status, error = null) {
+/** 指定runの状態をmanifestへ記録し、途中失敗を前回成功と区別可能にする。 */
+function writeRunManifest(artifactDirectory, status, error = null) {
   fs.writeFileSync(
-    runManifestPath,
+    `${artifactDirectory}/run-manifest.json`,
     JSON.stringify({ error, recordedAt: new Date().toISOString(), status }, null, 2),
   );
 }
@@ -607,14 +692,14 @@ async function verifyVehicleLab() {
 
       const performance = await measureRenderFps(page);
       const rendererName = rendererInfo.unmaskedRenderer ?? rendererInfo.renderer;
-      const { certified, physicalGpu, thresholdMet } = evaluatePerformancePolicy(
+      const { certified, physicalGpu, rendererClass, thresholdMet } = evaluatePerformancePolicy(
         performance.fps,
         target.minimumFps,
         rendererName,
       );
       if (!physicalGpu) {
         environmentConcerns.push(
-          `Software renderer cannot certify ${target.name} performance; thresholdMet=${thresholdMet}; physical-GPU revalidation required (${rendererName})`,
+          `${rendererClass} renderer cannot certify ${target.name} performance; thresholdMet=${thresholdMet}; physical-GPU revalidation required (${rendererName || 'empty renderer string'})`,
         );
       } else if (!thresholdMet) {
         verificationFailures.push(
@@ -645,6 +730,7 @@ async function verifyVehicleLab() {
         performance,
         physicalGpu,
         rendererInfo,
+        rendererClass,
         target,
         thresholdMet,
       });
@@ -676,7 +762,8 @@ async function verifyVehicleLab() {
     performancePolicy: {
       certification: 'Certified only when physicalGpu and thresholdMet are both true.',
       physicalGpu: 'Fail when a physical GPU misses the viewport target.',
-      softwareRenderer: 'Always record an environment concern and never certify, regardless of thresholdMet.',
+      rendererClassification: 'Only explicitly recognized physical GPU vendors/devices are physical; known software rasterizers are software; all other renderers are unknown.',
+      softwareOrUnknownRenderer: 'Always record an environment concern and never certify, regardless of thresholdMet.',
       targets: Object.fromEntries(targets.map((target) => [target.name, target.minimumFps])),
     },
     results,
@@ -691,23 +778,73 @@ async function verifyVehicleLab() {
   }
 }
 
-/** artifact初期化から成功・失敗manifestまで1回の検証runとして管理する。 */
-async function runVehicleLabVerification() {
-  resetOutputArtifacts();
-  writeRunManifest('running');
+/** artifact初期化、policy、browser検証、manifestを1回のrunとして管理する。 */
+async function runVehicleLabVerification({
+  artifactDirectory = outputDirectory,
+  policySelfCheck = verifyPerformancePolicySelfCheck,
+  vehicleLabVerification = verifyVehicleLab,
+} = {}) {
+  resetOutputArtifacts(artifactDirectory);
+  writeRunManifest(artifactDirectory, 'running');
   try {
-    await verifyVehicleLab();
-    writeRunManifest('completed');
+    policySelfCheck();
+    await vehicleLabVerification();
+    writeRunManifest(artifactDirectory, 'completed');
   } catch (error) {
     const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    writeRunManifest('failed', errorMessage);
+    writeRunManifest(artifactDirectory, 'failed', errorMessage);
     throw error;
   }
 }
 
-verifyPerformancePolicySelfCheck();
+/** 意図的policy失敗で旧artifact消去とfailed manifest更新を一時directory内に実証する。 */
+async function verifyManifestFailureSelfCheck() {
+  const artifactDirectory = `${outputDirectory}-manifest-self-check`;
+  const staleArtifactPath = `${artifactDirectory}/stale-artifact.png`;
+  const staleResultsPath = `${artifactDirectory}/results.json`;
+  let browserVerificationCalled = false;
+  fs.rmSync(artifactDirectory, { force: true, recursive: true });
+  fs.mkdirSync(artifactDirectory, { recursive: true });
+  fs.writeFileSync(staleArtifactPath, 'stale');
+  fs.writeFileSync(staleResultsPath, '{"stale":true}');
+
+  try {
+    let caughtError = null;
+    try {
+      await runVehicleLabVerification({
+        artifactDirectory,
+        policySelfCheck: () => {
+          throw new Error('Intentional policy self-check failure');
+        },
+        vehicleLabVerification: async () => {
+          browserVerificationCalled = true;
+        },
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    assert(caughtError instanceof Error, 'Intentional policy failure was not propagated');
+    assert(!browserVerificationCalled, 'Browser verification ran after policy self-check failure');
+    assert(!fs.existsSync(staleArtifactPath), 'Stale PNG survived policy self-check failure');
+    assert(!fs.existsSync(staleResultsPath), 'Stale results survived policy self-check failure');
+    const manifest = JSON.parse(fs.readFileSync(`${artifactDirectory}/run-manifest.json`, 'utf8'));
+    assert(manifest.status === 'failed', `Expected failed manifest: ${JSON.stringify(manifest)}`);
+    assert(
+      manifest.error.includes('Intentional policy self-check failure'),
+      `Failed manifest did not record policy error: ${JSON.stringify(manifest)}`,
+    );
+  } finally {
+    fs.rmSync(artifactDirectory, { force: true, recursive: true });
+  }
+}
+
 if (process.argv.includes('--self-check')) {
-  console.log('Performance policy self-check passed: 8 cases');
+  verifyPerformancePolicySelfCheck();
+  console.log('Performance policy self-check passed: 20 cases');
+} else if (process.argv.includes('--manifest-failure-self-check')) {
+  await verifyManifestFailureSelfCheck();
+  console.log('Manifest failure self-check passed: stale artifacts removed and failed status recorded');
 } else {
   await runVehicleLabVerification();
 }
