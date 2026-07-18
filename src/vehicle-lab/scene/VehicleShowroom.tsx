@@ -48,10 +48,17 @@ function CameraRig({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomPro
       return;
     }
     const [x, y, z] = CAMERA_POSITIONS[cameraPreset.view];
+    const controls = controlsRef.current;
+    if (controls) {
+      controls.autoRotate = false;
+      controls.target.set(0, 0.85, 0);
+    }
     camera.position.set(x, y, z);
     camera.lookAt(0, 0.85, 0);
-    controlsRef.current?.target.set(0, 0.85, 0);
-    controlsRef.current?.update();
+    if ('zoom' in camera) {
+      camera.zoom = 72;
+      camera.updateProjectionMatrix();
+    }
   }, [camera, cameraPreset]);
 
   /** 操作開始時のOrbitControls角度を、終了時の回転判定用に保持する。 */
@@ -89,6 +96,7 @@ function CameraRig({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomPro
     <OrbitControls
       autoRotate={autoRotate}
       autoRotateSpeed={0.8}
+      enableDamping={false}
       enablePan={false}
       maxZoom={110}
       minZoom={45}
@@ -118,6 +126,21 @@ function RendererMetrics(): null {
   return null;
 }
 
+/** 静止展示物のshadow mapを初回だけ更新し、以後の重複shadow passを省く。 */
+function StaticShadowMap(): null {
+  const gl = useThree((state) => state.gl);
+
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+    return () => {
+      gl.shadowMap.autoUpdate = true;
+    };
+  }, [gl]);
+
+  return null;
+}
+
 /** 純ボクセル消防車、展示台、照明、カメラ操作を構成する。 */
 export function VehicleShowroom({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomProps): ReactElement {
   return (
@@ -126,6 +149,7 @@ export function VehicleShowroom({ autoRotate, cameraPreset, onFreeOrbit }: Vehic
       <OrthographicCamera makeDefault position={[6.5, 4.8, 8]} zoom={72} />
       <CameraRig autoRotate={autoRotate} cameraPreset={cameraPreset} onFreeOrbit={onFreeOrbit} />
       <RendererMetrics />
+      <StaticShadowMap />
 
       <ambientLight intensity={1.35} />
       <directionalLight castShadow intensity={2.1} position={[5, 8, 6]} shadow-mapSize={[1024, 1024]} />

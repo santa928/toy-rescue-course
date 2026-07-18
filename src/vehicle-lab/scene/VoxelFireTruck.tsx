@@ -56,11 +56,10 @@ function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
       receiveShadow
       ref={meshRef}
     >
-      <meshStandardMaterial
+      <meshLambertMaterial
         color={material.color}
         emissive={'emissive' in material ? material.emissive : undefined}
         emissiveIntensity={'emissiveIntensity' in material ? material.emissiveIntensity : 0}
-        roughness={material.roughness}
       />
     </instancedMesh>
   );

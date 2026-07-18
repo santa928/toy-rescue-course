@@ -1,5 +1,8 @@
 node_modules
 dist
+output
 .git
+.playwright-cli
+.superpowers
 .DS_Store
 npm-debug.log
