@@ -58,6 +58,11 @@ export function VehicleLabApp(): ReactElement {
     setCameraPreset({ requestId: cameraPresetRequestId.current, view: nextView });
   }, []);
 
+  /** zoomを含む任意のユーザー操作開始時に初期自動回転だけを停止する。 */
+  const handleInteractionStart = useCallback(() => {
+    setAutoRotate(false);
+  }, []);
+
   /** 実回転後のカメラを維持したまま、UIとtelemetryを自由視点へ切り替える。 */
   const handleFreeOrbit = useCallback(() => {
     setAutoRotate(false);
@@ -122,13 +127,14 @@ export function VehicleLabApp(): ReactElement {
               autoRotate={autoRotate}
               cameraPreset={cameraPreset}
               onFreeOrbit={handleFreeOrbit}
+              onInteractionStart={handleInteractionStart}
             />
           </Canvas>
         </VehicleLabErrorBoundary>
       </section>
 
       <footer className="vehicle-lab-footer">
-        <div className="vehicle-view-buttons" aria-label="消防車を見る方向">
+        <div className="vehicle-view-buttons" aria-label="消防車を見る方向" role="group">
           {FIXED_VIEWS.map(({ id, label }) => (
             <button
               aria-pressed={view === id}

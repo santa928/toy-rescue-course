@@ -16,15 +16,21 @@ services:
       context: .
       dockerfile: Dockerfile.e2e
     working_dir: /app
-    depends_on:
-      - web
     environment:
-      VEHICLE_LAB_BASE_URL: http://web:5173
+      VEHICLE_LAB_BASE_URL: http://127.0.0.1:5173
     volumes:
-      - .:/app
-      - e2e_node_modules:/app/node_modules
-    command: node scripts/verify-vehicle-lab.mjs
+      - ./output:/app/output
+    command:
+      - sh
+      - -lc
+      - |
+        npm run dev -- --host 127.0.0.1 > /tmp/vehicle-lab-vite.log 2>&1 &
+        server_pid=$$!
+        trap 'kill "$$server_pid" 2>/dev/null || true' EXIT
+        node scripts/verify-vehicle-lab.mjs || {
+          cat /tmp/vehicle-lab-vite.log >&2
+          exit 1
+        }
 
 volumes:
   node_modules:
-  e2e_node_modules:

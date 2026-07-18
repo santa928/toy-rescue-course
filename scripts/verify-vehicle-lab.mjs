@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
-const baseUrl = process.env.VEHICLE_LAB_BASE_URL ?? 'http://web:5173';
+const baseUrl = process.env.VEHICLE_LAB_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/vehicle-lab';
+const runManifestPath = `${outputDirectory}/run-manifest.json`;
 const cameraEpsilon = 0.08;
 const targets = [
   { name: 'desktop', width: 1280, height: 720, minimumFps: 60 },
@@ -31,8 +32,24 @@ function meetsFrameRateTarget(measuredFps, minimumFps) {
   return measuredFps >= minimumFps;
 }
 
-/** 性能下限の直前と一致値を検証し、丸めによる誤判定を防ぐ。 */
-function verifyFrameRateBoundaryPolicy() {
+/** WebGL renderer名から既知のsoftware rasterizerか判定する。 */
+function isSoftwareRenderer(rendererName) {
+  return /swiftshader|llvmpipe|softpipe|software rasterizer|basic render driver/i.test(rendererName);
+}
+
+/** fps下限とrenderer分類を性能認証フィールドへ変換する。 */
+function evaluatePerformancePolicy(measuredFps, minimumFps, rendererName) {
+  const thresholdMet = meetsFrameRateTarget(measuredFps, minimumFps);
+  const physicalGpu = !isSoftwareRenderer(rendererName);
+  return {
+    certified: thresholdMet && physicalGpu,
+    physicalGpu,
+    thresholdMet,
+  };
+}
+
+/** fps境界、software分類、物理GPU認証policyの独立性を自己検証する。 */
+function verifyPerformancePolicySelfCheck() {
   const cases = [
     { measuredFps: 59.99, minimumFps: 60, expected: false },
     { measuredFps: 60, minimumFps: 60, expected: true },
@@ -47,6 +64,59 @@ function verifyFrameRateBoundaryPolicy() {
       `Frame-rate boundary mismatch: ${JSON.stringify({ ...boundaryCase, actual })}`,
     );
   }
+
+  const policyCases = [
+    {
+      expected: { certified: false, physicalGpu: false, thresholdMet: true },
+      measuredFps: 120,
+      minimumFps: 60,
+      rendererName: 'ANGLE (SwiftShader Device)',
+    },
+    {
+      expected: { certified: false, physicalGpu: false, thresholdMet: false },
+      measuredFps: 59.99,
+      minimumFps: 60,
+      rendererName: 'llvmpipe (LLVM 15.0.7)',
+    },
+    {
+      expected: { certified: true, physicalGpu: true, thresholdMet: true },
+      measuredFps: 60,
+      minimumFps: 60,
+      rendererName: 'ANGLE (NVIDIA GeForce RTX 4080)',
+    },
+    {
+      expected: { certified: false, physicalGpu: true, thresholdMet: false },
+      measuredFps: 59.99,
+      minimumFps: 60,
+      rendererName: 'ANGLE (NVIDIA GeForce RTX 4080)',
+    },
+  ];
+
+  for (const policyCase of policyCases) {
+    const actual = evaluatePerformancePolicy(
+      policyCase.measuredFps,
+      policyCase.minimumFps,
+      policyCase.rendererName,
+    );
+    assert(
+      JSON.stringify(actual) === JSON.stringify(policyCase.expected),
+      `Performance policy mismatch: ${JSON.stringify({ ...policyCase, actual })}`,
+    );
+  }
+}
+
+/** 前回runの既知artifactを完全削除し、空の出力directoryを作る。 */
+function resetOutputArtifacts() {
+  fs.rmSync(outputDirectory, { force: true, recursive: true });
+  fs.mkdirSync(outputDirectory, { recursive: true });
+}
+
+/** 現在runの状態をmanifestへ記録し、途中失敗を前回成功と区別可能にする。 */
+function writeRunManifest(status, error = null) {
+  fs.writeFileSync(
+    runManifestPath,
+    JSON.stringify({ error, recordedAt: new Date().toISOString(), status }, null, 2),
+  );
 }
 
 /** Vite開発サーバーが応答するまで最大30秒待つ。 */
@@ -115,6 +185,16 @@ function assertCameraPreset(telemetry, view) {
   );
 }
 
+/** steady renderer callsが車両7 batchと展示台・床2 drawの合計か検証する。 */
+function assertStableRendererCalls(telemetry) {
+  const expectedRendererCalls = telemetry.vehicleDrawCalls + 2;
+  assert(
+    telemetry.rendererCalls === expectedRendererCalls,
+    `Renderer calls do not match vehicle + showroom draws: ${JSON.stringify({ expectedRendererCalls, telemetry })}`,
+  );
+  return expectedRendererCalls;
+}
+
 /** 自動回転を止め、指定viewの決定的camera bookmarkを再適用する。 */
 async function setView(page, view) {
   await page.evaluate((nextView) => window.set_vehicle_lab_view(nextView), view);
@@ -159,6 +239,47 @@ async function readCanvasGeometry(page) {
   };
 }
 
+/** 2つのcamera position間の最大軸差分を返す。 */
+function calculateMaximumPositionDelta(first, second) {
+  return Math.max(...first.map((value, index) => Math.abs(value - second[index])));
+}
+
+/** zoom操作後のperspective cameraが時間経過しても静止することを検証する。 */
+async function verifyPerspectiveCameraStability(page, afterZoom, inputType) {
+  await page.waitForTimeout(600);
+  const afterWait = await readTelemetry(page);
+  const maximumPositionDelta = calculateMaximumPositionDelta(
+    afterZoom.cameraPosition,
+    afterWait.cameraPosition,
+  );
+  assert(afterZoom.view === 'perspective', `${inputType} zoom changed the initial perspective view`);
+  assert(afterWait.view === 'perspective', `${inputType} zoom wait changed the perspective view`);
+  assert(
+    maximumPositionDelta <= 0.02,
+    `${inputType} zoom did not stop auto-rotate: ${JSON.stringify({ afterWait, afterZoom, maximumPositionDelta })}`,
+  );
+  return { afterWait, afterZoom, maximumPositionDelta };
+}
+
+/** CDPで2本指を広げ、OrbitControlsのpinch zoomを発生させる。 */
+async function dispatchPinchZoom(client, centerX, centerY) {
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [
+      { x: centerX - 30, y: centerY },
+      { x: centerX + 30, y: centerY },
+    ],
+  });
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [
+      { x: centerX - 75, y: centerY },
+      { x: centerX + 75, y: centerY },
+    ],
+  });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+
 /** fixed view、aria状態、telemetry viewが一致することを確認する。 */
 async function assertFixedViewState(page, view) {
   const telemetry = await readTelemetry(page);
@@ -170,8 +291,20 @@ async function assertFixedViewState(page, view) {
 
 /** デスクトップの固定view維持、同一preset再適用、drag自由視点を実測する。 */
 async function verifyMouseControls(page) {
-  await setView(page, 'front');
   const { box, centerX, centerY } = await readCanvasGeometry(page);
+
+  const beforePerspectiveZoom = await readTelemetry(page);
+  assert(beforePerspectiveZoom.view === 'perspective', 'Mouse scenario did not start in perspective');
+  await page.mouse.move(centerX, centerY);
+  await page.mouse.wheel(0, -500);
+  const afterPerspectiveZoom = await waitForCameraChange(page, beforePerspectiveZoom, 'cameraZoom');
+  const perspectiveZoomStability = await verifyPerspectiveCameraStability(
+    page,
+    afterPerspectiveZoom,
+    'Mouse wheel',
+  );
+
+  await setView(page, 'front');
 
   const beforeZoom = await readTelemetry(page);
   await page.mouse.move(centerX, centerY);
@@ -193,32 +326,38 @@ async function verifyMouseControls(page) {
   );
   const resetPerspective = await setView(page, 'perspective');
 
-  return { afterOrbit, afterZoom, beforeOrbit, beforeZoom, fixedAfterZoom, resetPerspective, resetSameFixed };
+  return {
+    afterOrbit,
+    afterZoom,
+    beforeOrbit,
+    beforePerspectiveZoom,
+    beforeZoom,
+    fixedAfterZoom,
+    perspectiveZoomStability,
+    resetPerspective,
+    resetSameFixed,
+  };
 }
 
 /** タッチ端末の固定view維持、同一preset再適用、drag自由視点を実測する。 */
 async function verifyTouchControls(page) {
-  await setView(page, 'front');
   const { box, centerX, centerY } = await readCanvasGeometry(page);
   const client = await page.context().newCDPSession(page);
 
   try {
+    const beforePerspectiveZoom = await readTelemetry(page);
+    assert(beforePerspectiveZoom.view === 'perspective', 'Touch scenario did not start in perspective');
+    await dispatchPinchZoom(client, centerX, centerY);
+    const afterPerspectiveZoom = await waitForCameraChange(page, beforePerspectiveZoom, 'cameraZoom');
+    const perspectiveZoomStability = await verifyPerspectiveCameraStability(
+      page,
+      afterPerspectiveZoom,
+      'Touch pinch',
+    );
+
+    await setView(page, 'front');
     const beforeZoom = await readTelemetry(page);
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [
-        { x: centerX - 30, y: centerY },
-        { x: centerX + 30, y: centerY },
-      ],
-    });
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [
-        { x: centerX - 75, y: centerY },
-        { x: centerX + 75, y: centerY },
-      ],
-    });
-    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await dispatchPinchZoom(client, centerX, centerY);
     const afterZoom = await waitForCameraChange(page, beforeZoom, 'cameraZoom');
     const fixedAfterZoom = await assertFixedViewState(page, 'front');
 
@@ -241,7 +380,17 @@ async function verifyTouchControls(page) {
     );
     const resetPerspective = await setView(page, 'perspective');
 
-    return { afterOrbit, afterZoom, beforeOrbit, beforeZoom, fixedAfterZoom, resetPerspective, resetSameFixed };
+    return {
+      afterOrbit,
+      afterZoom,
+      beforeOrbit,
+      beforePerspectiveZoom,
+      beforeZoom,
+      fixedAfterZoom,
+      perspectiveZoomStability,
+      resetPerspective,
+      resetSameFixed,
+    };
   } finally {
     await client.detach();
   }
@@ -299,6 +448,7 @@ async function measureLayout(page) {
         bottom: groupRect.bottom,
         left: groupRect.left,
         right: groupRect.right,
+        role: buttonGroup.getAttribute('role'),
         top: groupRect.top,
       },
       buttons,
@@ -401,7 +551,6 @@ async function captureCameraEnvelope(page) {
 
 /** 代表viewportでlayout、操作、性能、model統計、画像を検証する。 */
 async function verifyVehicleLab() {
-  fs.mkdirSync(outputDirectory, { recursive: true });
   await waitForServer();
 
   const browser = await chromium.launch({ headless: true });
@@ -443,6 +592,7 @@ async function verifyVehicleLab() {
         layout.buttons.length === 4 && layout.buttons.every((button) => button.withinParent),
         `Direction buttons overflow at ${target.name}: ${JSON.stringify(layout.buttons)}`,
       );
+      assert(layout.buttonGroup.role === 'group', `Direction button group role is missing at ${target.name}`);
 
       const initialTelemetry = await readTelemetry(page);
       const rendererInfo = await readRendererInfo(page);
@@ -452,17 +602,24 @@ async function verifyVehicleLab() {
       assert(initialTelemetry.voxelCount === 640, `Expected 640 voxels: ${JSON.stringify(initialTelemetry)}`);
       assert(initialTelemetry.vehicleDrawCalls === 7, `Expected 7 vehicle draw calls: ${JSON.stringify(initialTelemetry)}`);
       assert(initialTelemetry.vehicleDrawCalls <= 10, `Vehicle draw call limit exceeded: ${JSON.stringify(initialTelemetry)}`);
+      const expectedStableRendererCalls = assertStableRendererCalls(initialTelemetry);
       assert(!loadedResources.some((resourceUrl) => /rapier/i.test(resourceUrl)), `Vehicle Lab loaded Rapier: ${loadedResources.join(' | ')}`);
 
       const performance = await measureRenderFps(page);
-      if (!meetsFrameRateTarget(performance.fps, target.minimumFps)) {
-        const message = `Frame rate below target at ${target.name}: ${performance.fps.toFixed(2)} < ${target.minimumFps}`;
-        const rendererName = rendererInfo.unmaskedRenderer ?? rendererInfo.renderer;
-        if (/swiftshader/i.test(rendererName)) {
-          environmentConcerns.push(`${message}; physical-GPU revalidation required (${rendererName})`);
-        } else {
-          verificationFailures.push(message);
-        }
+      const rendererName = rendererInfo.unmaskedRenderer ?? rendererInfo.renderer;
+      const { certified, physicalGpu, thresholdMet } = evaluatePerformancePolicy(
+        performance.fps,
+        target.minimumFps,
+        rendererName,
+      );
+      if (!physicalGpu) {
+        environmentConcerns.push(
+          `Software renderer cannot certify ${target.name} performance; thresholdMet=${thresholdMet}; physical-GPU revalidation required (${rendererName})`,
+        );
+      } else if (!thresholdMet) {
+        verificationFailures.push(
+          `Frame rate below target at ${target.name}: ${performance.fps.toFixed(2)} < ${target.minimumFps}`,
+        );
       }
 
       const controls = target.name === 'desktop'
@@ -471,20 +628,25 @@ async function verifyVehicleLab() {
       const fixedCaptures = await captureFixedViews(page, target.name);
       const cameraEnvelope = target.name === 'desktop' ? await captureCameraEnvelope(page) : null;
       const finalTelemetry = await readTelemetry(page);
+      assertStableRendererCalls(finalTelemetry);
 
       assert(errors.length === 0, `Browser errors at ${target.name}: ${errors.join(' | ')}`);
       results.push({
         cameraEnvelope,
+        certified,
         controls,
         errors,
+        expectedStableRendererCalls,
         finalTelemetry,
         fixedCaptures,
         initialTelemetry,
         layout,
         loadedResources,
         performance,
+        physicalGpu,
         rendererInfo,
         target,
+        thresholdMet,
       });
       await page.close();
     }
@@ -512,8 +674,9 @@ async function verifyVehicleLab() {
     },
     environmentConcerns,
     performancePolicy: {
-      physicalGpu: 'Fail when measured CPU-side rendered frame rate is below the viewport target.',
-      softwareRenderer: 'Record the miss as an environment concern; it does not certify the target and requires physical-GPU revalidation.',
+      certification: 'Certified only when physicalGpu and thresholdMet are both true.',
+      physicalGpu: 'Fail when a physical GPU misses the viewport target.',
+      softwareRenderer: 'Always record an environment concern and never certify, regardless of thresholdMet.',
       targets: Object.fromEntries(targets.map((target) => [target.name, target.minimumFps])),
     },
     results,
@@ -528,9 +691,23 @@ async function verifyVehicleLab() {
   }
 }
 
-verifyFrameRateBoundaryPolicy();
+/** artifact初期化から成功・失敗manifestまで1回の検証runとして管理する。 */
+async function runVehicleLabVerification() {
+  resetOutputArtifacts();
+  writeRunManifest('running');
+  try {
+    await verifyVehicleLab();
+    writeRunManifest('completed');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    writeRunManifest('failed', errorMessage);
+    throw error;
+  }
+}
+
+verifyPerformancePolicySelfCheck();
 if (process.argv.includes('--self-check')) {
-  console.log('Frame-rate boundary self-check passed: 4 cases');
+  console.log('Performance policy self-check passed: 8 cases');
 } else {
-  await verifyVehicleLab();
+  await runVehicleLabVerification();
 }

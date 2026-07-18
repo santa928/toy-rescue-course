@@ -15,6 +15,7 @@ interface VehicleShowroomProps {
   readonly autoRotate: boolean;
   readonly cameraPreset: VehicleLabCameraPreset | null;
   readonly onFreeOrbit: () => void;
+  readonly onInteractionStart: () => void;
 }
 
 interface OrbitAngles {
@@ -38,7 +39,12 @@ function calculateAzimuthDistance(first: number, second: number): number {
 }
 
 /** 固定方向ボタンとOrbitControlsを同じカメラへ同期する。 */
-function CameraRig({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomProps): ReactElement {
+function CameraRig({
+  autoRotate,
+  cameraPreset,
+  onFreeOrbit,
+  onInteractionStart,
+}: VehicleShowroomProps): ReactElement {
   const controlsRef = useRef<ComponentRef<typeof OrbitControls>>(null);
   const interactionStartRef = useRef<OrbitAngles | null>(null);
   const camera = useThree((state) => state.camera);
@@ -63,6 +69,7 @@ function CameraRig({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomPro
 
   /** 操作開始時のOrbitControls角度を、終了時の回転判定用に保持する。 */
   const trackInteractionStart = (): void => {
+    onInteractionStart();
     const controls = controlsRef.current;
     if (!controls) {
       return;
@@ -142,12 +149,22 @@ function StaticShadowMap(): null {
 }
 
 /** 純ボクセル消防車、展示台、照明、カメラ操作を構成する。 */
-export function VehicleShowroom({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomProps): ReactElement {
+export function VehicleShowroom({
+  autoRotate,
+  cameraPreset,
+  onFreeOrbit,
+  onInteractionStart,
+}: VehicleShowroomProps): ReactElement {
   return (
     <>
       <color attach="background" args={['#eee9e2']} />
       <OrthographicCamera makeDefault position={[6.5, 4.8, 8]} zoom={72} />
-      <CameraRig autoRotate={autoRotate} cameraPreset={cameraPreset} onFreeOrbit={onFreeOrbit} />
+      <CameraRig
+        autoRotate={autoRotate}
+        cameraPreset={cameraPreset}
+        onFreeOrbit={onFreeOrbit}
+        onInteractionStart={onInteractionStart}
+      />
       <RendererMetrics />
       <StaticShadowMap />
 
