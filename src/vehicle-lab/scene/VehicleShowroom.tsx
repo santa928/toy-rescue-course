@@ -6,11 +6,23 @@ import { VoxelFireTruck } from './VoxelFireTruck';
 
 export type VehicleLabView = 'perspective' | 'front' | 'left' | 'back' | 'right';
 
-interface VehicleShowroomProps {
-  readonly autoRotate: boolean;
-  readonly onFreeOrbit: () => void;
+export interface VehicleLabCameraPreset {
+  readonly requestId: number;
   readonly view: VehicleLabView;
 }
+
+interface VehicleShowroomProps {
+  readonly autoRotate: boolean;
+  readonly cameraPreset: VehicleLabCameraPreset | null;
+  readonly onFreeOrbit: () => void;
+}
+
+interface OrbitAngles {
+  readonly azimuth: number;
+  readonly polar: number;
+}
+
+const ORBIT_ANGLE_EPSILON = 0.001;
 
 const CAMERA_POSITIONS: Record<VehicleLabView, readonly [number, number, number]> = {
   perspective: [6.5, 4.8, 8],
@@ -20,21 +32,58 @@ const CAMERA_POSITIONS: Record<VehicleLabView, readonly [number, number, number]
   right: [10, 2.4, 0],
 };
 
+/** 2つの方位角の最短差分を0からπの範囲で返す。 */
+function calculateAzimuthDistance(first: number, second: number): number {
+  return Math.abs(Math.atan2(Math.sin(first - second), Math.cos(first - second)));
+}
+
 /** 固定方向ボタンとOrbitControlsを同じカメラへ同期する。 */
-function CameraRig({ autoRotate, onFreeOrbit, view }: VehicleShowroomProps): ReactElement {
+function CameraRig({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomProps): ReactElement {
   const controlsRef = useRef<ComponentRef<typeof OrbitControls>>(null);
+  const interactionStartRef = useRef<OrbitAngles | null>(null);
   const camera = useThree((state) => state.camera);
 
   useEffect(() => {
-    if (view === 'perspective') {
+    if (!cameraPreset) {
       return;
     }
-    const [x, y, z] = CAMERA_POSITIONS[view];
+    const [x, y, z] = CAMERA_POSITIONS[cameraPreset.view];
     camera.position.set(x, y, z);
     camera.lookAt(0, 0.85, 0);
     controlsRef.current?.target.set(0, 0.85, 0);
     controlsRef.current?.update();
-  }, [camera, view]);
+  }, [camera, cameraPreset]);
+
+  /** 操作開始時のOrbitControls角度を、終了時の回転判定用に保持する。 */
+  const trackInteractionStart = (): void => {
+    const controls = controlsRef.current;
+    if (!controls) {
+      return;
+    }
+    interactionStartRef.current = {
+      azimuth: controls.getAzimuthalAngle(),
+      polar: controls.getPolarAngle(),
+    };
+  };
+
+  /** 操作終了時に実際の回転だけを自由視点としてアプリへ通知する。 */
+  const detectCompletedOrbit = (): void => {
+    const controls = controlsRef.current;
+    const interactionStart = interactionStartRef.current;
+    interactionStartRef.current = null;
+    if (!controls || !interactionStart) {
+      return;
+    }
+
+    const azimuthDistance = calculateAzimuthDistance(
+      controls.getAzimuthalAngle(),
+      interactionStart.azimuth,
+    );
+    const polarDistance = Math.abs(controls.getPolarAngle() - interactionStart.polar);
+    if (azimuthDistance > ORBIT_ANGLE_EPSILON || polarDistance > ORBIT_ANGLE_EPSILON) {
+      onFreeOrbit();
+    }
+  };
 
   return (
     <OrbitControls
@@ -43,7 +92,8 @@ function CameraRig({ autoRotate, onFreeOrbit, view }: VehicleShowroomProps): Rea
       enablePan={false}
       maxZoom={110}
       minZoom={45}
-      onStart={onFreeOrbit}
+      onEnd={detectCompletedOrbit}
+      onStart={trackInteractionStart}
       ref={controlsRef}
       target={[0, 0.85, 0]}
     />
@@ -69,12 +119,12 @@ function RendererMetrics(): null {
 }
 
 /** 純ボクセル消防車、展示台、照明、カメラ操作を構成する。 */
-export function VehicleShowroom({ autoRotate, onFreeOrbit, view }: VehicleShowroomProps): ReactElement {
+export function VehicleShowroom({ autoRotate, cameraPreset, onFreeOrbit }: VehicleShowroomProps): ReactElement {
   return (
     <>
       <color attach="background" args={['#eee9e2']} />
       <OrthographicCamera makeDefault position={[6.5, 4.8, 8]} zoom={72} />
-      <CameraRig autoRotate={autoRotate} onFreeOrbit={onFreeOrbit} view={view} />
+      <CameraRig autoRotate={autoRotate} cameraPreset={cameraPreset} onFreeOrbit={onFreeOrbit} />
       <RendererMetrics />
 
       <ambientLight intensity={1.35} />

@@ -1,9 +1,10 @@
-import { Component, useCallback, useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useRef, useState } from 'react';
 import type { ErrorInfo, ReactElement, ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { FIRE_TRUCK_RENDER_PLAN } from './scene/VoxelFireTruck';
 import {
   VehicleShowroom,
+  type VehicleLabCameraPreset,
   type VehicleLabView,
 } from './scene/VehicleShowroom';
 
@@ -46,16 +47,30 @@ class VehicleLabErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
 export function VehicleLabApp(): ReactElement {
   const [autoRotate, setAutoRotate] = useState(true);
   const [view, setView] = useState<VehicleLabView>('perspective');
+  const [cameraPreset, setCameraPreset] = useState<VehicleLabCameraPreset | null>(null);
+  const cameraPresetRequestId = useRef(0);
+
+  /** UIまたは公開APIからのpreset要求を、同一viewでも必ずカメラへ適用する。 */
+  const applyCameraPreset = useCallback((nextView: VehicleLabView) => {
+    setAutoRotate(false);
+    setView(nextView);
+    cameraPresetRequestId.current += 1;
+    setCameraPreset({ requestId: cameraPresetRequestId.current, view: nextView });
+  }, []);
+
+  /** 実回転後のカメラを維持したまま、UIとtelemetryを自由視点へ切り替える。 */
   const handleFreeOrbit = useCallback(() => {
     setAutoRotate(false);
     setView('perspective');
+    setCameraPreset(null);
   }, []);
 
+  /** 固定方向ボタンの要求をカメラpresetとして適用する。 */
   const selectFixedView = useCallback((nextView: Exclude<VehicleLabView, 'perspective'>) => {
-    setAutoRotate(false);
-    setView(nextView);
-  }, []);
+    applyCameraPreset(nextView);
+  }, [applyCameraPreset]);
 
+  /** window APIをマウント中に一度だけ登録し、telemetryの実測値を保持する。 */
   useEffect(() => {
     window.__vehicleLabTelemetry = {
       cameraPosition: [6.5, 4.8, 8],
@@ -63,20 +78,26 @@ export function VehicleLabApp(): ReactElement {
       renderedFrames: 0,
       rendererCalls: 0,
       vehicleDrawCalls: FIRE_TRUCK_RENDER_PLAN.drawCalls,
-      view,
+      view: 'perspective',
       voxelCount: FIRE_TRUCK_RENDER_PLAN.voxelCount,
     };
     window.render_vehicle_lab_to_text = () => JSON.stringify(window.__vehicleLabTelemetry);
-    window.set_vehicle_lab_view = (nextView: VehicleLabView) => {
-      setAutoRotate(false);
-      setView(nextView);
-    };
+    window.set_vehicle_lab_view = applyCameraPreset;
 
     return () => {
       delete window.__vehicleLabTelemetry;
       delete window.render_vehicle_lab_to_text;
       delete window.set_vehicle_lab_view;
     };
+  }, [applyCameraPreset]);
+
+  /** viewだけを更新し、rendererが蓄積したテレメトリー値を維持する。 */
+  useEffect(() => {
+    const telemetry = window.__vehicleLabTelemetry;
+    if (!telemetry) {
+      return;
+    }
+    window.__vehicleLabTelemetry = { ...telemetry, view };
   }, [view]);
 
   return (
@@ -97,7 +118,11 @@ export function VehicleLabApp(): ReactElement {
             gl={{ antialias: true, powerPreference: 'high-performance' }}
             shadows
           >
-            <VehicleShowroom autoRotate={autoRotate} onFreeOrbit={handleFreeOrbit} view={view} />
+            <VehicleShowroom
+              autoRotate={autoRotate}
+              cameraPreset={cameraPreset}
+              onFreeOrbit={handleFreeOrbit}
+            />
           </Canvas>
         </VehicleLabErrorBoundary>
       </section>
