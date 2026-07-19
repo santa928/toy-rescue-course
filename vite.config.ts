@@ -12,6 +12,7 @@ export default defineConfig({
       input: {
         game: resolve(process.cwd(), 'index.html'),
         vehicleLab: resolve(process.cwd(), 'vehicle-lab.html'),
+        voxelGame: resolve(process.cwd(), 'voxel-game.html'),
       },
     },
   },

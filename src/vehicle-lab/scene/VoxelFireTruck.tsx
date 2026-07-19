@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
+import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   FIRE_TRUCK_PALETTE,
@@ -27,6 +28,8 @@ export const FIRE_TRUCK_RENDER_PLAN = createVoxelRenderPlan(
 interface VoxelBatchProps {
   readonly batch: VoxelRenderBatch<FireTruckPaletteId>;
 }
+
+type VoxelFireTruckProps = ThreeElements['group'];
 
 /** 同色ボクセルを1つのInstancedMeshとして描画する。 */
 function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
@@ -66,14 +69,16 @@ function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
 }
 
 /** 純ボクセル消防車を色別instanceバッチで描画する。 */
-export function VoxelFireTruck(): ReactElement {
+export function VoxelFireTruck(props: VoxelFireTruckProps): ReactElement {
   assertValidVoxelModel(FIRE_TRUCK_VOXELS, FIRE_TRUCK_PALETTE_IDS);
 
   return (
-    <group position={FIRE_TRUCK_RENDER_PLAN.offset}>
-      {FIRE_TRUCK_RENDER_PLAN.batches.map((batch) => (
-        <VoxelBatch batch={batch} key={batch.paletteId} />
-      ))}
+    <group {...props}>
+      <group position={FIRE_TRUCK_RENDER_PLAN.offset}>
+        {FIRE_TRUCK_RENDER_PLAN.batches.map((batch) => (
+          <VoxelBatch batch={batch} key={batch.paletteId} />
+        ))}
+      </group>
     </group>
   );
 }

@@ -1,0 +1,41 @@
+:root {
+  color: #2b2119;
+  background: #d7b07a;
+  font-family: system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.voxel-game-shell,
+.voxel-game-canvas {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.voxel-game-shell {
+  background: #d7b07a;
+}
+
+.voxel-game-canvas {
+  position: relative;
+}
+
+.voxel-game-canvas canvas {
+  display: block;
+  touch-action: none;
+}
