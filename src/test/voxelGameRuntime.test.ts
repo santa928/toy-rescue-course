@@ -22,6 +22,15 @@ describe('VoxelGameRuntime', () => {
     expect(runtime.getSnapshot()).toMatchObject({ fireIntensity: 0, missionPhase: 'celebrating' });
   });
 
+  it('小数msに分割した有効放水が合計2500msなら消火する', () => {
+    const runtime = new VoxelGameRuntime(['plaza-red']);
+    runtime.setSignals({ sprayActive: true, sprayOnFire: true });
+
+    for (let step = 0; step < 25_000; step += 1) runtime.advance(0.1);
+
+    expect(runtime.getSnapshot()).toMatchObject({ fireIntensity: 0, missionPhase: 'celebrating' });
+  });
+
   it('火の範囲外へ放水しても強さを減らさない', () => {
     const runtime = new VoxelGameRuntime(['plaza-red']);
     runtime.setSignals({ sprayActive: true, sprayOnFire: false });

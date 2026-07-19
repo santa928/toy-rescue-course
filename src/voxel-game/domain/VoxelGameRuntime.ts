@@ -34,6 +34,7 @@ const EXTINGUISH_DURATION_MS = 2_500;
 const CELEBRATION_DURATION_MS = 1_800;
 const RESPAWN_DURATION_MS = 5_000;
 const BREAK_IMPACT_THRESHOLD = 4;
+const TIME_EPSILON_MS = 1e-6;
 
 /** 消火ミッションと壊せる積み木を固定stepで進めるframework非依存runtime。 */
 export class VoxelGameRuntime {
@@ -70,7 +71,7 @@ export class VoxelGameRuntime {
 
   /** runtimeを指定ミリ秒だけ決定的に進める。 */
   public advance(milliseconds: number): void {
-    const deltaMs = Math.max(0, milliseconds);
+    const deltaMs = Number.isFinite(milliseconds) ? Math.max(0, milliseconds) : 0;
     let extinguishedThisStep = false;
     this.elapsedMs += deltaMs;
 
@@ -78,6 +79,7 @@ export class VoxelGameRuntime {
       this.missionPhase = 'active';
       if (this.signals.sprayOnFire) {
         this.extinguishRemainingMs = Math.max(0, this.extinguishRemainingMs - deltaMs);
+        if (this.extinguishRemainingMs <= TIME_EPSILON_MS) this.extinguishRemainingMs = 0;
         if (this.extinguishRemainingMs === 0) {
           this.missionPhase = 'celebrating';
           this.celebrationRemainingMs = CELEBRATION_DURATION_MS;
