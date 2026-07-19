@@ -55,7 +55,14 @@ export interface BreakableBlockTelemetry {
   readonly vehicleImpactCount: number;
 }
 
+export interface ActiveBreakableFragmentTelemetry {
+  readonly id: string;
+  readonly position: readonly [number, number, number];
+  readonly scale: readonly [number, number, number];
+}
+
 export interface BreakableTelemetry {
+  readonly activeFragments: readonly ActiveBreakableFragmentTelemetry[];
   readonly activeFragmentCount: number;
   readonly blocks: readonly BreakableBlockTelemetry[];
   readonly bodyHandles: readonly number[];
@@ -161,12 +168,12 @@ const ZERO_VELOCITY = { x: 0, y: 0, z: 0 } as const;
 const IDENTITY_ROTATION = { w: 1, x: 0, y: 0, z: 0 } as const;
 
 const FRAGMENT_TEMPLATES = [
-  { localPosition: [0.32, 0.26, 0] as const, velocity: [3.2, 1.6, 0] as const },
-  { localPosition: [0.12, 0.18, 0.28] as const, velocity: [2.7, 1.8, 0.8] as const },
-  { localPosition: [0.12, 0.42, 0] as const, velocity: [2.4, 2.8, 0] as const },
-  { localPosition: [0.12, 0.12, 0.36] as const, velocity: [2.7, 1.8, 1.8] as const },
-  { localPosition: [0.12, 0.12, -0.36] as const, velocity: [2.7, 1.8, -1.8] as const },
-  { localPosition: [0.28, -0.18, -0.2] as const, velocity: [2.1, 2.6, -0.8] as const },
+  { localPosition: [0.2, 0.87, -0.1] as const, velocity: [0.05, 0.2, 0] as const },
+  { localPosition: [0.2, 1.67, -0.7] as const, velocity: [0.06, 0.25, 0.15] as const },
+  { localPosition: [0.2, 1.27, -2.1] as const, velocity: [0.07, 0.3, -0.15] as const },
+  { localPosition: [0.8, 1.27, -2.7] as const, velocity: [0.08, 0.35, -0.2] as const },
+  { localPosition: [0.2, 2.07, -2.9] as const, velocity: [0.09, 0.4, -0.25] as const },
+  { localPosition: [2.6, 0.07, -2.5] as const, velocity: [0.1, 0.45, -0.3] as const },
 ] as const;
 
 /** block定義ごとに専用6片を割り当て、再生成しない固定pool定義を返す。 */
@@ -438,6 +445,18 @@ export function BreakableBlockPlaza({
   const refreshTelemetry = useCallback((): void => {
     const fragmentSlots = runtimeSlotsRef.current;
     const actualPool = createActualFragmentPoolSnapshot(fragmentSlots);
+    const activeFragments = fragmentSlots.flatMap((runtimeSlot, slotIndex) => {
+      const definition = BREAKABLE_FRAGMENT_POOL[slotIndex];
+      const body = runtimeSlot.body;
+      if (!definition || !body?.isEnabled() || !runtimeSlot.collider?.isEnabled()
+        || !runtimeSlot.mesh?.visible) return [];
+      const position = body.translation();
+      return [{
+        id: definition.id,
+        position: [position.x, position.y, position.z] as const,
+        scale: definition.scale,
+      }];
+    });
     const runtimeSnapshot = runtime.getSnapshot();
     const blocks = BREAKABLE_BLOCKS.map((block, blockIndex) => {
       const slotIndices = BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[blockIndex] ?? [];
@@ -468,6 +487,7 @@ export function BreakableBlockPlaza({
     });
 
     breakableTelemetryRef.current = {
+      activeFragments,
       activeFragmentCount: actualPool.activeFragmentCount,
       blocks,
       bodyHandles: actualPool.bodyHandles,

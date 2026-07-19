@@ -37,6 +37,7 @@ export function VoxelGameApp(): ReactElement {
   const controls = useVoxelGameControls();
   const breakablePoolHandleRef = useRef<BreakablePoolHandle>(null);
   const breakableTelemetryRef = useRef<BreakableTelemetry>({
+    activeFragments: [],
     activeFragmentCount: 0,
     blocks: BREAKABLE_BLOCKS.map(({ id }, blockIndex) => ({
       bodyHandles: [],

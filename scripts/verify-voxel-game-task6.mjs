@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import * as THREE from 'three';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/voxel-game';
@@ -41,6 +42,127 @@ async function readGameStateAfterMacrotask(page) {
   }));
   if (!rendered) throw new Error('Voxel Game text state is unavailable after macrotask.');
   return JSON.parse(rendered);
+}
+
+/** Task 5と同じ実camera telemetryでworld-space cubeをscreen-space矩形へ投影する。 */
+function projectWorldCubeToScreenRect(cameraTelemetry, cube) {
+  assert(cameraTelemetry?.position && cameraTelemetry?.lookTarget && cameraTelemetry?.viewport,
+    `Camera telemetry is unavailable: ${JSON.stringify(cameraTelemetry)}`);
+  const { height, width } = cameraTelemetry.viewport;
+  const camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2);
+  camera.position.fromArray(cameraTelemetry.position);
+  camera.zoom = cameraTelemetry.zoom;
+  camera.lookAt(new THREE.Vector3(...cameraTelemetry.lookTarget));
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+
+  const rect = {
+    bottom: Number.NEGATIVE_INFINITY,
+    left: Number.POSITIVE_INFINITY,
+    right: Number.NEGATIVE_INFINITY,
+    top: Number.POSITIVE_INFINITY,
+  };
+  const corner = new THREE.Vector3();
+  for (const xSign of [-1, 1]) {
+    for (const ySign of [-1, 1]) {
+      for (const zSign of [-1, 1]) {
+        corner.set(
+          cube.position[0] + (cube.scale[0] / 2) * xSign,
+          cube.position[1] + (cube.scale[1] / 2) * ySign,
+          cube.position[2] + (cube.scale[2] / 2) * zSign,
+        ).project(camera);
+        const x = (corner.x + 1) * width / 2;
+        const y = (1 - corner.y) * height / 2;
+        rect.left = Math.min(rect.left, x);
+        rect.right = Math.max(rect.right, x);
+        rect.top = Math.min(rect.top, y);
+        rect.bottom = Math.max(rect.bottom, y);
+      }
+    }
+  }
+  return { ...rect, height: rect.bottom - rect.top, width: rect.right - rect.left };
+}
+
+/** 2矩形が重なると0、離れていれば最短screen-space距離を返す。 */
+function getScreenRectDistance(first, second) {
+  const horizontalGap = Math.max(first.left - second.right, second.left - first.right, 0);
+  const verticalGap = Math.max(first.top - second.bottom, second.top - first.bottom, 0);
+  return Math.hypot(horizontalGap, verticalGap);
+}
+
+/** actual body位置から6片の画面分離、他block距離、viewport内包、内側方向を測る。 */
+function measureFragmentVisualSeparation(state) {
+  const fragments = state.breakables.activeFragments
+    ?.filter(({ id }) => id.startsWith('plaza-red:'));
+  if (!Array.isArray(fragments) || fragments.length !== 6) {
+    return { ready: false, reason: `Expected six actual active fragment positions: ${JSON.stringify(fragments)}` };
+  }
+  const fragmentRects = fragments.map((fragment) => projectWorldCubeToScreenRect(state.camera, fragment));
+  const fragmentGaps = [];
+  for (let first = 0; first < fragmentRects.length; first += 1) {
+    for (let second = first + 1; second < fragmentRects.length; second += 1) {
+      fragmentGaps.push(getScreenRectDistance(fragmentRects[first], fragmentRects[second]));
+    }
+  }
+  const intactRects = state.landmarks.breakableBlocks
+    .filter(({ id }) => id !== 'plaza-red')
+    .map(({ position }) => projectWorldCubeToScreenRect(state.camera, {
+      position,
+      scale: [1.5, 1.5, 1.5],
+    }));
+  const intactGaps = fragmentRects.flatMap((fragmentRect) => (
+    intactRects.map((intactRect) => getScreenRectDistance(fragmentRect, intactRect))
+  ));
+  const bounds = {
+    bottom: Math.max(...fragmentRects.map(({ bottom }) => bottom)),
+    left: Math.min(...fragmentRects.map(({ left }) => left)),
+    right: Math.max(...fragmentRects.map(({ right }) => right)),
+    top: Math.min(...fragmentRects.map(({ top }) => top)),
+  };
+  const minFragmentGap = Math.min(...fragmentGaps);
+  const minIntactGap = Math.min(...intactGaps);
+  const minWorldX = Math.min(...fragments.map(({ position }) => position[0]));
+  const otherBlockPhases = state.runtime.blocks
+    .filter(({ id }) => id !== 'plaza-red')
+    .map(({ id, phase }) => ({ id, phase }));
+  const otherBlockImpacts = state.breakables.blocks
+    .filter(({ id }) => id !== 'plaza-red')
+    .map(({ id, impactCount }) => ({ id, impactCount }));
+  const otherBlocksUntouched = otherBlockPhases.every(({ phase }) => phase === 'intact')
+    && otherBlockImpacts.every(({ impactCount }) => impactCount === 0);
+  const viewport = state.camera.viewport;
+  const allInsideViewport = bounds.left >= 0 && bounds.top >= 0
+    && bounds.right <= viewport.width && bounds.bottom <= viewport.height;
+  return {
+    allInsideViewport,
+    bounds,
+    camera: state.camera,
+    fragmentRects,
+    minFragmentGap,
+    minIntactGap,
+    minWorldX,
+    otherBlockImpacts,
+    otherBlockPhases,
+    otherBlocksUntouched,
+    positions: fragments.map(({ id, position }) => ({ id, position })),
+    ready: allInsideViewport && minFragmentGap >= 2 && minIntactGap >= 2
+      && minWorldX > -12.95 && otherBlocksUntouched,
+  };
+}
+
+/** 1.2秒の表示窓内で、actual 6片すべてが視覚分離する最初のframeを返す。 */
+async function waitForFragmentVisualSeparation(page) {
+  let latestMeasurement = { ready: false, reason: 'No fragment frame observed.' };
+  for (let frame = 0; frame < 65; frame += 1) {
+    await waitForFrames(page, 1);
+    const state = await readGameState(page);
+    const activeRedFragments = state.breakables.activeFragments
+      ?.filter(({ id }) => id.startsWith('plaza-red:'));
+    if (activeRedFragments?.length !== 6) continue;
+    latestMeasurement = measureFragmentVisualSeparation(state);
+    if (latestMeasurement.ready) return { measurement: latestMeasurement, state };
+  }
+  throw new Error(`Six fragments never became visually separated: ${JSON.stringify(latestMeasurement)}`);
 }
 
 /** scene ready、公開hook、24-slot pool準備まで待つ。 */
@@ -390,8 +512,8 @@ try {
     await waitForFrames(chainPage, 2);
     await driveToRedBlockApproach(chainPage);
     const rebroken = await collideAtEffectiveSpeed(chainPage);
-    await waitForFrames(chainPage, 1);
-    const rebrokenRendered = await readGameState(chainPage);
+    const visualSeparation = await waitForFragmentVisualSeparation(chainPage);
+    const rebrokenRendered = visualSeparation.state;
     const rebrokenRed = rebrokenRendered.breakables.blocks.find(({ id }) => id === 'plaza-red');
     assert.equal(rebrokenRed?.fragmentVisibleCount, 6, 'Re-break did not reactivate six slots.');
     assert.deepEqual(rebrokenRed?.slotIds, originalSlotIds, 'Re-break replaced fragment slot identities.');
@@ -420,6 +542,7 @@ try {
       restored: restored.runtime.blocks.find(({ id }) => id === 'plaza-red'),
       reusedSlotIds: rebrokenRed.slotIds,
       rebroken: rebroken.runtime.blocks.find(({ id }) => id === 'plaza-red'),
+      visualProjection: visualSeparation.measurement,
     };
   } finally {
     await chainPage.keyboard.up('KeyW').catch(() => undefined);
