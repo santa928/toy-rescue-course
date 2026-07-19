@@ -23,6 +23,12 @@ export interface VoxelGameSnapshot {
   readonly signals: VoxelGameSignals;
 }
 
+export type VoxelGameSnapshotListener = (snapshot: VoxelGameSnapshot) => void;
+
+export interface ManualClockFlag {
+  current: boolean;
+}
+
 interface MutableBreakableState {
   clear: boolean;
   id: string;
@@ -35,10 +41,33 @@ const CELEBRATION_DURATION_MS = 1_800;
 const RESPAWN_DURATION_MS = 5_000;
 const BREAK_IMPACT_THRESHOLD = 4;
 const TIME_EPSILON_MS = 1e-6;
+const FIXED_STEP_MS = 1_000 / 60;
 
 /** 残り時間を0以上へ正規化し、丸め誤差として無視できる値を0にする。 */
 function normalizeRemainingMilliseconds(value: number): number {
   return value <= TIME_EPSILON_MS ? 0 : value;
+}
+
+/** 正の有限時間を60Hz固定stepと最後の余りへ分け、合計時間を変えずに進める。 */
+export function advanceInFixedSteps(
+  milliseconds: number,
+  advance: (deltaMs: number) => void,
+): void {
+  const totalMs = Number.isFinite(milliseconds) ? Math.max(0, milliseconds) : 0;
+  if (totalMs === 0) return;
+
+  const fullStepCount = Math.floor(totalMs / FIXED_STEP_MS);
+  for (let step = 0; step < fullStepCount; step += 1) advance(FIXED_STEP_MS);
+
+  const remainderMs = normalizeRemainingMilliseconds(totalMs - fullStepCount * FIXED_STEP_MS);
+  if (remainderMs > 0) advance(remainderMs);
+}
+
+/** Reactへ公開する低頻度snapshot項目だけを比較できる署名へ変換する。 */
+function createObservableSignature(snapshot: VoxelGameSnapshot): string {
+  return `${snapshot.missionPhase}:${snapshot.fireIntensity}:${snapshot.blocks
+    .map(({ id, phase }) => `${id}=${phase}`)
+    .join(',')}`;
 }
 
 /** 消火ミッションと壊せる積み木を固定stepで進めるframework非依存runtime。 */
@@ -49,10 +78,22 @@ export class VoxelGameRuntime {
   private extinguishRemainingMs = EXTINGUISH_DURATION_MS;
   private missionPhase: MissionPhase = 'assigned';
   private signals: VoxelGameSignals = { atGarage: false, sprayActive: false, sprayOnFire: false };
+  private readonly listeners = new Set<VoxelGameSnapshotListener>();
+  private observableSignature: string;
 
   /** @param blockIds 壊せる積み木として管理する一意な識別子の一覧。 */
   public constructor(blockIds: readonly string[]) {
     this.blocks = blockIds.map((id) => ({ clear: true, id, phase: 'intact', respawnRemainingMs: 0 }));
+    this.observableSignature = createObservableSignature(this.getSnapshot());
+  }
+
+  /** mission・火・block phaseの変化通知を購読し、戻り値で安全に解除する。 */
+  public subscribe(listener: VoxelGameSnapshotListener): () => void {
+    if (this.listeners.size === 0) {
+      this.observableSignature = createObservableSignature(this.getSnapshot());
+    }
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** 入力・空間判定から得た現在signalを部分更新する。 */
@@ -104,6 +145,8 @@ export class VoxelGameRuntime {
       block.respawnRemainingMs = normalizeRemainingMilliseconds(block.respawnRemainingMs - deltaMs);
       if (block.respawnRemainingMs === 0 && block.clear) block.phase = 'intact';
     }
+
+    this.publishObservableChanges();
   }
 
   /** 消火仕事だけを初期状態へ戻す。 */
@@ -126,4 +169,26 @@ export class VoxelGameRuntime {
       signals: { ...this.signals },
     };
   }
+
+  /** 高頻度timerを除く公開項目が変わったときだけ現在snapshotを通知する。 */
+  private publishObservableChanges(): void {
+    const snapshot = this.getSnapshot();
+    const nextSignature = createObservableSignature(snapshot);
+    if (nextSignature === this.observableSignature) return;
+    this.observableSignature = nextSignature;
+    for (const listener of this.listeners) listener(snapshot);
+  }
+}
+
+/** 手動clock直後の1frameをskipし、それ以外の通常deltaを最大50msで進める。 */
+export function advanceRuntimeFrame(
+  runtime: VoxelGameRuntime,
+  manualClockFlag: ManualClockFlag,
+  deltaSeconds: number,
+): void {
+  if (manualClockFlag.current) {
+    manualClockFlag.current = false;
+    return;
+  }
+  runtime.advance(Math.min(deltaSeconds, 0.05) * 1_000);
 }

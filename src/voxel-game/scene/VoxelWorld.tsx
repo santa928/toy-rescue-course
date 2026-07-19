@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import * as THREE from 'three';
-import { BREAKABLE_BLOCKS, FIRE_POSITION, PARK_CENTER } from './worldLayout';
+import { BREAKABLE_BLOCKS, PARK_CENTER } from './worldLayout';
 
 interface BoxInstance {
   readonly position: readonly [number, number, number];
@@ -124,7 +124,7 @@ function VoxelGarage(): ReactElement {
   );
 }
 
-/** 北東に木壁、窓、直方体の炎を持つ火災建物を描画する。 */
+/** 北東に木壁と窓を持つ火災建物を描画する。 */
 function VoxelFireBuilding(): ReactElement {
   return (
     <group>
@@ -144,20 +144,6 @@ function VoxelFireBuilding(): ReactElement {
         <boxGeometry args={[1.5, 1.5, 0.18]} />
         <meshLambertMaterial color="#7ed1e6" />
       </mesh>
-      <group position={[FIRE_POSITION[0] - 1, 0, FIRE_POSITION[2] + 1]}>
-        <mesh position={[-0.6, 4.45, 0]}>
-          <boxGeometry args={[1.2, 1.6, 1.2]} />
-          <meshLambertMaterial color="#ef4c23" />
-        </mesh>
-        <mesh position={[0.55, 4.65, 0.2]}>
-          <boxGeometry args={[1.1, 2, 1.1]} />
-          <meshLambertMaterial color="#f47c20" />
-        </mesh>
-        <mesh position={[0.55, 5.65, 0.2]}>
-          <boxGeometry args={[0.65, 0.8, 0.65]} />
-          <meshLambertMaterial color="#ffd23f" />
-        </mesh>
-      </group>
     </group>
   );
 }

@@ -39,3 +39,22 @@ body,
   display: block;
   touch-action: none;
 }
+
+.voxel-game-success {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 2;
+  margin: 0;
+  padding: 10px 20px;
+  border: 4px solid #8f421f;
+  border-radius: 12px;
+  color: #7f321d;
+  background: #fff8dc;
+  box-shadow: 0 5px 0 #d49d16;
+  font-size: clamp(1.45rem, 4vw, 2.5rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
