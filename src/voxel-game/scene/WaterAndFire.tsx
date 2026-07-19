@@ -8,7 +8,7 @@ import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetry, VehicleTelemetryRef } from './VehicleController';
 import { FIRE_POSITION } from './worldLayout';
 
-interface VoxelBox {
+export interface VoxelBox {
   readonly position: readonly [number, number, number];
   readonly scale: readonly [number, number, number];
 }
@@ -46,7 +46,7 @@ interface MissionVisualState {
 const NOZZLE_FORWARD_OFFSET = 1.7;
 const NOZZLE_HEIGHT = 2.15;
 const WATER_CUBE_COUNT = 18;
-const WATER_TARGET_STOP_OFFSET = 1.2;
+const WATER_TARGET_STOP_OFFSET = 1.9;
 const WATER_CUBE_SCALE = new THREE.Vector3(0.18, 0.18, 0.18);
 const WATER_BLUE_INDICES = Array.from({ length: WATER_CUBE_COUNT }, (_, index) => index)
   .filter((index) => index % 3 !== 2);
@@ -65,14 +65,20 @@ const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map((position) => ({
 }));
 
 export const FIRE_LAYER_POSITIONS: readonly (readonly [number, number, number])[] = [
-  [12.9, 0.75, -9.8],
-  [12.95, 1.5, -9.72],
-  [12.9, 2.15, -9.8],
+  [12.9, 0.75, -9.1],
+  [12.95, 1.5, -9.02],
+  [12.9, 2.15, -9.1],
+];
+
+export const FIRE_LAYER_BOXES: readonly VoxelBox[] = [
+  { position: FIRE_LAYER_POSITIONS[0], scale: [1.15, 1.15, 1.15] },
+  { position: FIRE_LAYER_POSITIONS[1], scale: [0.92, 1.25, 0.92] },
+  { position: FIRE_LAYER_POSITIONS[2], scale: [0.68, 1.12, 0.68] },
 ];
 
 export const CELEBRATION_STAR_CENTERS: readonly (readonly [number, number, number])[] = [
   [10.8, 1, -4], [8.5, 1.2, -4.4], [17, 1, -4.8],
-  [10, 1.8, -5.2], [15.5, 1.9, -5.6], [14.8, 1.7, -6],
+  [10, 1.8, -5.2], [17.25, 3, -8], [14.8, 1.7, -6],
 ];
 
 /** 5つのcubeで十字型の星を作る。 */
@@ -86,8 +92,10 @@ function createStarBoxes(centers: readonly (readonly [number, number, number])[]
   ] as VoxelBox[]);
 }
 
-const YELLOW_STAR_BOXES = createStarBoxes(CELEBRATION_STAR_CENTERS.filter((_, index) => index % 2 === 0));
-const WHITE_STAR_BOXES = createStarBoxes(CELEBRATION_STAR_CENTERS.filter((_, index) => index % 2 === 1));
+export const CELEBRATION_STAR_GROUPS: readonly (readonly VoxelBox[])[] = CELEBRATION_STAR_CENTERS
+  .map((center) => createStarBoxes([center]));
+const YELLOW_STAR_BOXES = CELEBRATION_STAR_GROUPS.filter((_, index) => index % 2 === 0).flat();
+const WHITE_STAR_BOXES = CELEBRATION_STAR_GROUPS.filter((_, index) => index % 2 === 1).flat();
 
 /** 同色の静的cubeを1つのInstancedMeshへまとめる。 */
 function StaticVoxelBatch({ boxes, color, emissive }: StaticVoxelBatchProps): ReactElement {
@@ -232,20 +240,20 @@ export function WaterAndFire({
   return (
     <group>
       {visualState.fireLayerCount >= 1 ? (
-        <mesh position={FIRE_LAYER_POSITIONS[0]}>
-          <boxGeometry args={[1.15, 1.15, 1.15]} />
+        <mesh position={FIRE_LAYER_BOXES[0].position}>
+          <boxGeometry args={FIRE_LAYER_BOXES[0].scale} />
           <meshLambertMaterial color="#ffd23f" emissive="#ef7d22" emissiveIntensity={0.48} />
         </mesh>
       ) : null}
       {visualState.fireLayerCount >= 2 ? (
-        <mesh position={FIRE_LAYER_POSITIONS[1]}>
-          <boxGeometry args={[0.92, 1.25, 0.92]} />
+        <mesh position={FIRE_LAYER_BOXES[1].position}>
+          <boxGeometry args={FIRE_LAYER_BOXES[1].scale} />
           <meshLambertMaterial color="#f47c20" emissive="#ef4c23" emissiveIntensity={0.42} />
         </mesh>
       ) : null}
       {visualState.fireLayerCount >= 3 ? (
-        <mesh position={FIRE_LAYER_POSITIONS[2]}>
-          <boxGeometry args={[0.68, 1.12, 0.68]} />
+        <mesh position={FIRE_LAYER_BOXES[2].position}>
+          <boxGeometry args={FIRE_LAYER_BOXES[2].scale} />
           <meshLambertMaterial color="#ef4c23" emissive="#f47c20" emissiveIntensity={0.38} />
         </mesh>
       ) : null}

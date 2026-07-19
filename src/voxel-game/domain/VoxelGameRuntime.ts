@@ -180,6 +180,17 @@ export class VoxelGameRuntime {
   }
 }
 
+/** 正の有限時間だけを同期加算し、直後の通常frame skipを予約する。 */
+export function advanceManualClock(
+  runtime: VoxelGameRuntime,
+  manualClockFlag: ManualClockFlag,
+  milliseconds: number,
+): void {
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return;
+  manualClockFlag.current = true;
+  advanceInFixedSteps(milliseconds, (deltaMs) => runtime.advance(deltaMs));
+}
+
 /** 手動clock直後の1frameをskipし、それ以外の通常deltaを最大50msで進める。 */
 export function advanceRuntimeFrame(
   runtime: VoxelGameRuntime,

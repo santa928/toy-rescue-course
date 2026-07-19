@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { advanceInFixedSteps, VoxelGameRuntime } from './domain/VoxelGameRuntime';
+import { advanceManualClock, VoxelGameRuntime } from './domain/VoxelGameRuntime';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
 import { VoxelGameScene } from './scene/VoxelGameScene';
 import type {
   VehicleControllerHandle,
   VehicleTelemetry,
 } from './scene/VehicleController';
-import { getFireLayerCount, type MissionTelemetry } from './scene/WaterAndFire';
+import {
+  CELEBRATION_STAR_GROUPS,
+  FIRE_LAYER_BOXES,
+  getFireLayerCount,
+  type MissionTelemetry,
+} from './scene/WaterAndFire';
+import type { WorldCameraTelemetry } from './scene/WorldFixedCamera';
 import {
   BREAKABLE_BLOCKS,
   FIRE_POSITION,
@@ -20,6 +26,12 @@ import {
 export function VoxelGameApp(): ReactElement {
   const controls = useVoxelGameControls();
   const controllerRef = useRef<VehicleControllerHandle>(null);
+  const cameraTelemetryRef = useRef<WorldCameraTelemetry>({
+    lookTarget: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 0.8, GARAGE_POSITION[2] - 1.5],
+    position: [GARAGE_POSITION[0] + 10, GARAGE_POSITION[1] + 12, GARAGE_POSITION[2] + 12],
+    viewport: { height: 0, width: 0 },
+    zoom: 56,
+  });
   const runtimeRef = useRef(new VoxelGameRuntime(BREAKABLE_BLOCKS.map(({ id }) => id)));
   const manualClockRef = useRef(false);
   const missionTelemetryRef = useRef<MissionTelemetry>({
@@ -53,9 +65,14 @@ export function VoxelGameApp(): ReactElement {
           garage: GARAGE_POSITION,
         },
         mode: 'drive-ready',
+        camera: cameraTelemetryRef.current,
         mission: missionTelemetryRef.current,
         runtime,
         vehicle: telemetryRef.current,
+        visualLayout: {
+          fireLayers: FIRE_LAYER_BOXES,
+          starGroups: CELEBRATION_STAR_GROUPS,
+        },
         visuals: {
           fireLayerCount: getFireLayerCount(runtime.fireIntensity),
           routeCubeCount: runtime.routeVisible ? 12 : 0,
@@ -66,12 +83,11 @@ export function VoxelGameApp(): ReactElement {
       });
     };
     window.reset_voxel_game_vehicle = () => controllerRef.current?.resetVehicle();
-    window.advanceTime = (milliseconds: number) => {
-      const totalMs = Number.isFinite(milliseconds) ? Math.max(0, milliseconds) : 0;
-      manualClockRef.current = true;
-      if (totalMs === 0) return;
-      advanceInFixedSteps(totalMs, (deltaMs) => runtimeRef.current.advance(deltaMs));
-    };
+    window.advanceTime = (milliseconds: number) => advanceManualClock(
+      runtimeRef.current,
+      manualClockRef,
+      milliseconds,
+    );
 
     return () => {
       unsubscribe();
@@ -86,6 +102,7 @@ export function VoxelGameApp(): ReactElement {
       <section className="voxel-game-canvas" aria-label="純ボクセル消防車の箱庭">
         <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}>
           <VoxelGameScene
+            cameraTelemetryRef={cameraTelemetryRef}
             commandRef={controls.commandRef}
             controllerRef={controllerRef}
             manualClockRef={manualClockRef}

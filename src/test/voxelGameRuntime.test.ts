@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   advanceInFixedSteps,
+  advanceManualClock,
   advanceRuntimeFrame,
   VoxelGameRuntime,
 } from '../voxel-game/domain/VoxelGameRuntime';
@@ -81,6 +82,36 @@ describe('VoxelGameRuntime', () => {
 
     advanceRuntimeFrame(runtime, manualClockFlag, 0.2);
     expect(runtime.getSnapshot().elapsedMs).toBe(50);
+  });
+
+  it('0・負数・非有限のmanual clockは時間もflagも変えず、次の通常frameを進める', () => {
+    const runtime = new VoxelGameRuntime([]);
+    const manualClockFlag = { current: false };
+
+    advanceManualClock(runtime, manualClockFlag, 0);
+    advanceManualClock(runtime, manualClockFlag, -1);
+    advanceManualClock(runtime, manualClockFlag, Number.NaN);
+    advanceManualClock(runtime, manualClockFlag, Number.POSITIVE_INFINITY);
+
+    expect(runtime.getSnapshot().elapsedMs).toBe(0);
+    expect(manualClockFlag.current).toBe(false);
+    advanceRuntimeFrame(runtime, manualClockFlag, 0.02);
+    expect(runtime.getSnapshot().elapsedMs).toBe(20);
+  });
+
+  it('連続する正のmanual clockは合算し、直後の通常frameだけをskipする', () => {
+    const runtime = new VoxelGameRuntime([]);
+    const manualClockFlag = { current: false };
+
+    advanceManualClock(runtime, manualClockFlag, 10);
+    advanceManualClock(runtime, manualClockFlag, 20);
+
+    expect(runtime.getSnapshot().elapsedMs).toBe(30);
+    expect(manualClockFlag.current).toBe(true);
+    advanceRuntimeFrame(runtime, manualClockFlag, 0.05);
+    expect(runtime.getSnapshot().elapsedMs).toBe(30);
+    advanceRuntimeFrame(runtime, manualClockFlag, 0.05);
+    expect(runtime.getSnapshot().elapsedMs).toBe(80);
   });
 
   it('有効放水2500msで消火し、お礼演出後に自由走行へ移る', () => {

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import * as THREE from 'three';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/voxel-game';
@@ -16,6 +17,55 @@ for (const screenshot of screenshots) fs.rmSync(`${outputDirectory}/${screenshot
 /** 条件を満たさない場合はscenario名を含むErrorで停止する。 */
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+/** 実camera telemetryでvoxel群の8 cornersを投影し、screen-space矩形を返す。 */
+function projectVoxelBoxesToScreenRect(cameraTelemetry, boxes) {
+  assert(cameraTelemetry?.position && cameraTelemetry?.lookTarget && cameraTelemetry?.viewport,
+    `Camera telemetry is unavailable: ${JSON.stringify(cameraTelemetry)}`);
+  assert(Array.isArray(boxes) && boxes.length > 0, `Voxel boxes are unavailable: ${JSON.stringify(boxes)}`);
+  const { height, width } = cameraTelemetry.viewport;
+  const camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2);
+  camera.position.fromArray(cameraTelemetry.position);
+  camera.zoom = cameraTelemetry.zoom;
+  camera.lookAt(new THREE.Vector3(...cameraTelemetry.lookTarget));
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+
+  const rect = {
+    bottom: Number.NEGATIVE_INFINITY,
+    left: Number.POSITIVE_INFINITY,
+    right: Number.NEGATIVE_INFINITY,
+    top: Number.POSITIVE_INFINITY,
+  };
+  const corner = new THREE.Vector3();
+  for (const box of boxes) {
+    for (const xSign of [-1, 1]) {
+      for (const ySign of [-1, 1]) {
+        for (const zSign of [-1, 1]) {
+          corner.set(
+            box.position[0] + (box.scale[0] / 2) * xSign,
+            box.position[1] + (box.scale[1] / 2) * ySign,
+            box.position[2] + (box.scale[2] / 2) * zSign,
+          ).project(camera);
+          const x = (corner.x + 1) * width / 2;
+          const y = (1 - corner.y) * height / 2;
+          rect.left = Math.min(rect.left, x);
+          rect.right = Math.max(rect.right, x);
+          rect.top = Math.min(rect.top, y);
+          rect.bottom = Math.max(rect.bottom, y);
+        }
+      }
+    }
+  }
+  return { ...rect, height: rect.bottom - rect.top, width: rect.right - rect.left };
+}
+
+/** 2矩形が重なると0、離れていれば最短screen-space距離を返す。 */
+function getScreenRectDistance(first, second) {
+  const horizontalGap = Math.max(first.left - second.right, second.left - first.right, 0);
+  const verticalGap = Math.max(first.top - second.bottom, second.top - first.bottom, 0);
+  return Math.hypot(horizontalGap, verticalGap);
 }
 
 /** R3FとRapierを指定frame数だけ通常clockで進める。 */
@@ -56,10 +106,10 @@ async function advanceAndReadGameState(page, milliseconds) {
   return JSON.parse(rendered);
 }
 
-/** 0msで次frameをmanual化し、Space signal反映直後のsnapshotを同一browser taskで読む。 */
+/** spray前に正のmanual clockで次frameをskipし、Space signal反映直後のsnapshotを読む。 */
 async function armTargetedSprayAndReadGameState(page) {
   const rendered = await page.evaluate(() => new Promise((resolve) => {
-    window.advanceTime?.(0);
+    window.advanceTime?.(1);
     window.dispatchEvent(new KeyboardEvent('keydown', {
       bubbles: true,
       cancelable: true,
@@ -304,6 +354,12 @@ try {
       `Mobile medium fire layer count is not 2: ${mediumState.visuals.fireLayerCount}`);
     assert(mediumState.visuals.waterCubeCount === 18,
       `Mobile spray cube count is not 18: ${mediumState.visuals.waterCubeCount}`);
+    const mediumFireRect = projectVoxelBoxesToScreenRect(
+      mediumState.camera,
+      mediumState.visualLayout?.fireLayers?.slice(0, 2),
+    );
+    assert(mediumFireRect.top >= 8,
+      `Mobile fire lacks 8px top margin: ${JSON.stringify(mediumFireRect)}`);
     await mobilePage.screenshot({ path: `${outputDirectory}/fire-medium-water-mobile.png` });
 
     await mobilePage.evaluate(() => window.advanceTime?.(1_500));
@@ -323,10 +379,35 @@ try {
       && successBox.x + successBox.width <= 844
       && successBox.y + successBox.height <= 390,
     `Mobile success text exceeds viewport: ${JSON.stringify(successBox)}`);
+    const starGroups = celebrationState.visualLayout?.starGroups;
+    assert(Array.isArray(starGroups) && starGroups.length === 6,
+      `Mobile star groups are unavailable: ${JSON.stringify(starGroups)}`);
+    assert(starGroups.every((group) => group.length === 5),
+      `Mobile star group does not contain five cubes: ${JSON.stringify(starGroups)}`);
+    const starRects = starGroups.map((group) => projectVoxelBoxesToScreenRect(celebrationState.camera, group));
+    for (const [index, rect] of starRects.entries()) {
+      assert(rect.left >= 0 && rect.top >= 0 && rect.right <= 844 && rect.bottom <= 390,
+        `Mobile star ${index} exceeds viewport: ${JSON.stringify(rect)}`);
+      for (let otherIndex = index + 1; otherIndex < starRects.length; otherIndex += 1) {
+        const distance = getScreenRectDistance(rect, starRects[otherIndex]);
+        assert(distance >= 4,
+          `Mobile stars ${index}/${otherIndex} are less than 4px apart: ${JSON.stringify({ distance, rect, other: starRects[otherIndex] })}`);
+      }
+    }
+    const successRect = {
+      bottom: successBox.y + successBox.height,
+      left: successBox.x,
+      right: successBox.x + successBox.width,
+      top: successBox.y,
+    };
+    const successDistances = starRects.map((rect) => getScreenRectDistance(rect, successRect));
+    assert(successDistances.every((distance) => distance >= 4),
+      `Mobile stars overlap success text: ${JSON.stringify({ starRects, successBox, successDistances })}`);
     await mobilePage.screenshot({ path: `${outputDirectory}/mission-complete-mobile.png` });
     results.mobileVisuals = {
       celebration: celebrationState.runtime,
       medium: mediumState.runtime,
+      projection: { mediumFireRect, starRects, successDistances },
       successBox,
       targetedDistance: targetedState.mission.distance,
     };

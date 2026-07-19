@@ -11,9 +11,10 @@ import {
 } from './VehicleController';
 import { VoxelWorld } from './VoxelWorld';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
-import { WorldFixedCamera } from './WorldFixedCamera';
+import { WorldFixedCamera, type WorldCameraTelemetryRef } from './WorldFixedCamera';
 
 interface VoxelGameSceneProps {
+  readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
   readonly commandRef: RefObject<DriveCommand>;
   readonly controllerRef: RefObject<VehicleControllerHandle | null>;
   readonly manualClockRef: React.MutableRefObject<boolean>;
@@ -58,6 +59,7 @@ function RuntimeClock({ manualClockRef, runtime }: RuntimeClockProps): null {
 
 /** 箱庭の照明、世界方向固定camera、物理空間、運転可能な消防車を構成する。 */
 export function VoxelGameScene({
+  cameraTelemetryRef,
   commandRef,
   controllerRef,
   manualClockRef,
@@ -68,7 +70,7 @@ export function VoxelGameScene({
   return (
     <>
       <color attach="background" args={['#ead4b3']} />
-      <WorldFixedCamera telemetryRef={telemetryRef} />
+      <WorldFixedCamera cameraTelemetryRef={cameraTelemetryRef} telemetryRef={telemetryRef} />
       <SceneReadySignal />
       <RuntimeClock manualClockRef={manualClockRef} runtime={runtime} />
       <ambientLight intensity={1.5} />
