@@ -3,7 +3,13 @@ import { chromium } from 'playwright';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/voxel-game';
-const screenshots = ['fire-full.png', 'fire-medium-water.png', 'mission-complete.png'];
+const screenshots = [
+  'fire-full.png',
+  'fire-medium-water.png',
+  'mission-complete.png',
+  'fire-medium-water-mobile.png',
+  'mission-complete-mobile.png',
+];
 fs.mkdirSync(outputDirectory, { recursive: true });
 for (const screenshot of screenshots) fs.rmSync(`${outputDirectory}/${screenshot}`, { force: true });
 
@@ -40,9 +46,35 @@ async function readGameState(page) {
   return state;
 }
 
+/** 手動clockとsnapshot読取を同一browser taskで行い、通常frameの混入を防ぐ。 */
+async function advanceAndReadGameState(page, milliseconds) {
+  const rendered = await page.evaluate((duration) => {
+    window.advanceTime?.(duration);
+    return window.render_game_to_text?.();
+  }, milliseconds);
+  if (!rendered) throw new Error('Voxel Game text state is unavailable after manual advance.');
+  return JSON.parse(rendered);
+}
+
+/** 0msで次frameをmanual化し、Space signal反映直後のsnapshotを同一browser taskで読む。 */
+async function armTargetedSprayAndReadGameState(page) {
+  const rendered = await page.evaluate(() => new Promise((resolve) => {
+    window.advanceTime?.(0);
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Space',
+      key: ' ',
+    }));
+    requestAnimationFrame(() => resolve(window.render_game_to_text?.()));
+  }));
+  if (!rendered) throw new Error('Voxel Game text state is unavailable after spray signal frame.');
+  return JSON.parse(rendered);
+}
+
 /** scene ready、公開hook、初期routeまで待つ。 */
-async function openGamePage(browser, scenario, errors) {
-  const page = await browser.newPage({ viewport: { height: 720, width: 1280 } });
+async function openGamePage(browser, scenario, errors, viewport = { height: 720, width: 1280 }) {
+  const page = await browser.newPage({ viewport });
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(`${scenario}: ${message.text()}`);
   });
@@ -162,6 +194,51 @@ const errors = [];
 const results = {};
 
 try {
+  const durationPage = await openGamePage(browser, 'duration-contract', errors);
+  try {
+    await driveRightRouteToFireApproach(durationPage, -2);
+    const targetedState = await approachSprayDistance(durationPage, 5.7);
+    assert(targetedState.mission.targeted,
+      `Duration approach is not targeted: ${JSON.stringify(targetedState.mission)}`);
+    assert(targetedState.runtime.fireIntensity === 1,
+      `Duration scenario did not start at full fire: ${targetedState.runtime.fireIntensity}`);
+
+    const armedState = await armTargetedSprayAndReadGameState(durationPage);
+    assert(armedState.mission.sprayOnFire, 'Space did not arm targeted spray signal.');
+    assert(armedState.runtime.fireIntensity === 1,
+      `Signal reflection consumed normal-clock fire time: ${armedState.runtime.fireIntensity}`);
+
+    const beforeCompletion = await advanceAndReadGameState(durationPage, 2_499);
+    assert(beforeCompletion.runtime.missionPhase === 'active',
+      `2499ms spray completed too early: ${beforeCompletion.runtime.missionPhase}`);
+    assert(beforeCompletion.runtime.fireIntensity > 0,
+      `2499ms spray reduced fire to zero: ${beforeCompletion.runtime.fireIntensity}`);
+
+    const exactCompletion = await advanceAndReadGameState(durationPage, 1);
+    assert(exactCompletion.runtime.missionPhase === 'celebrating',
+      `2500ms spray did not enter celebrating: ${exactCompletion.runtime.missionPhase}`);
+    assert(exactCompletion.runtime.fireIntensity === 0,
+      `2500ms spray did not extinguish fire: ${exactCompletion.runtime.fireIntensity}`);
+    assert(Math.abs(exactCompletion.runtime.celebrationRemainingMs - 1_800) <= 1e-6,
+      `Celebration duration was consumed at completion: ${exactCompletion.runtime.celebrationRemainingMs}`);
+    results.durationContract = {
+      armed: armedState.runtime,
+      beforeCompletion: beforeCompletion.runtime,
+      exactCompletion: exactCompletion.runtime,
+      targetedDistance: targetedState.mission.distance,
+    };
+  } finally {
+    await durationPage.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        bubbles: true,
+        cancelable: true,
+        code: 'Space',
+        key: ' ',
+      }));
+    }).catch(() => undefined);
+    await durationPage.close();
+  }
+
   const missionPage = await openGamePage(browser, 'mission-chain', errors);
   try {
     await driveRightRouteToFireApproach(missionPage, -2);
@@ -208,6 +285,54 @@ try {
   } finally {
     await missionPage.keyboard.up('Space').catch(() => undefined);
     await missionPage.close();
+  }
+
+  const mobilePage = await openGamePage(
+    browser,
+    'mobile-visuals',
+    errors,
+    { height: 390, width: 844 },
+  );
+  try {
+    await driveRightRouteToFireApproach(mobilePage, -2);
+    const targetedState = await approachSprayDistance(mobilePage, 5.7);
+    assert(targetedState.mission.targeted,
+      `Mobile approach is not targeted: ${JSON.stringify(targetedState.mission)}`);
+
+    const mediumState = await sprayAndAdvance(mobilePage, 1_000);
+    assert(mediumState.visuals.fireLayerCount === 2,
+      `Mobile medium fire layer count is not 2: ${mediumState.visuals.fireLayerCount}`);
+    assert(mediumState.visuals.waterCubeCount === 18,
+      `Mobile spray cube count is not 18: ${mediumState.visuals.waterCubeCount}`);
+    await mobilePage.screenshot({ path: `${outputDirectory}/fire-medium-water-mobile.png` });
+
+    await mobilePage.evaluate(() => window.advanceTime?.(1_500));
+    await mobilePage.keyboard.up('Space');
+    await waitForFrames(mobilePage, 2);
+    const celebrationState = await readGameState(mobilePage);
+    assert(celebrationState.runtime.missionPhase === 'celebrating',
+      `Mobile mission did not enter celebrating: ${celebrationState.runtime.missionPhase}`);
+    assert(celebrationState.visuals.starCubeCount === 30,
+      `Mobile star cube count is not 30: ${celebrationState.visuals.starCubeCount}`);
+    const success = mobilePage.getByText('できた！', { exact: true });
+    await success.waitFor({ state: 'visible' });
+    const successBox = await success.boundingBox();
+    assert(successBox
+      && successBox.x >= 0
+      && successBox.y >= 0
+      && successBox.x + successBox.width <= 844
+      && successBox.y + successBox.height <= 390,
+    `Mobile success text exceeds viewport: ${JSON.stringify(successBox)}`);
+    await mobilePage.screenshot({ path: `${outputDirectory}/mission-complete-mobile.png` });
+    results.mobileVisuals = {
+      celebration: celebrationState.runtime,
+      medium: mediumState.runtime,
+      successBox,
+      targetedDistance: targetedState.mission.distance,
+    };
+  } finally {
+    await mobilePage.keyboard.up('Space').catch(() => undefined);
+    await mobilePage.close();
   }
 
   const outOfRangePage = await openGamePage(browser, 'out-of-range', errors);

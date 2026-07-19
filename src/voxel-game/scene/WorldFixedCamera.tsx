@@ -4,6 +4,7 @@ import { OrthographicCamera } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { VehicleTelemetryRef } from './VehicleController';
+import { resolveWorldFixedCameraZoom } from './WorldFixedCameraLayout';
 
 interface WorldFixedCameraProps {
   readonly telemetryRef: VehicleTelemetryRef;
@@ -32,8 +33,7 @@ export function WorldFixedCamera({ telemetryRef }: WorldFixedCameraProps): React
     camera.position.copy(cameraTarget);
     camera.lookAt(lookTarget);
 
-    const aspect = size.width / Math.max(1, size.height);
-    const nextZoom = THREE.MathUtils.clamp(56 + (aspect - 1) * 16, 56, 72);
+    const nextZoom = resolveWorldFixedCameraZoom(size.width, size.height);
     if (Math.abs(camera.zoom - nextZoom) > 0.01) {
       camera.zoom = nextZoom;
       camera.updateProjectionMatrix();

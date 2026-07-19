@@ -46,6 +46,7 @@ interface MissionVisualState {
 const NOZZLE_FORWARD_OFFSET = 1.7;
 const NOZZLE_HEIGHT = 2.15;
 const WATER_CUBE_COUNT = 18;
+const WATER_TARGET_STOP_OFFSET = 1.2;
 const WATER_CUBE_SCALE = new THREE.Vector3(0.18, 0.18, 0.18);
 const WATER_BLUE_INDICES = Array.from({ length: WATER_CUBE_COUNT }, (_, index) => index)
   .filter((index) => index % 3 !== 2);
@@ -64,14 +65,14 @@ const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map((position) => ({
 }));
 
 export const FIRE_LAYER_POSITIONS: readonly (readonly [number, number, number])[] = [
-  [12.9, 1.75, -9.8],
-  [12.95, 2.65, -9.72],
-  [12.9, 3.5, -9.8],
+  [12.9, 0.75, -9.8],
+  [12.95, 1.5, -9.72],
+  [12.9, 2.15, -9.8],
 ];
 
 export const CELEBRATION_STAR_CENTERS: readonly (readonly [number, number, number])[] = [
-  [10.8, 3.2, -4], [12.4, 3.4, -4.4], [14, 3.2, -4.8],
-  [11.2, 4, -5.2], [13, 4.1, -5.6], [14.8, 3.9, -6],
+  [10.8, 1, -4], [8.5, 1.2, -4.4], [17, 1, -4.8],
+  [10, 1.8, -5.2], [15.5, 1.9, -5.6], [14.8, 1.7, -6],
 ];
 
 /** 5つのcubeで十字型の星を作る。 */
@@ -161,6 +162,13 @@ function selectMissionVisualState(snapshot: VoxelGameSnapshot): MissionVisualSta
   };
 }
 
+/** targeted時は奥の判定座標を越えず、camera側のvisible fireで水を止める。 */
+export function getWaterVisibleDistance(distance: number, targeted: boolean): number {
+  return targeted
+    ? Math.max(0, Math.min(6, distance - WATER_TARGET_STOP_OFFSET))
+    : 6;
+}
+
 /** 放水cubeをnozzleから照準方向へ最大18個配置する。 */
 function updateWaterBatch(
   mesh: THREE.InstancedMesh | null,
@@ -174,7 +182,7 @@ function updateWaterBatch(
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
-  const visibleDistance = telemetry.targeted ? Math.min(6, telemetry.distance) : 6;
+  const visibleDistance = getWaterVisibleDistance(telemetry.distance, telemetry.targeted);
   indices.forEach((waterIndex, instanceIndex) => {
     const distance = ((waterIndex + 1) / WATER_CUBE_COUNT) * visibleDistance;
     position.set(

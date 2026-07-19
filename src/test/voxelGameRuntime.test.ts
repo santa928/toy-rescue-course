@@ -63,6 +63,14 @@ describe('VoxelGameRuntime', () => {
     expect(deltas).toEqual([0.125]);
   });
 
+  it('timer epsilon以下でも正の有限時間は捨てずに1回進める', () => {
+    const deltas: number[] = [];
+
+    advanceInFixedSteps(1e-7, (deltaMs) => deltas.push(deltaMs));
+
+    expect(deltas).toEqual([1e-7]);
+  });
+
   it('手動clock直後の通常frameだけをskipし、次frameは50ms上限で進める', () => {
     const runtime = new VoxelGameRuntime([]);
     const manualClockFlag = { current: true };

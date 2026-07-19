@@ -4,6 +4,7 @@ import {
   CELEBRATION_STAR_CENTERS,
   FIRE_LAYER_POSITIONS,
   getFireLayerCount,
+  getWaterVisibleDistance,
   resolveWaterAndFireFrame,
 } from '../voxel-game/scene/WaterAndFire';
 
@@ -11,13 +12,21 @@ describe('WaterAndFire', () => {
   it('火cubeを建物のcamera側外壁面へ置き、3層すべてを遮蔽させない', () => {
     expect(FIRE_LAYER_POSITIONS).toHaveLength(3);
     expect(FIRE_LAYER_POSITIONS.every(([x]) => x >= 12.75)).toBe(true);
-    expect(Math.max(...FIRE_LAYER_POSITIONS.map(([, y]) => y))).toBeGreaterThan(3.4);
-    expect(Math.max(...FIRE_LAYER_POSITIONS.map(([, y]) => y))).toBeLessThanOrEqual(3.6);
+    expect(FIRE_LAYER_POSITIONS.map(([, y]) => y)).toEqual([0.75, 1.5, 2.15]);
   });
 
   it('6組の成功星を火災現場上空かつcamera安全矩形へ置く', () => {
     expect(CELEBRATION_STAR_CENTERS).toHaveLength(6);
-    expect(CELEBRATION_STAR_CENTERS.every(([, y, z]) => y >= 3.2 && y <= 4.1 && z >= -6)).toBe(true);
+    expect(CELEBRATION_STAR_CENTERS.every(([, y, z]) => y >= 1 && y <= 1.9 && z >= -6)).toBe(true);
+    expect(CELEBRATION_STAR_CENTERS[1]?.[0]).toBeLessThanOrEqual(8.5);
+    expect(CELEBRATION_STAR_CENTERS[2]?.[0]).toBeGreaterThanOrEqual(17);
+    expect(CELEBRATION_STAR_CENTERS[3]?.[0]).toBeLessThanOrEqual(10);
+    expect(CELEBRATION_STAR_CENTERS[4]?.[0]).toBeGreaterThanOrEqual(15.5);
+  });
+
+  it('targetedな水はvisible fireで止め、非targeted時だけ最大6unit描く', () => {
+    expect(getWaterVisibleDistance(5.5, true)).toBeCloseTo(4.3, 9);
+    expect(getWaterVisibleDistance(2, false)).toBe(6);
   });
 
   it.each([

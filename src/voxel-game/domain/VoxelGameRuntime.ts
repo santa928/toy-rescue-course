@@ -59,7 +59,7 @@ export function advanceInFixedSteps(
   const fullStepCount = Math.floor(totalMs / FIXED_STEP_MS);
   for (let step = 0; step < fullStepCount; step += 1) advance(FIXED_STEP_MS);
 
-  const remainderMs = normalizeRemainingMilliseconds(totalMs - fullStepCount * FIXED_STEP_MS);
+  const remainderMs = totalMs - fullStepCount * FIXED_STEP_MS;
   if (remainderMs > 0) advance(remainderMs);
 }
 

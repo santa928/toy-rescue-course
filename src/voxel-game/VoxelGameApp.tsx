@@ -68,8 +68,8 @@ export function VoxelGameApp(): ReactElement {
     window.reset_voxel_game_vehicle = () => controllerRef.current?.resetVehicle();
     window.advanceTime = (milliseconds: number) => {
       const totalMs = Number.isFinite(milliseconds) ? Math.max(0, milliseconds) : 0;
-      if (totalMs === 0) return;
       manualClockRef.current = true;
+      if (totalMs === 0) return;
       advanceInFixedSteps(totalMs, (deltaMs) => runtimeRef.current.advance(deltaMs));
     };
 
