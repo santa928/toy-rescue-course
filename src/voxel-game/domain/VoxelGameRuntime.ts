@@ -36,6 +36,11 @@ const RESPAWN_DURATION_MS = 5_000;
 const BREAK_IMPACT_THRESHOLD = 4;
 const TIME_EPSILON_MS = 1e-6;
 
+/** 残り時間を0以上へ正規化し、丸め誤差として無視できる値を0にする。 */
+function normalizeRemainingMilliseconds(value: number): number {
+  return value <= TIME_EPSILON_MS ? 0 : value;
+}
+
 /** 消火ミッションと壊せる積み木を固定stepで進めるframework非依存runtime。 */
 export class VoxelGameRuntime {
   private blocks: MutableBreakableState[];
@@ -78,8 +83,7 @@ export class VoxelGameRuntime {
     if ((this.missionPhase === 'assigned' || this.missionPhase === 'active') && this.signals.sprayActive) {
       this.missionPhase = 'active';
       if (this.signals.sprayOnFire) {
-        this.extinguishRemainingMs = Math.max(0, this.extinguishRemainingMs - deltaMs);
-        if (this.extinguishRemainingMs <= TIME_EPSILON_MS) this.extinguishRemainingMs = 0;
+        this.extinguishRemainingMs = normalizeRemainingMilliseconds(this.extinguishRemainingMs - deltaMs);
         if (this.extinguishRemainingMs === 0) {
           this.missionPhase = 'celebrating';
           this.celebrationRemainingMs = CELEBRATION_DURATION_MS;
@@ -89,7 +93,7 @@ export class VoxelGameRuntime {
     }
 
     if (this.missionPhase === 'celebrating' && !extinguishedThisStep) {
-      this.celebrationRemainingMs = Math.max(0, this.celebrationRemainingMs - deltaMs);
+      this.celebrationRemainingMs = normalizeRemainingMilliseconds(this.celebrationRemainingMs - deltaMs);
       if (this.celebrationRemainingMs === 0) this.missionPhase = 'freeRoam';
     } else if (this.missionPhase === 'freeRoam' && this.signals.atGarage) {
       this.resetMission();
@@ -97,7 +101,7 @@ export class VoxelGameRuntime {
 
     for (const block of this.blocks) {
       if (block.phase !== 'broken') continue;
-      block.respawnRemainingMs = Math.max(0, block.respawnRemainingMs - deltaMs);
+      block.respawnRemainingMs = normalizeRemainingMilliseconds(block.respawnRemainingMs - deltaMs);
       if (block.respawnRemainingMs === 0 && block.clear) block.phase = 'intact';
     }
   }

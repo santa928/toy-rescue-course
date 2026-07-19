@@ -31,6 +31,16 @@ describe('VoxelGameRuntime', () => {
     expect(runtime.getSnapshot()).toMatchObject({ fireIntensity: 0, missionPhase: 'celebrating' });
   });
 
+  it('小数msに分割したお礼演出が合計1800msなら自由走行へ移る', () => {
+    const runtime = new VoxelGameRuntime(['plaza-red']);
+    runtime.setSignals({ sprayActive: true, sprayOnFire: true });
+    runtime.advance(2_500);
+
+    for (let step = 0; step < 18_000; step += 1) runtime.advance(0.1);
+
+    expect(runtime.getSnapshot().missionPhase).toBe('freeRoam');
+  });
+
   it('火の範囲外へ放水しても強さを減らさない', () => {
     const runtime = new VoxelGameRuntime(['plaza-red']);
     runtime.setSignals({ sprayActive: true, sprayOnFire: false });
@@ -54,6 +64,15 @@ describe('VoxelGameRuntime', () => {
     expect(runtime.getSnapshot().blocks[0]?.phase).toBe('broken');
     runtime.setBlockClear('plaza-red', true);
     runtime.advance(16.67);
+    expect(runtime.getSnapshot().blocks[0]?.phase).toBe('intact');
+  });
+
+  it('小数msに分割した復元待ちが合計5000msなら積み木を復元する', () => {
+    const runtime = new VoxelGameRuntime(['plaza-red']);
+    runtime.registerBlockImpact('plaza-red', 4);
+
+    for (let step = 0; step < 50_000; step += 1) runtime.advance(0.1);
+
     expect(runtime.getSnapshot().blocks[0]?.phase).toBe('intact');
   });
 
