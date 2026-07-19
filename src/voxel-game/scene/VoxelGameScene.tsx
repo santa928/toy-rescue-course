@@ -1,12 +1,21 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { ReactElement } from 'react';
-import { OrthographicCamera } from '@react-three/drei';
+import { useEffect, useRef } from 'react';
+import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Physics } from '@react-three/rapier';
-import * as THREE from 'three';
-import { VoxelFireTruck } from '../../vehicle-lab/scene/VoxelFireTruck';
+import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
+import type { DriveCommand } from '../input/controlState';
+import {
+  VehicleController,
+  type VehicleControllerHandle,
+  type VehicleTelemetryRef,
+} from './VehicleController';
 import { VoxelWorld } from './VoxelWorld';
-import { GARAGE_POSITION } from './worldLayout';
+import { WorldFixedCamera } from './WorldFixedCamera';
+
+interface VoxelGameSceneProps {
+  readonly commandRef: RefObject<DriveCommand>;
+  readonly controllerRef: RefObject<VehicleControllerHandle | null>;
+  readonly telemetryRef: VehicleTelemetryRef;
+}
 
 /** 複数frameとdraw callを確認してから自動検証へscene readyを通知する。 */
 function SceneReadySignal(): null {
@@ -29,30 +38,22 @@ function SceneReadySignal(): null {
   return null;
 }
 
-/** static箱庭の照明、俯瞰カメラ、物理空間、消防車を構成する。 */
-export function VoxelGameScene(): ReactElement {
-  const cameraRef = useRef<THREE.OrthographicCamera>(null);
-
-  useLayoutEffect(() => {
-    const camera = cameraRef.current;
-    if (!camera) {
-      return;
-    }
-    camera.lookAt(0, 0, 0);
-    camera.updateProjectionMatrix();
-  }, []);
-
+/** 箱庭の照明、世界方向固定camera、物理空間、運転可能な消防車を構成する。 */
+export function VoxelGameScene({ commandRef, controllerRef, telemetryRef }: VoxelGameSceneProps): ReactElement {
   return (
     <>
       <color attach="background" args={['#ead4b3']} />
-      <OrthographicCamera makeDefault position={[30, 36, 38]} ref={cameraRef} zoom={15.5} />
+      <WorldFixedCamera telemetryRef={telemetryRef} />
       <SceneReadySignal />
       <ambientLight intensity={1.5} />
       <directionalLight intensity={2.1} position={[20, 34, 18]} />
       <directionalLight color="#cbe0ff" intensity={0.75} position={[-18, 20, -14]} />
       <Physics gravity={[0, -18, 0]}>
         <VoxelWorld />
-        <VoxelFireTruck position={GARAGE_POSITION} scale={1.2} />
+        <RigidBody colliders={false} type="fixed">
+          <CuboidCollider args={[18, 0.2, 18]} position={[0, -0.2, 0]} />
+        </RigidBody>
+        <VehicleController commandRef={commandRef} ref={controllerRef} telemetryRef={telemetryRef} />
       </Physics>
     </>
   );

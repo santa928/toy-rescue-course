@@ -3,6 +3,7 @@ export {};
 declare global {
   interface Window {
     render_game_to_text?: () => string;
+    reset_voxel_game_vehicle?: () => void;
     advanceTime?: (milliseconds: number) => void;
     render_vehicle_lab_to_text?: () => string;
     set_vehicle_lab_view?: (
