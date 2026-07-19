@@ -40,10 +40,11 @@ export class VoxelGameRuntime {
   private blocks: MutableBreakableState[];
   private celebrationRemainingMs = 0;
   private elapsedMs = 0;
-  private fireIntensity = 1;
+  private extinguishRemainingMs = EXTINGUISH_DURATION_MS;
   private missionPhase: MissionPhase = 'assigned';
   private signals: VoxelGameSignals = { atGarage: false, sprayActive: false, sprayOnFire: false };
 
+  /** @param blockIds 壊せる積み木として管理する一意な識別子の一覧。 */
   public constructor(blockIds: readonly string[]) {
     this.blocks = blockIds.map((id) => ({ clear: true, id, phase: 'intact', respawnRemainingMs: 0 }));
   }
@@ -76,8 +77,8 @@ export class VoxelGameRuntime {
     if ((this.missionPhase === 'assigned' || this.missionPhase === 'active') && this.signals.sprayActive) {
       this.missionPhase = 'active';
       if (this.signals.sprayOnFire) {
-        this.fireIntensity = Math.max(0, this.fireIntensity - deltaMs / EXTINGUISH_DURATION_MS);
-        if (this.fireIntensity === 0) {
+        this.extinguishRemainingMs = Math.max(0, this.extinguishRemainingMs - deltaMs);
+        if (this.extinguishRemainingMs === 0) {
           this.missionPhase = 'celebrating';
           this.celebrationRemainingMs = CELEBRATION_DURATION_MS;
           extinguishedThisStep = true;
@@ -101,7 +102,7 @@ export class VoxelGameRuntime {
 
   /** 消火仕事だけを初期状態へ戻す。 */
   public resetMission(): void {
-    this.fireIntensity = 1;
+    this.extinguishRemainingMs = EXTINGUISH_DURATION_MS;
     this.missionPhase = 'assigned';
     this.celebrationRemainingMs = 0;
     this.signals = { ...this.signals, atGarage: false, sprayOnFire: false };
@@ -113,7 +114,7 @@ export class VoxelGameRuntime {
       blocks: this.blocks.map(({ id, phase, respawnRemainingMs }) => ({ id, phase, respawnRemainingMs })),
       celebrationRemainingMs: this.celebrationRemainingMs,
       elapsedMs: this.elapsedMs,
-      fireIntensity: this.fireIntensity,
+      fireIntensity: Math.max(0, Math.min(1, this.extinguishRemainingMs / EXTINGUISH_DURATION_MS)),
       missionPhase: this.missionPhase,
       routeVisible: this.missionPhase === 'assigned' || this.missionPhase === 'active',
       signals: { ...this.signals },
