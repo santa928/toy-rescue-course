@@ -12,6 +12,7 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
   const activePointerRef = useRef<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLSpanElement>(null);
+  const { setTouchStick } = controls;
 
   /** thumbを正規化済みstick位置へ移し、React renderを発生させない。 */
   const moveThumb = useCallback((x: number, y: number): void => {
@@ -27,9 +28,9 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
     const root = rootRef.current;
     if (!root) return;
     const point = resolveJoystickPointer(root.getBoundingClientRect(), clientX, clientY);
-    controls.setTouchStick(point.x, point.y);
+    setTouchStick(point.x, point.y);
     moveThumb(point.x, point.y);
-  }, [controls, moveThumb]);
+  }, [moveThumb, setTouchStick]);
 
   /** active pointerを解除し、全終了経路でstickとthumbを中央へ戻す。 */
   const releaseActivePointer = useCallback((releaseCapture = true): void => {
@@ -37,7 +38,7 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
     activePointerRef.current = null;
     const root = rootRef.current;
     if (root) root.dataset.active = 'false';
-    controls.setTouchStick(0, 0);
+    setTouchStick(0, 0);
     moveThumb(0, 0);
     if (!releaseCapture || pointerId === null || !root?.hasPointerCapture(pointerId)) return;
     try {
@@ -45,7 +46,7 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
     } catch {
       // captureはbrowser側で既に失われる場合があるため、中央復帰だけを保証する。
     }
-  }, [controls, moveThumb]);
+  }, [moveThumb, setTouchStick]);
 
   /** 最初のpointerだけをcaptureしてstick操作を開始する。 */
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -82,11 +83,16 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
   }, [releaseActivePointer]);
 
   useEffect(() => {
-    /** window focus喪失時に見た目とcommandを同時解除する。 */
+    /** focusまたはhidden時に見た目とcommandを同時解除する。 */
     const handleBlur = (): void => releaseActivePointer(true);
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === 'hidden') releaseActivePointer(true);
+    };
     window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       releaseActivePointer(true);
     };
   }, [releaseActivePointer]);
@@ -94,9 +100,6 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
   return (
     <div
       aria-label="運転スティック"
-      aria-valuemax={1}
-      aria-valuemin={-1}
-      aria-valuenow={0}
       className="touch-joystick"
       data-active="false"
       onLostPointerCapture={handleLostPointerCapture}
@@ -105,8 +108,6 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       ref={rootRef}
-      role="slider"
-      tabIndex={-1}
     >
       <span aria-hidden="true" className="touch-joystick__track" />
       <span aria-hidden="true" className="touch-joystick__thumb" ref={thumbRef} />

@@ -36,6 +36,11 @@ function toEdges(box) {
   };
 }
 
+/** 子矩形が親矩形内に残す最小のedge gapを返す。 */
+function minimumEdgeGap(child, parent) {
+  return Math.min(child.left - parent.left, child.top - parent.top, parent.right - child.right, parent.bottom - child.bottom);
+}
+
 /** 実camera telemetryと車両headingでvehicle world boxをscreenへ投影する。 */
 function projectVehicleToScreenRect(cameraTelemetry, vehicle, bounds) {
   const { height, width } = cameraTelemetry.viewport;
@@ -259,10 +264,97 @@ async function verifyTouch(browser, errors, results) {
   const { context, page } = opened;
   const cdp = await context.newCDPSession(page);
   try {
+    await page.evaluate(() => {
+      window.__task7TouchPointers = [];
+      document.addEventListener('pointerdown', (event) => {
+        const control = event.target.closest('.touch-joystick, .spray-button');
+        if (control) window.__task7TouchPointers.push({ className: control.className, pointerId: event.pointerId });
+      }, { capture: true });
+    });
     const joystick = await page.locator('.touch-joystick').boundingBox();
     const spray = await page.locator('.spray-button').boundingBox();
     assert(joystick && spray, 'Touch controls lack bounding boxes.');
+    for (const attribute of ['role', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'tabindex']) {
+      assert(await page.locator('.touch-joystick').getAttribute(attribute) === null,
+        `Joystick has misleading keyboard-slider ${attribute} semantics.`);
+    }
+    assert(await page.locator('.touch-joystick').getAttribute('aria-label') === '運転スティック',
+      'Joystick lost its required accessible label.');
     const center = { x: joystick.x + joystick.width / 2, y: joystick.y + joystick.height / 2 };
+    const joystickEdges = toEdges(joystick);
+    const thumbBounds = [];
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ id: 3, x: center.x, y: center.y }],
+      type: 'touchStart',
+    });
+    for (const [name, point] of Object.entries({
+      bottom: { x: center.x, y: joystick.y + joystick.height },
+      left: { x: joystick.x, y: center.y },
+      right: { x: joystick.x + joystick.width, y: center.y },
+      top: { x: center.x, y: joystick.y },
+      topRight: { x: joystick.x + joystick.width, y: joystick.y },
+    })) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        touchPoints: [{ id: 3, x: point.x, y: point.y }],
+        type: 'touchMove',
+      });
+      await waitForFrames(page, 1);
+      const thumb = await page.locator('.touch-joystick__thumb').boundingBox();
+      assert(thumb, `${name}: joystick thumb bounding box is unavailable.`);
+      const edges = toEdges(thumb);
+      const minEdgeGap = minimumEdgeGap(edges, joystickEdges);
+      assert(minEdgeGap >= -0.5,
+        `${name}: joystick thumb exceeds parent: ${JSON.stringify({ edges, joystickEdges, minEdgeGap })}`);
+      thumbBounds.push({ minEdgeGap, name, thumb: edges });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+
+    const visibilityPoint = { x: center.x + joystick.width * 0.38, y: center.y - joystick.height * 0.38 };
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ id: 13, x: center.x, y: center.y }],
+      type: 'touchStart',
+    });
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ id: 13, x: visibilityPoint.x, y: visibilityPoint.y }],
+      type: 'touchMove',
+    });
+    await waitForFrames(page, 1);
+    assert(await page.locator('.touch-joystick').getAttribute('data-active') === 'true',
+      'Visibility setup did not activate the joystick.');
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitForFrames(page, 1);
+    const hidden = await readGameState(page);
+    const hiddenThumb = await page.locator('.touch-joystick__thumb').boundingBox();
+    assert(hiddenThumb, 'Visibility release lost the joystick thumb.');
+    const hiddenThumbEdges = toEdges(hiddenThumb);
+    assert(hidden.controls.throttle === 0 && hidden.controls.steer === 0
+      && await page.locator('.touch-joystick').getAttribute('data-active') === 'false'
+      && Math.abs((hiddenThumbEdges.left + hiddenThumbEdges.right) / 2 - (joystickEdges.left + joystickEdges.right) / 2) <= 0.5
+      && Math.abs((hiddenThumbEdges.top + hiddenThumbEdges.bottom) / 2 - (joystickEdges.top + joystickEdges.bottom) / 2) <= 0.5,
+    `Visibility did not release command, active pointer, and thumb: ${JSON.stringify({ controls: hidden.controls, hiddenThumbEdges })}`);
+    await page.evaluate(() => {
+      delete document.visibilityState;
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchCancel' });
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ id: 14, x: center.x, y: center.y }],
+      type: 'touchStart',
+    });
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ id: 14, x: visibilityPoint.x, y: visibilityPoint.y }],
+      type: 'touchMove',
+    });
+    await waitForFrames(page, 1);
+    const afterVisibilityRestart = await readGameState(page);
+    assert(afterVisibilityRestart.controls.throttle > 0.45 && afterVisibilityRestart.controls.steer > 0.45,
+      `Joystick did not accept a new pointer after visibility release: ${JSON.stringify(afterVisibilityRestart.controls)}`);
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchCancel' });
+
+    await page.evaluate(() => { window.__task7TouchPointers = []; });
     await cdp.send('Input.dispatchTouchEvent', {
       touchPoints: [{ id: 7, x: center.x, y: center.y }],
       type: 'touchStart',
@@ -275,13 +367,53 @@ async function verifyTouch(browser, errors, results) {
     const dragged = await readGameState(page);
     assert(dragged.controls.throttle > 0.45 && dragged.controls.steer > 0.45,
       `Actual touch drag did not move/steer: ${JSON.stringify(dragged.controls)}`);
+    const heldStick = { x: center.x + joystick.width * 0.38, y: center.y - joystick.height * 0.38 };
+
+    const sprayCenter = { x: spray.x + spray.width / 2, y: spray.y + spray.height / 2 };
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ id: 7, x: heldStick.x, y: heldStick.y }, { id: 9, x: sprayCenter.x, y: sprayCenter.y }],
+      type: 'touchStart',
+    });
+    await waitForFrames(page, 1);
+    const simultaneous = await readGameState(page);
+    assert(simultaneous.controls.throttle > 0.45 && simultaneous.controls.steer > 0.45 && simultaneous.controls.spray,
+      `Spray start released the held joystick: ${JSON.stringify(simultaneous.controls)}`);
+    assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'true',
+      'Simultaneous spray did not set aria-pressed true.');
     await page.screenshot({ path: `${outputDirectory}/touch-active.png` });
+    const activePointers = await page.evaluate(() => window.__task7TouchPointers);
+    const joystickPointer = activePointers.find((pointer) => pointer.className === 'touch-joystick');
+    const sprayPointer = activePointers.find((pointer) => pointer.className === 'spray-button');
+    assert(joystickPointer && sprayPointer, `CDP pointer mapping is incomplete: ${JSON.stringify(activePointers)}`);
+    await page.locator('.spray-button').dispatchEvent('pointerup', {
+      bubbles: true,
+      clientX: sprayCenter.x,
+      clientY: sprayCenter.y,
+      pointerId: sprayPointer.pointerId,
+      pointerType: 'touch',
+    });
+    await waitForFrames(page, 1);
+    const stickAfterSprayRelease = await readGameState(page);
+    assert(stickAfterSprayRelease.controls.throttle > 0.45 && stickAfterSprayRelease.controls.steer > 0.45
+      && !stickAfterSprayRelease.controls.spray,
+    `Spray release did not preserve the held joystick: ${JSON.stringify(stickAfterSprayRelease.controls)}`);
+
+    await page.locator('.touch-joystick').dispatchEvent('pointerup', {
+      bubbles: true,
+      clientX: heldStick.x,
+      clientY: heldStick.y,
+      pointerId: joystickPointer.pointerId,
+      pointerType: 'touch',
+    });
+    const joystickReleased = await readGameState(page);
+    assert(joystickReleased.controls.throttle === 0 && joystickReleased.controls.steer === 0,
+      `Joystick release did not center command: ${JSON.stringify(joystickReleased.controls)}`);
+
     await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchCancel' });
     const cancelled = await readGameState(page);
     assert(cancelled.controls.throttle === 0 && cancelled.controls.steer === 0,
       `Touch cancel did not center joystick: ${JSON.stringify(cancelled.controls)}`);
 
-    const sprayCenter = { x: spray.x + spray.width / 2, y: spray.y + spray.height / 2 };
     await cdp.send('Input.dispatchTouchEvent', {
       touchPoints: [{ id: 9, x: sprayCenter.x, y: sprayCenter.y }],
       type: 'touchStart',
@@ -322,7 +454,59 @@ async function verifyTouch(browser, errors, results) {
     assert(!(await readGameState(page)).controls.spray, 'Spray lostpointercapture left command stuck.');
     assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'false',
       'Spray lostpointercapture left aria-pressed stuck.');
-    results.touch = { cancelled: cancelled.controls, dragged: dragged.controls };
+    await page.locator('.spray-button').dispatchEvent('pointerdown', {
+      bubbles: true,
+      button: 0,
+      clientX: sprayCenter.x,
+      clientY: sprayCenter.y,
+      pointerId: 53,
+      pointerType: 'touch',
+    });
+    await page.locator('.touch-joystick').dispatchEvent('pointerdown', {
+      bubbles: true,
+      button: 0,
+      clientX: heldStick.x,
+      clientY: heldStick.y,
+      pointerId: 54,
+      pointerType: 'touch',
+    });
+    const inverseActive = await readGameState(page);
+    assert(inverseActive.controls.throttle > 0.45 && inverseActive.controls.steer > 0.45 && inverseActive.controls.spray,
+      `Spray-first input did not preserve both commands: ${JSON.stringify(inverseActive.controls)}`);
+    await page.locator('.touch-joystick').dispatchEvent('pointercancel', {
+      bubbles: true,
+      pointerId: 54,
+      pointerType: 'touch',
+    });
+    const inverseJoystickCancelled = await readGameState(page);
+    assert(inverseJoystickCancelled.controls.throttle === 0 && inverseJoystickCancelled.controls.steer === 0
+      && inverseJoystickCancelled.controls.spray,
+    `Joystick cancel did not preserve the earlier spray: ${JSON.stringify(inverseJoystickCancelled.controls)}`);
+    await page.locator('.spray-button').dispatchEvent('lostpointercapture', {
+      bubbles: true,
+      pointerId: 53,
+      pointerType: 'touch',
+    });
+    const inverseReleased = await readGameState(page);
+    assert(!inverseReleased.controls.spray, 'Spray lostpointercapture did not release the spray-first sequence.');
+    results.touch = {
+      afterVisibilityRestart: afterVisibilityRestart.controls,
+      cancelled: cancelled.controls,
+      dragged: dragged.controls,
+      inverse: {
+        active: inverseActive.controls,
+        joystickCancelled: inverseJoystickCancelled.controls,
+        released: inverseReleased.controls,
+      },
+      minThumbEdgeGap: Math.min(...thumbBounds.map(({ minEdgeGap }) => minEdgeGap)),
+      simultaneous: {
+        afterSprayRelease: stickAfterSprayRelease.controls,
+        during: simultaneous.controls,
+        joystickReleased: joystickReleased.controls,
+      },
+      thumbBounds,
+      visibilityRelease: hidden.controls,
+    };
   } finally {
     await context.close();
   }
