@@ -13,6 +13,18 @@ docker compose up --build web
 - 既存ゲーム: <http://localhost:5180/>
 - 純ボクセル消防車: <http://localhost:5180/vehicle-lab.html>
 
+## 純ボクセル消防車ゲーム
+
+- URL: <http://localhost:5180/voxel-game.html>
+- PC: WASD／矢印で運転、Spaceで放水、Fでfullscreen
+- タッチ: 左スティックで運転、右の水ボタン長押しで放水
+
+最終E2E、3 viewportの代表画像、renderer分類と性能実測はDocker内で生成します。
+
+```bash
+docker compose --profile e2e run --rm --build voxel-game-e2e
+```
+
 ## Vehicle Labの操作
 
 - マウスドラッグ／1本指ドラッグ: 消防車を回り込んで見る
@@ -29,6 +41,9 @@ docker compose up --build web
 docker compose run --rm web npm test
 docker compose run --rm web npm run build
 docker compose --profile e2e run --rm --build e2e
+docker compose --profile e2e run --rm --build voxel-game-e2e
 ```
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
+
+Voxel Gameの `run-manifest.json`、`results.json`、8枚の代表画像は `output/voxel-game/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。

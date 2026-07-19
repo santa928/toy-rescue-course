@@ -6,7 +6,8 @@ describe('resolveWorldFixedCameraZoom', () => {
     expect(resolveWorldFixedCameraZoom(1_280, 720)).toBeCloseTo(68.444444, 6);
   });
 
-  it('低高さのmobile横画面だけ安全zoom上限を適用する', () => {
-    expect(resolveWorldFixedCameraZoom(844, 390)).toBe(56);
+  it('低高さのmobile横画面だけ主要対象とHUDの安全余白を取るzoom上限を適用する', () => {
+    expect(resolveWorldFixedCameraZoom(1_024, 768)).toBeCloseTo(61.333333, 6);
+    expect(resolveWorldFixedCameraZoom(844, 390)).toBe(52);
   });
 });

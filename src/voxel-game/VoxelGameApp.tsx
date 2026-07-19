@@ -3,7 +3,6 @@ import type { ReactElement } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
   advanceManualClock,
-  syncBlockClearance,
   VoxelGameRuntime,
 } from './domain/VoxelGameRuntime';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
@@ -12,7 +11,11 @@ import {
   isFullscreenAvailable,
   toggleFullscreen,
 } from './input/fullscreenControls';
-import { VoxelGameScene } from './scene/VoxelGameScene';
+import {
+  syncRuntimeSpatialSignals,
+  VoxelGameScene,
+  type VoxelGameRenderTelemetry,
+} from './scene/VoxelGameScene';
 import type {
   VehicleControllerHandle,
   VehicleTelemetry,
@@ -106,6 +109,10 @@ export function VoxelGameApp(): ReactElement {
     sprayOnFire: false,
     targeted: false,
   });
+  const renderTelemetryRef = useRef<VoxelGameRenderTelemetry>({
+    renderedFrames: 0,
+    rendererCalls: 0,
+  });
   const [missionPhase, setMissionPhase] = useState(runtimeRef.current.getSnapshot().missionPhase);
   const [fullscreen, setFullscreen] = useState(false);
   const fullscreenAvailable = isFullscreenAvailable(document);
@@ -154,6 +161,7 @@ export function VoxelGameApp(): ReactElement {
           garage: GARAGE_POSITION,
         },
         mode: 'drive-ready',
+        renderer: { ...renderTelemetryRef.current },
         camera: {
           ...cameraTelemetryRef.current,
           lookTarget: [...cameraTelemetryRef.current.lookTarget],
@@ -199,11 +207,7 @@ export function VoxelGameApp(): ReactElement {
         runtimeRef.current,
         manualClockRef,
         milliseconds,
-        () => syncBlockClearance(
-          runtimeRef.current,
-          BREAKABLE_BLOCKS,
-          telemetryRef.current.position,
-        ),
+        () => syncRuntimeSpatialSignals(runtimeRef.current, telemetryRef.current.position),
       );
       breakablePoolHandleRef.current?.syncAfterRuntimeAdvance();
     };
@@ -228,6 +232,7 @@ export function VoxelGameApp(): ReactElement {
             controllerRef={controllerRef}
             manualClockRef={manualClockRef}
             missionTelemetryRef={missionTelemetryRef}
+            renderTelemetryRef={renderTelemetryRef}
             runtime={runtimeRef.current}
             telemetryRef={telemetryRef}
           />

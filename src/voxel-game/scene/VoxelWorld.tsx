@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import * as THREE from 'three';
-import { PARK_CENTER } from './worldLayout';
+import { BLOCK_PLAZA, PARK_CENTER } from './worldLayout';
 
 interface BoxInstance {
   readonly position: readonly [number, number, number];
@@ -152,8 +152,8 @@ function VoxelFireBuilding(): ReactElement {
 function VoxelBlockPlaza(): ReactElement {
   return (
     <group>
-      <mesh position={[-11.7, 0.18, 0]}>
-        <boxGeometry args={[6.6, 0.34, 7]} />
+      <mesh position={BLOCK_PLAZA.position}>
+        <boxGeometry args={BLOCK_PLAZA.scale} />
         <meshLambertMaterial color="#e1c78c" />
       </mesh>
     </group>

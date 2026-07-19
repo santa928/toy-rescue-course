@@ -123,8 +123,14 @@ async function armTargetedSprayAndReadGameState(page) {
 }
 
 /** scene ready、公開hook、初期routeまで待つ。 */
-async function openGamePage(browser, scenario, errors, viewport = { height: 720, width: 1280 }) {
-  const page = await browser.newPage({ viewport });
+async function openGamePage(
+  browser,
+  scenario,
+  errors,
+  viewport = { height: 720, width: 1280 },
+  hasTouch = false,
+) {
+  const page = await browser.newPage({ hasTouch, viewport });
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(`${scenario}: ${message.text()}`);
   });
@@ -144,6 +150,69 @@ async function openGamePage(browser, scenario, errors, viewport = { height: 720,
   return page;
 }
 
+/** CDPのtouch eventでjoystickと放水ボタンを保持・解除する実touch driverを作る。 */
+async function createTouchDriver(page) {
+  const cdp = await page.context().newCDPSession(page);
+  const joystick = await page.locator('.touch-joystick').boundingBox();
+  const spray = await page.locator('.spray-button').boundingBox();
+  assert(joystick && spray, 'Touch controls lack bounding boxes.');
+  const joystickCenter = {
+    x: joystick.x + joystick.width / 2,
+    y: joystick.y + joystick.height / 2,
+  };
+  const joystickRadius = Math.min(joystick.width, joystick.height) / 2;
+  const sprayCenter = {
+    x: spray.x + spray.width / 2,
+    y: spray.y + spray.height / 2,
+  };
+  let stickActive = false;
+  let sprayActive = false;
+
+  /** 正規化stick位置へtouch pointerを置き、既存pointerならmoveする。 */
+  const setStick = async (x, y) => {
+    const point = {
+      id: 51,
+      x: joystickCenter.x + x * joystickRadius,
+      y: joystickCenter.y + y * joystickRadius,
+    };
+    if (!stickActive) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        touchPoints: [{ id: 51, ...joystickCenter }],
+        type: 'touchStart',
+      });
+      stickActive = true;
+    }
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [point], type: 'touchMove' });
+  };
+
+  /** joystick pointerだけを終了する。放水との同時利用はこのE2Eでは行わない。 */
+  const releaseStick = async () => {
+    if (!stickActive) return;
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+    stickActive = false;
+  };
+
+  /** 放水ボタン中心へtouch pointerを置く。 */
+  const pressSpray = async () => {
+    assert(!stickActive, 'Spray touch must start after the joystick is released.');
+    if (sprayActive) return;
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ id: 52, ...sprayCenter }],
+      type: 'touchStart',
+    });
+    sprayActive = true;
+  };
+
+  /** 放水pointerを終了する。 */
+  const releaseSpray = async () => {
+    if (!sprayActive) return;
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+    sprayActive = false;
+  };
+
+  return { pressSpray, releaseSpray, releaseStick, setStick };
+}
+
 /** throttleを離した自然減速で、旋回前・撮影前の位置driftを抑える。 */
 async function brakeVehicle(page) {
   for (let frame = 0; frame < 120; frame += 1) {
@@ -154,7 +223,7 @@ async function brakeVehicle(page) {
 }
 
 /** 現在位置で左右入力だけを使い、指定世界方向へ消防車を向ける。 */
-async function turnVehicleToward(page, targetX, targetZ) {
+async function turnVehicleToward(page, targetX, targetZ, touchDriver) {
   const targetLength = Math.hypot(targetX, targetZ) || 1;
   const normalizedTargetX = targetX / targetLength;
   const normalizedTargetZ = targetZ / targetLength;
@@ -162,22 +231,25 @@ async function turnVehicleToward(page, targetX, targetZ) {
     const state = await readGameState(page);
     const [forwardX, , forwardZ] = state.vehicle.forward;
     const dot = forwardX * normalizedTargetX + forwardZ * normalizedTargetZ;
-    if (dot >= 0.9995) return;
+    if (dot >= 0.9995) {
+      await touchDriver?.releaseStick();
+      return;
+    }
     const currentAngle = Math.atan2(forwardX, forwardZ);
     const targetAngle = Math.atan2(normalizedTargetX, normalizedTargetZ);
     const delta = Math.atan2(Math.sin(targetAngle - currentAngle), Math.cos(targetAngle - currentAngle));
-    const key = delta >= 0 ? 'KeyD' : 'KeyA';
-    await page.keyboard.down(key);
+    if (touchDriver) await touchDriver.setStick(delta >= 0 ? 1 : -1, 0);
+    else await page.keyboard.down(delta >= 0 ? 'KeyD' : 'KeyA');
     await waitForFrames(page, 1);
-    await page.keyboard.up(key);
-    await waitForFrames(page, 1);
+    if (!touchDriver) await page.keyboard.up(delta >= 0 ? 'KeyD' : 'KeyA');
   }
   throw new Error(`Vehicle did not turn toward [${targetX}, ${targetZ}].`);
 }
 
 /** Wの公開keyboard経路だけで指定座標条件まで走り、停止する。 */
-async function driveUntil(page, predicate, description, maxBursts = 180) {
-  await page.keyboard.down('KeyW');
+async function driveUntil(page, predicate, description, maxBursts = 180, touchDriver) {
+  if (touchDriver) await touchDriver.setStick(0, -1);
+  else await page.keyboard.down('KeyW');
   try {
     for (let burst = 0; burst < maxBursts; burst += 1) {
       await waitForFrames(page, 2);
@@ -187,41 +259,59 @@ async function driveUntil(page, predicate, description, maxBursts = 180) {
     }
     throw new Error(`${description}: destination was not reached.`);
   } finally {
-    await page.keyboard.up('KeyW');
+    if (touchDriver) await touchDriver.releaseStick();
+    else await page.keyboard.up('KeyW');
     await brakeVehicle(page);
   }
 }
 
 /** 車庫から右回り道路を実際に走り、火災現場の南側へ到達する。 */
-async function driveRightRouteToFireApproach(page, stopZ) {
-  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'garage exit');
-  await turnVehicleToward(page, 1, 0);
-  await driveUntil(page, (state) => state.vehicle.position[0] >= 12, 'east road');
-  await turnVehicleToward(page, 0, -1);
-  await driveUntil(page, (state) => state.vehicle.position[2] <= stopZ, 'north road');
+async function driveRightRouteToFireApproach(page, stopZ, touchDriver) {
+  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'garage exit', 180, touchDriver);
+  await turnVehicleToward(page, 1, 0, touchDriver);
+  await driveUntil(page, (state) => state.vehicle.position[0] >= 12, 'east road', 180, touchDriver);
+  await turnVehicleToward(page, 0, -1, touchDriver);
+  await driveUntil(page, (state) => state.vehicle.position[2] <= stopZ, 'north road', 180, touchDriver);
+}
+
+/** 火災現場から南側道路を戻り、車庫の再開領域まで実入力で走る。 */
+async function driveBackToGarage(page, touchDriver) {
+  await turnVehicleToward(page, 0, 1, touchDriver);
+  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'return south road', 240, touchDriver);
+  await turnVehicleToward(page, -1, 0, touchDriver);
+  await driveUntil(
+    page,
+    (state) => state.runtime.missionPhase === 'assigned',
+    'garage mission restart',
+    180,
+    touchDriver,
+  );
 }
 
 /** current headingのまま短いW burstを入れ、照準距離を微調整する。 */
-async function pulseForward(page, frames = 3) {
-  await page.keyboard.down('KeyW');
+async function pulseForward(page, frames = 3, touchDriver) {
+  if (touchDriver) await touchDriver.setStick(0, -1);
+  else await page.keyboard.down('KeyW');
   await waitForFrames(page, frames);
-  await page.keyboard.up('KeyW');
+  if (touchDriver) await touchDriver.releaseStick();
+  else await page.keyboard.up('KeyW');
   await brakeVehicle(page);
 }
 
 /** 実車を前進させ、指定distance以下で初めて停止する。 */
-async function approachSprayDistance(page, maximumDistance) {
+async function approachSprayDistance(page, maximumDistance, touchDriver) {
   await driveUntil(
     page,
     (state) => state.mission.distance <= maximumDistance + 1.8,
     `spray approach ${maximumDistance}`,
     120,
+    touchDriver,
   );
   for (let pulse = 0; pulse < 40; pulse += 1) {
     const state = await readGameState(page);
     if (state.mission.distance <= maximumDistance) return state;
     assert(state.vehicle.resetCount === 0, `Spray approach reset unexpectedly: ${JSON.stringify(state.vehicle)}`);
-    await pulseForward(page);
+    await pulseForward(page, 3, touchDriver);
   }
   const finalState = await readGameState(page);
   throw new Error(`Spray distance did not reach ${maximumDistance}: ${JSON.stringify({
@@ -231,8 +321,9 @@ async function approachSprayDistance(page, maximumDistance) {
 }
 
 /** Space入力後に手動clockを進め、R3F表示へ反映する。 */
-async function sprayAndAdvance(page, milliseconds) {
-  await page.keyboard.down('Space');
+async function sprayAndAdvance(page, milliseconds, touchDriver) {
+  if (touchDriver) await touchDriver.pressSpray();
+  else await page.keyboard.down('Space');
   await waitForFrames(page, 2);
   await page.evaluate((duration) => window.advanceTime?.(duration), milliseconds);
   await waitForFrames(page, 2);
@@ -326,10 +417,19 @@ try {
     assert(freeRoamState.visuals.routeCubeCount === 0 && freeRoamState.visuals.starCubeCount === 0,
       `Mission visuals remain in freeRoam: ${JSON.stringify(freeRoamState.visuals)}`);
     assert(await missionPage.getByText('できた！', { exact: true }).count() === 0, 'Success text remains in freeRoam.');
+    await driveBackToGarage(missionPage);
+    const restartedState = await readGameState(missionPage);
+    assert(restartedState.runtime.missionPhase === 'assigned',
+      `Desktop garage did not restart assigned mission: ${restartedState.runtime.missionPhase}`);
+    assert(restartedState.runtime.fireIntensity === 1 && restartedState.runtime.routeVisible,
+      `Desktop garage did not restore fire and route: ${JSON.stringify(restartedState.runtime)}`);
+    assert(restartedState.visuals.fireLayerCount === 3 && restartedState.visuals.routeCubeCount === 12,
+      `Desktop garage did not restore mission visuals: ${JSON.stringify(restartedState.visuals)}`);
     results.missionChain = {
       celebration: celebrationState.runtime,
       freeRoam: freeRoamState.runtime,
       medium: mediumState.runtime,
+      restarted: restartedState.runtime,
       targetedDistance: targetedState.mission.distance,
     };
   } finally {
@@ -342,14 +442,16 @@ try {
     'mobile-visuals',
     errors,
     { height: 390, width: 844 },
+    true,
   );
+  const mobileTouch = await createTouchDriver(mobilePage);
   try {
-    await driveRightRouteToFireApproach(mobilePage, -2);
-    const targetedState = await approachSprayDistance(mobilePage, 5.7);
+    await driveRightRouteToFireApproach(mobilePage, -2, mobileTouch);
+    const targetedState = await approachSprayDistance(mobilePage, 5.7, mobileTouch);
     assert(targetedState.mission.targeted,
       `Mobile approach is not targeted: ${JSON.stringify(targetedState.mission)}`);
 
-    const mediumState = await sprayAndAdvance(mobilePage, 1_000);
+    const mediumState = await sprayAndAdvance(mobilePage, 1_000, mobileTouch);
     assert(mediumState.visuals.fireLayerCount === 2,
       `Mobile medium fire layer count is not 2: ${mediumState.visuals.fireLayerCount}`);
     assert(mediumState.visuals.waterCubeCount === 18,
@@ -363,7 +465,7 @@ try {
     await mobilePage.screenshot({ path: `${outputDirectory}/fire-medium-water-mobile.png` });
 
     await mobilePage.evaluate(() => window.advanceTime?.(1_500));
-    await mobilePage.keyboard.up('Space');
+    await mobileTouch.releaseSpray();
     await waitForFrames(mobilePage, 2);
     const celebrationState = await readGameState(mobilePage);
     assert(celebrationState.runtime.missionPhase === 'celebrating',
@@ -404,15 +506,32 @@ try {
     assert(successDistances.every((distance) => distance >= 4),
       `Mobile stars overlap success text: ${JSON.stringify({ starRects, successBox, successDistances })}`);
     await mobilePage.screenshot({ path: `${outputDirectory}/mission-complete-mobile.png` });
+    await mobilePage.evaluate(() => window.advanceTime?.(1_800));
+    await waitForFrames(mobilePage, 2);
+    const freeRoamState = await readGameState(mobilePage);
+    assert(freeRoamState.runtime.missionPhase === 'freeRoam',
+      `Mobile celebration did not end in freeRoam: ${freeRoamState.runtime.missionPhase}`);
+    await driveBackToGarage(mobilePage, mobileTouch);
+    const restartedState = await readGameState(mobilePage);
+    assert(restartedState.runtime.missionPhase === 'assigned',
+      `Touch garage did not restart assigned mission: ${restartedState.runtime.missionPhase}`);
+    assert(restartedState.runtime.fireIntensity === 1 && restartedState.runtime.routeVisible,
+      `Touch garage did not restore fire and route: ${JSON.stringify(restartedState.runtime)}`);
+    assert(restartedState.visuals.fireLayerCount === 3 && restartedState.visuals.routeCubeCount === 12,
+      `Touch garage did not restore mission visuals: ${JSON.stringify(restartedState.visuals)}`);
     results.mobileVisuals = {
       celebration: celebrationState.runtime,
+      freeRoam: freeRoamState.runtime,
+      input: 'touch',
       medium: mediumState.runtime,
       projection: { mediumFireRect, starRects, successDistances },
+      restarted: restartedState.runtime,
       successBox,
       targetedDistance: targetedState.mission.distance,
     };
   } finally {
-    await mobilePage.keyboard.up('Space').catch(() => undefined);
+    await mobileTouch.releaseSpray().catch(() => undefined);
+    await mobileTouch.releaseStick().catch(() => undefined);
     await mobilePage.close();
   }
 

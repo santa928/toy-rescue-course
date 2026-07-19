@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { ReactElement, RefObject } from 'react';
+import type { MutableRefObject, ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
 import type { DriveCommand } from '../input/controlState';
@@ -21,7 +21,7 @@ import {
 import { VoxelWorld } from './VoxelWorld';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
 import { WorldFixedCamera, type WorldCameraTelemetryRef } from './WorldFixedCamera';
-import { BREAKABLE_BLOCKS } from './worldLayout';
+import { BREAKABLE_BLOCKS, isInsideGarageRestartArea } from './worldLayout';
 
 interface VoxelGameSceneProps {
   readonly breakablePoolHandleRef: BreakablePoolHandleRef;
@@ -32,15 +32,49 @@ interface VoxelGameSceneProps {
   readonly manualClockRef: React.MutableRefObject<boolean>;
   readonly missionTelemetryRef: MissionTelemetryRef;
   readonly runtime: VoxelGameRuntime;
+  readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
   readonly telemetryRef: VehicleTelemetryRef;
 }
 
+export interface VoxelGameRenderTelemetry {
+  readonly renderedFrames: number;
+  readonly rendererCalls: number;
+}
+
+export type VoxelGameRenderTelemetryRef = MutableRefObject<VoxelGameRenderTelemetry>;
+
+/** 車両位置に依存する積み木復元と車庫帰還signalを同じphysics時点へ同期する。 */
+export function syncRuntimeSpatialSignals(
+  runtime: VoxelGameRuntime,
+  vehiclePosition: readonly [number, number, number],
+): void {
+  syncBlockClearance(runtime, BREAKABLE_BLOCKS, vehiclePosition);
+  runtime.setSignals({ atGarage: isInsideGarageRestartArea(vehiclePosition) });
+}
+
+/** 最新draw call数を保持しながら実描画frame数を1増やす。 */
+export function advanceRenderTelemetry(
+  current: VoxelGameRenderTelemetry,
+  rendererCalls: number,
+): VoxelGameRenderTelemetry {
+  return {
+    renderedFrames: current.renderedFrames + 1,
+    rendererCalls,
+  };
+}
+
 /** 複数frameとdraw callを確認してから自動検証へscene readyを通知する。 */
-function SceneReadySignal(): null {
+function SceneReadySignal({ renderTelemetryRef }: {
+  readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
+}): null {
   const renderedFrameCount = useRef(0);
 
   useFrame(({ gl }) => {
     renderedFrameCount.current += 1;
+    renderTelemetryRef.current = advanceRenderTelemetry(
+      renderTelemetryRef.current,
+      gl.info.render.calls,
+    );
     if (renderedFrameCount.current >= 3 && gl.info.render.calls > 0) {
       document.documentElement.dataset.voxelSceneReady = 'true';
     }
@@ -71,7 +105,7 @@ function RuntimeClock({
   telemetryRef,
 }: RuntimeClockProps): null {
   const syncLatestBlockClearance = useCallback(() => {
-    syncBlockClearance(runtime, BREAKABLE_BLOCKS, telemetryRef.current.position);
+    syncRuntimeSpatialSignals(runtime, telemetryRef.current.position);
   }, [runtime, telemetryRef]);
 
   useFrame((_state, delta) => {
@@ -90,6 +124,7 @@ export function VoxelGameScene({
   controllerRef,
   manualClockRef,
   missionTelemetryRef,
+  renderTelemetryRef,
   runtime,
   telemetryRef,
 }: VoxelGameSceneProps): ReactElement {
@@ -97,7 +132,7 @@ export function VoxelGameScene({
     <>
       <color attach="background" args={['#ead4b3']} />
       <WorldFixedCamera cameraTelemetryRef={cameraTelemetryRef} telemetryRef={telemetryRef} />
-      <SceneReadySignal />
+      <SceneReadySignal renderTelemetryRef={renderTelemetryRef} />
       <RuntimeClock
         breakablePoolHandleRef={breakablePoolHandleRef}
         manualClockRef={manualClockRef}

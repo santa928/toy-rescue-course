@@ -10,7 +10,7 @@ import {
 import * as THREE from 'three';
 import type { BreakablePhase, VoxelGameSnapshot, VoxelGameRuntime } from '../domain/VoxelGameRuntime';
 import type { VehicleTelemetryRef } from './VehicleController';
-import { BREAKABLE_BLOCKS } from './worldLayout';
+import { BLOCK_PLAZA, BREAKABLE_BLOCKS } from './worldLayout';
 
 interface LinearVelocity {
   readonly x: number;
@@ -168,27 +168,54 @@ const ZERO_VELOCITY = { x: 0, y: 0, z: 0 } as const;
 const IDENTITY_ROTATION = { w: 1, x: 0, y: 0, z: 0 } as const;
 
 const FRAGMENT_TEMPLATES = [
-  { localPosition: [0.2, 0.87, -0.1] as const, velocity: [0.05, 0.2, 0] as const },
-  { localPosition: [0.2, 1.67, -0.7] as const, velocity: [0.06, 0.25, 0.15] as const },
-  { localPosition: [0.2, 1.27, -2.1] as const, velocity: [0.07, 0.3, -0.15] as const },
-  { localPosition: [0.8, 1.27, -2.7] as const, velocity: [0.08, 0.35, -0.2] as const },
-  { localPosition: [0.2, 2.07, -2.9] as const, velocity: [0.09, 0.4, -0.25] as const },
-  { localPosition: [2.6, 0.07, -2.5] as const, velocity: [0.1, 0.45, -0.3] as const },
+  { localPosition: [3, 0.87, -2.2] as const, velocity: [0.05, 0.2, 0] as const },
+  { localPosition: [4.2, 1.67, -0.2] as const, velocity: [0.06, 0.25, 0.15] as const },
+  { localPosition: [1.8, 1.27, -4] as const, velocity: [0.07, 0.3, -0.15] as const },
+  { localPosition: [3.8, 1.27, -2.8] as const, velocity: [0.08, 0.35, -0.2] as const },
+  { localPosition: [5, 2.07, -0.8] as const, velocity: [0.09, 0.4, -0.25] as const },
+  { localPosition: [2.6, 0.07, -4.6] as const, velocity: [0.1, 0.45, -0.3] as const },
 ] as const;
+
+const FRAGMENT_LOCAL_POSITIONS_BY_BLOCK_ID: Readonly<Record<
+  string,
+  readonly (readonly [number, number, number])[]
+>> = {
+  'plaza-red': FRAGMENT_TEMPLATES.map(({ localPosition }) => localPosition),
+  'plaza-yellow': [
+    [0.4, 0.87, -0.2], [0, 1.67, 1], [-1.2, 1.27, -0.6],
+    [-1.6, 1.27, 0.6], [-2.4, 2.07, 1.4], [-3.6, 0.07, -0.2],
+  ],
+  'plaza-blue': [
+    [0.2, 0.87, 0.4], [-1.4, 1.67, 0], [-1, 1.27, -1.2],
+    [0.2, 1.27, -1.6], [-0.2, 2.07, 1.6], [-1.8, 0.07, 1.2],
+  ],
+  'plaza-green': [
+    [-0.4, 0.87, -0.3], [1.2, 1.67, 0.1], [0, 1.27, -1.5],
+    [0.8, 1.27, 1.3], [-0.4, 2.07, 1.7], [1.6, 0.07, -1.1],
+  ],
+};
 
 /** block定義ごとに専用6片を割り当て、再生成しない固定pool定義を返す。 */
 export function createBreakableFragmentPool(
   blocks: readonly BreakableBlockDefinition[],
 ): readonly BreakableFragmentSlot[] {
-  return blocks.flatMap((block) => FRAGMENT_TEMPLATES.map((template, index) => ({
-    blockId: block.id,
-    color: block.color,
-    id: `${block.id}:fragment-${index}`,
-    index,
-    localPosition: template.localPosition,
-    scale: FRAGMENT_SCALE,
-    velocity: template.velocity,
-  })));
+  return blocks.flatMap((block) => {
+    const inwardX = Math.sign(BLOCK_PLAZA.position[0] - block.position[0]) || 1;
+    const positions = FRAGMENT_LOCAL_POSITIONS_BY_BLOCK_ID[block.id];
+    return FRAGMENT_TEMPLATES.map((template, index) => ({
+      blockId: block.id,
+      color: block.color,
+      id: `${block.id}:fragment-${index}`,
+      index,
+      localPosition: positions?.[index] ?? template.localPosition,
+      scale: FRAGMENT_SCALE,
+      velocity: [
+        Math.abs(template.velocity[0]) * inwardX,
+        template.velocity[1],
+        template.velocity[2],
+      ] as const,
+    }));
+  });
 }
 
 export const BREAKABLE_FRAGMENT_POOL = createBreakableFragmentPool(BREAKABLE_BLOCKS);
@@ -272,13 +299,12 @@ export function calculateRelativeLinearSpeed(
   );
 }
 
-/** after-step eventでは衝突車両の前step速度を使い、他bodyはevent時の実速度を使う。 */
+/** after-step eventでは衝突車両の前step速度だけを破壊速度として採用する。 */
 export function resolveBlockImpactSpeed({
   collisionBodyIsVehicle,
-  eventRelativeSpeed,
   vehiclePreviousStepSpeed,
 }: BlockImpactSpeedInput): number {
-  return collisionBodyIsVehicle ? vehiclePreviousStepSpeed : eventRelativeSpeed;
+  return collisionBodyIsVehicle ? vehiclePreviousStepSpeed : 0;
 }
 
 /** block中心と車両のXZ距離が復元半径3を厳密に超えるか判定する。 */

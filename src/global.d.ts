@@ -26,6 +26,7 @@ declare global {
       readonly routeVisible: boolean;
     };
     readonly mode: 'drive-ready';
+    readonly renderer: import('./voxel-game/scene/VoxelGameScene').VoxelGameRenderTelemetry;
     readonly runtime: import('./voxel-game/domain/VoxelGameRuntime').VoxelGameSnapshot;
     readonly vehicle: import('./voxel-game/scene/VehicleController').VehicleTelemetry;
     readonly visualLayout: {

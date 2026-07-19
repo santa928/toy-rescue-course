@@ -4,7 +4,9 @@ import { chromium } from 'playwright';
 import * as THREE from 'three';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
+const additionalBlocksOnly = process.env.TASK6_ADDITIONAL_BLOCKS_ONLY === '1';
 const outputDirectory = 'output/voxel-game';
+const BLOCK_PLAZA_BOUNDS = { maxX: -6, maxZ: 7, minX: -13, minZ: -7 };
 fs.mkdirSync(outputDirectory, { recursive: true });
 
 /** R3FとRapierを指定frame数だけ通常clockで進める。 */
@@ -90,10 +92,10 @@ function getScreenRectDistance(first, second) {
   return Math.hypot(horizontalGap, verticalGap);
 }
 
-/** actual body位置から6片の画面分離、他block距離、viewport内包、内側方向を測る。 */
-function measureFragmentVisualSeparation(state) {
+/** actual body位置から指定block6片の画面分離、他block距離、viewport/広場内包を測る。 */
+function measureFragmentVisualSeparation(state, blockId = 'plaza-red', requireViewport = true) {
   const fragments = state.breakables.activeFragments
-    ?.filter(({ id }) => id.startsWith('plaza-red:'));
+    ?.filter(({ id }) => id.startsWith(`${blockId}:`));
   if (!Array.isArray(fragments) || fragments.length !== 6) {
     return { ready: false, reason: `Expected six actual active fragment positions: ${JSON.stringify(fragments)}` };
   }
@@ -105,7 +107,7 @@ function measureFragmentVisualSeparation(state) {
     }
   }
   const intactRects = state.landmarks.breakableBlocks
-    .filter(({ id }) => id !== 'plaza-red')
+    .filter(({ id }) => id !== blockId)
     .map(({ position }) => projectWorldCubeToScreenRect(state.camera, {
       position,
       scale: [1.5, 1.5, 1.5],
@@ -121,12 +123,17 @@ function measureFragmentVisualSeparation(state) {
   };
   const minFragmentGap = Math.min(...fragmentGaps);
   const minIntactGap = Math.min(...intactGaps);
-  const minWorldX = Math.min(...fragments.map(({ position }) => position[0]));
+  const allInsidePlaza = fragments.every(({ position, scale }) => (
+    position[0] - scale[0] / 2 >= BLOCK_PLAZA_BOUNDS.minX
+    && position[0] + scale[0] / 2 <= BLOCK_PLAZA_BOUNDS.maxX
+    && position[2] - scale[2] / 2 >= BLOCK_PLAZA_BOUNDS.minZ
+    && position[2] + scale[2] / 2 <= BLOCK_PLAZA_BOUNDS.maxZ
+  ));
   const otherBlockPhases = state.runtime.blocks
-    .filter(({ id }) => id !== 'plaza-red')
+    .filter(({ id }) => id !== blockId)
     .map(({ id, phase }) => ({ id, phase }));
   const otherBlockImpacts = state.breakables.blocks
-    .filter(({ id }) => id !== 'plaza-red')
+    .filter(({ id }) => id !== blockId)
     .map(({ id, impactCount }) => ({ id, impactCount }));
   const otherBlocksUntouched = otherBlockPhases.every(({ phase }) => phase === 'intact')
     && otherBlockImpacts.every(({ impactCount }) => impactCount === 0);
@@ -135,39 +142,44 @@ function measureFragmentVisualSeparation(state) {
     && bounds.right <= viewport.width && bounds.bottom <= viewport.height;
   return {
     allInsideViewport,
+    allInsidePlaza,
     bounds,
     camera: state.camera,
     fragmentRects,
     minFragmentGap,
     minIntactGap,
-    minWorldX,
     otherBlockImpacts,
     otherBlockPhases,
     otherBlocksUntouched,
     positions: fragments.map(({ id, position }) => ({ id, position })),
-    ready: allInsideViewport && minFragmentGap >= 2 && minIntactGap >= 2
-      && minWorldX > -12.95 && otherBlocksUntouched,
+    ready: (!requireViewport || allInsideViewport) && allInsidePlaza && minFragmentGap >= 2 && minIntactGap >= 2
+      && otherBlocksUntouched,
   };
 }
 
 /** 1.2秒の表示窓内で、actual 6片すべてが視覚分離する最初のframeを返す。 */
-async function waitForFragmentVisualSeparation(page) {
+async function waitForFragmentVisualSeparation(page, blockId = 'plaza-red', requireViewport = true) {
   let latestMeasurement = { ready: false, reason: 'No fragment frame observed.' };
   for (let frame = 0; frame < 65; frame += 1) {
     await waitForFrames(page, 1);
     const state = await readGameState(page);
     const activeRedFragments = state.breakables.activeFragments
-      ?.filter(({ id }) => id.startsWith('plaza-red:'));
+      ?.filter(({ id }) => id.startsWith(`${blockId}:`));
     if (activeRedFragments?.length !== 6) continue;
-    latestMeasurement = measureFragmentVisualSeparation(state);
+    latestMeasurement = measureFragmentVisualSeparation(state, blockId, requireViewport);
     if (latestMeasurement.ready) return { measurement: latestMeasurement, state };
   }
-  throw new Error(`Six fragments never became visually separated: ${JSON.stringify(latestMeasurement)}`);
+  throw new Error(`${blockId} fragments never became visually separated: ${JSON.stringify(latestMeasurement)}`);
 }
 
 /** scene ready、公開hook、24-slot pool準備まで待つ。 */
-async function openGamePage(browser, scenario, errors) {
-  const page = await browser.newPage({ viewport: { height: 720, width: 1280 } });
+async function openGamePage(
+  browser,
+  scenario,
+  errors,
+  viewport = { height: 720, width: 1280 },
+) {
+  const page = await browser.newPage({ viewport });
   page.on('console', (message) => {
     if (message.type() === 'error') {
       errors.push(`${scenario}: ${message.text()}`);
@@ -202,6 +214,53 @@ async function openGamePage(browser, scenario, errors) {
   assert.equal(state.breakables.uniqueMeshUuidCount, 24, `${scenario}: fragment mesh UUIDs are not unique.`);
   assert.equal(state.visuals.intactBlockCount, 4, `${scenario}: intact block count is not four.`);
   return page;
+}
+
+/** 西側道路の中央まで実走し、積み木広場4個を同時に見渡せる視点を作る。 */
+async function driveToBlockPlazaOverview(page) {
+  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'plaza overview garage exit');
+  await brakeVehicle(page);
+  await turnVehicleToward(page, -1, 0);
+  await driveUntil(page, (state) => state.vehicle.position[0] <= -16.1, 'plaza overview west road');
+  await brakeVehicle(page);
+  await turnVehicleToward(page, 0, -1);
+  await driveUntil(page, (state) => state.vehicle.position[2] <= 1.2, 'plaza overview northbound');
+  await brakeVehicle(page);
+  await turnVehicleToward(page, 1, 0);
+  await driveUntil(page, (state) => state.vehicle.position[0] >= -12.4, 'plaza overview eastbound');
+  await brakeVehicle(page);
+  await waitForFrames(page, 15);
+}
+
+/** 4 blockの実camera投影がviewport内に収まることを数値で確認する。 */
+function measureBlockPlazaVisibility(state, hudControlRects) {
+  const rects = state.landmarks.breakableBlocks.map(({ id, position }) => ({
+    id,
+    rect: projectWorldCubeToScreenRect(state.camera, { position, scale: [1.5, 1.5, 1.5] }),
+  }));
+  const { height, width } = state.camera.viewport;
+  const minimumViewportMargin = Math.min(...rects.flatMap(({ rect }) => [
+    rect.left,
+    rect.top,
+    width - rect.right,
+    height - rect.bottom,
+  ]));
+  const screenRectGap = (first, second) => Math.hypot(
+    Math.max(first.left - second.right, second.left - first.right, 0),
+    Math.max(first.top - second.bottom, second.top - first.bottom, 0),
+  );
+  const minimumHudControlGap = Math.min(...rects.flatMap(({ rect }) => (
+    hudControlRects.map((control) => screenRectGap(rect, control))
+  )));
+  return {
+    allInsideViewport: rects.every(({ rect }) => (
+      rect.left >= 0 && rect.top >= 0 && rect.right <= width && rect.bottom <= height
+    )),
+    camera: state.camera,
+    minimumHudControlGap,
+    minimumViewportMargin,
+    rects,
+  };
 }
 
 /** throttleを離した自然減速で次の旋回・接近を安定させる。 */
@@ -253,16 +312,88 @@ async function driveUntil(page, predicate, description, maxBursts = 180) {
 
 /** 車庫から外周西端を実走し、他blockを避けて赤block西側へ東向きで出る。 */
 async function driveToRedBlockApproach(page) {
+  const initialState = await readGameState(page);
+  const redPosition = initialState.landmarks.breakableBlocks
+    .find(({ id }) => id === 'plaza-red')?.position;
+  assert(redPosition, 'Red block landmark is unavailable.');
   await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'garage exit');
   await brakeVehicle(page);
   await turnVehicleToward(page, -1, 0);
   await driveUntil(page, (state) => state.vehicle.position[0] <= -16.1, 'west road outer edge');
   await brakeVehicle(page);
   await turnVehicleToward(page, 0, -1);
-  await driveUntil(page, (state) => state.vehicle.position[2] <= 1.7, 'red block west side');
+  await driveUntil(
+    page,
+    (state) => state.vehicle.position[2] <= redPosition[2] + 1.7,
+    'red block west side',
+  );
   await brakeVehicle(page);
   await turnVehicleToward(page, 1, 0);
   return readGameState(page);
+}
+
+/** 車庫から他blockを避け、指定blockへ東西いずれかの開けた側から接近する。 */
+async function driveToBlockApproach(page, blockId) {
+  if (blockId === 'plaza-red') return driveToRedBlockApproach(page);
+  const initialState = await readGameState(page);
+  const target = initialState.landmarks.breakableBlocks.find(({ id }) => id === blockId)?.position;
+  assert(target, `${blockId} landmark is unavailable.`);
+  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, `${blockId} garage exit`);
+  await brakeVehicle(page);
+
+  if (blockId === 'plaza-green') {
+    await turnVehicleToward(page, -1, 0);
+    await driveUntil(page, (state) => state.vehicle.position[0] <= -16.1, `${blockId} west road`);
+    await brakeVehicle(page);
+    await turnVehicleToward(page, 0, -1);
+    await driveUntil(page, (state) => state.vehicle.position[2] <= target[2] + 1.7, `${blockId} west side`);
+    await brakeVehicle(page);
+    await turnVehicleToward(page, 1, 0);
+  } else {
+    await turnVehicleToward(page, 0, -1);
+    await driveUntil(page, (state) => state.vehicle.position[2] <= target[2], `${blockId} east side latitude`);
+    await brakeVehicle(page);
+    await turnVehicleToward(page, -1, 0);
+  }
+  return readGameState(page);
+}
+
+/** 公開keyboard経路の有効速度衝突で指定blockだけがbrokenになるまで待つ。 */
+async function collideBlockAtEffectiveSpeed(page, blockId) {
+  await page.keyboard.down('KeyW');
+  try {
+    return await page.evaluate((targetBlockId) => new Promise((resolve, reject) => {
+      let frameCount = 0;
+      const tick = () => {
+        frameCount += 1;
+        const rendered = window.render_game_to_text?.();
+        if (!rendered) {
+          reject(new Error('Voxel Game text state is unavailable during all-block collision.'));
+          return;
+        }
+        const state = JSON.parse(rendered);
+        const targetBroken = state.runtime.blocks.find(({ id }) => id === targetBlockId)?.phase === 'broken';
+        const targetFragmentsActive = state.breakables.activeFragments
+          ?.filter(({ id }) => id.startsWith(`${targetBlockId}:`)).length === 6;
+        if (targetBroken && targetFragmentsActive) {
+          window.reset_voxel_game_vehicle?.();
+          resolve(state);
+          return;
+        }
+        if (frameCount >= 240) {
+          reject(new Error(`${targetBlockId} did not break through actual vehicle collision: ${JSON.stringify({
+            block: state.breakables.blocks.find(({ id }) => id === targetBlockId),
+            vehicle: state.vehicle,
+          })}`));
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }), blockId);
+  } finally {
+    await page.keyboard.up('KeyW');
+  }
 }
 
 /** 有効速度で赤blockへ衝突し、physics event経由のbrokenを待つ。 */
@@ -338,10 +469,16 @@ async function collideAtEffectiveSpeedThroughTimer(page) {
 
 /** 赤block中心と車両のXZ距離を返す。 */
 function distanceFromRedBlock(state) {
-  return Math.hypot(state.vehicle.position[0] + 13, state.vehicle.position[2]);
+  const redPosition = state.landmarks.breakableBlocks
+    .find(({ id }) => id === 'plaza-red')?.position;
+  assert(redPosition, 'Red block landmark is unavailable.');
+  return Math.hypot(
+    state.vehicle.position[0] - redPosition[0],
+    state.vehicle.position[2] - redPosition[2],
+  );
 }
 
-/** 復元期限直前に実keyboardでclear側から半径3内へ入り、0msでbroken維持後に離れる。 */
+/** clear側で期限直前まで進めてから実keyboardで半径3内へ入り、0msでbroken維持後に離れる。 */
 async function verifySafeRestoreBoundary(page) {
   await page.keyboard.down('KeyS');
   try {
@@ -355,25 +492,9 @@ async function verifySafeRestoreBoundary(page) {
   }
   await brakeVehicle(page);
   const outside = await readGameState(page);
-  assert(distanceFromRedBlock(outside) > 3, 'Vehicle is not outside red respawn radius.');
-
-  await page.keyboard.down('KeyW');
-  try {
-    for (let frame = 0; frame < 180; frame += 1) {
-      await waitForFrames(page, 1);
-      const approaching = await readGameState(page);
-      const distance = distanceFromRedBlock(approaching);
-      if (distance > 3.6 && distance <= 3.9) break;
-      if (frame === 179) throw new Error(`Vehicle missed outside boundary band: ${distance}.`);
-    }
-  } finally {
-    await page.keyboard.up('KeyW');
-  }
-
-  const justOutside = await readGameState(page);
-  const beforeDeadlineBlock = justOutside.runtime.blocks.find(({ id }) => id === 'plaza-red');
-  assert(distanceFromRedBlock(justOutside) > 3, 'Deadline setup crossed inside too early.');
-  await windowAdvance(page, Math.max(0, (beforeDeadlineBlock?.respawnRemainingMs ?? 0) - 500));
+  assert(distanceFromRedBlock(outside) > 4.2, 'Vehicle is not safely outside red respawn radius.');
+  const beforeDeadlineBlock = outside.runtime.blocks.find(({ id }) => id === 'plaza-red');
+  await windowAdvance(page, Math.max(0, (beforeDeadlineBlock?.respawnRemainingMs ?? 0) - 3_000));
   const justBeforeDeadline = await readGameState(page);
   assert.equal(justBeforeDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase, 'broken');
   assert(distanceFromRedBlock(justBeforeDeadline) > 3, 'Vehicle is not clear immediately before keyboard entry.');
@@ -381,7 +502,7 @@ async function verifySafeRestoreBoundary(page) {
   await page.keyboard.down('KeyW');
   let inside;
   try {
-    for (let frame = 0; frame < 30; frame += 1) {
+    for (let frame = 0; frame < 90; frame += 1) {
       await waitForFrames(page, 1);
       inside = await readGameState(page);
       if (distanceFromRedBlock(inside) <= 3) break;
@@ -437,6 +558,7 @@ const errors = [];
 const results = {};
 
 try {
+  if (!additionalBlocksOnly) {
   const chainPage = await openGamePage(browser, 'break-restore-chain', errors);
   try {
     await driveToRedBlockApproach(chainPage);
@@ -549,7 +671,44 @@ try {
     await chainPage.keyboard.up('KeyS').catch(() => undefined);
     await chainPage.close();
   }
+  }
 
+  results.allBlockBreaks = additionalBlocksOnly ? {} : {
+    'plaza-red': {
+      block: results.chain.rebroken,
+      impactSpeed: results.chain.effectiveImpactSpeed,
+      visualProjection: results.chain.visualProjection,
+    },
+  };
+  for (const blockId of ['plaza-yellow', 'plaza-blue', 'plaza-green']) {
+    const blockPage = await openGamePage(browser, `${blockId}-actual-break`, errors);
+    try {
+      const approach = await driveToBlockApproach(blockPage, blockId);
+      const broken = await collideBlockAtEffectiveSpeed(blockPage, blockId);
+      const blockTelemetry = broken.breakables.blocks.find(({ id }) => id === blockId);
+      assert((blockTelemetry?.maxImpactSpeed ?? 0) >= 4,
+        `${blockId} effective impact speed is below four: ${JSON.stringify(blockTelemetry)}`);
+      assert.equal(blockTelemetry?.fragmentVisibleCount, 6, `${blockId} does not show six fragments.`);
+      assert.equal(broken.breakables.activeFragmentCount, 6, `${blockId} did not activate exactly six pool slots.`);
+      for (const other of broken.runtime.blocks.filter(({ id }) => id !== blockId)) {
+        assert.equal(other.phase, 'intact', `${blockId} collision also broke ${other.id}.`);
+      }
+      // brokenを読んだframeで退避済みのため、車体の二次接触なしで破片配置を観測する。
+      await waitForFrames(blockPage, 1);
+      const visual = await waitForFragmentVisualSeparation(blockPage, blockId, false);
+      results.allBlockBreaks[blockId] = {
+        approach: approach.vehicle,
+        block: visual.state.runtime.blocks.find(({ id }) => id === blockId),
+        impactSpeed: blockTelemetry.maxImpactSpeed,
+        visualProjection: visual.measurement,
+      };
+    } finally {
+      await blockPage.keyboard.up('KeyW').catch(() => undefined);
+      await blockPage.close();
+    }
+  }
+
+  if (!additionalBlocksOnly) {
   const belowThresholdPage = await openGamePage(browser, 'below-threshold', errors);
   try {
     const approach = await driveToRedBlockApproach(belowThresholdPage);
@@ -569,9 +728,64 @@ try {
     await belowThresholdPage.close();
   }
 
+  results.plazaViewports = {};
+  for (const viewport of [
+    { height: 720, name: 'desktop', width: 1280 },
+    { height: 768, name: 'tablet-landscape', width: 1024 },
+    { height: 390, name: 'mobile-landscape', width: 844 },
+  ]) {
+    const overviewPage = await openGamePage(browser, `plaza-${viewport.name}`, errors, viewport);
+    try {
+      await driveToBlockPlazaOverview(overviewPage);
+      const state = await readGameState(overviewPage);
+      const hudControlRects = await overviewPage.evaluate(() => [
+        '.fullscreen-button',
+        '.mission-pill',
+        '.spray-button',
+        '.touch-joystick',
+      ].map((selector) => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error(`Missing HUD control: ${selector}`);
+        const rect = element.getBoundingClientRect();
+        return {
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+        };
+      }));
+      const visibility = measureBlockPlazaVisibility(state, hudControlRects);
+      assert(
+        visibility.allInsideViewport,
+        `${viewport.name}: not all four plaza blocks fit the viewport: ${JSON.stringify(visibility)}`,
+      );
+      assert(
+        visibility.minimumViewportMargin >= 4,
+        `${viewport.name}: plaza blocks have less than 4px viewport margin: ${JSON.stringify(visibility)}`,
+      );
+      assert(
+        visibility.minimumHudControlGap >= 4,
+        `${viewport.name}: plaza blocks have less than 4px HUD gap: ${JSON.stringify(visibility)}`,
+      );
+      await overviewPage.screenshot({
+        path: `${outputDirectory}/block-plaza-${viewport.name}.png`,
+      });
+      results.plazaViewports[viewport.name] = visibility;
+    } finally {
+      await overviewPage.close();
+    }
+  }
+
   assert.equal(errors.length, 0, `Voxel Game Task6 browser errors: ${errors.join(' | ')}`);
-  for (const screenshot of ['block-broken.png', 'block-restored.png']) {
+  for (const screenshot of [
+    'block-broken.png',
+    'block-restored.png',
+    'block-plaza-desktop.png',
+    'block-plaza-tablet-landscape.png',
+    'block-plaza-mobile-landscape.png',
+  ]) {
     assert(fs.existsSync(`${outputDirectory}/${screenshot}`), `Missing screenshot: ${screenshot}`);
+  }
   }
   fs.writeFileSync(`${outputDirectory}/task6-results.json`, `${JSON.stringify(results, null, 2)}\n`);
   console.log(JSON.stringify(results));
