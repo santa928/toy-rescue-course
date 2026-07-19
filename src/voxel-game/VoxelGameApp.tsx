@@ -22,6 +22,7 @@ export function VoxelGameApp(): ReactElement {
   const runtimeRef = useRef(new VoxelGameRuntime(BREAKABLE_BLOCKS.map(({ id }) => id)));
   const telemetryRef = useRef<VehicleTelemetry>({
     forward: [0, 0, 1],
+    mass: 0,
     position: [...GARAGE_POSITION],
     resetCount: 0,
     speed: 0,

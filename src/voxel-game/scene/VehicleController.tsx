@@ -9,6 +9,7 @@ import { GARAGE_POSITION, WORLD_BOUNDS } from './worldLayout';
 
 export interface VehicleTelemetry {
   readonly forward: readonly [number, number, number];
+  readonly mass: number;
   readonly position: readonly [number, number, number];
   readonly resetCount: number;
   readonly speed: number;
@@ -52,10 +53,12 @@ function updateTelemetry(
   telemetryRef: VehicleTelemetryRef,
   position: { readonly x: number; readonly y: number; readonly z: number },
   direction: THREE.Vector3,
+  mass: number,
   speed: number,
 ): void {
   telemetryRef.current = {
     forward: [direction.x, direction.y, direction.z],
+    mass,
     position: [position.x, position.y, position.z],
     resetCount: telemetryRef.current.resetCount,
     speed,
@@ -72,6 +75,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       const body = bodyRef.current;
       telemetryRef.current = {
         forward: [0, 0, 1],
+        mass: body?.mass() ?? telemetryRef.current.mass,
         position: [...GARAGE_POSITION],
         resetCount: telemetryRef.current.resetCount + 1,
         speed: 0,
@@ -111,7 +115,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
 
       body.setLinvel({ x: forward.x * nextSpeed, y: velocity.y, z: forward.z * nextSpeed }, true);
       body.setAngvel({ x: 0, y: targetYawVelocity, z: 0 }, true);
-      updateTelemetry(telemetryRef, position, forward, Math.abs(nextSpeed));
+      updateTelemetry(telemetryRef, position, forward, body.mass(), Math.abs(nextSpeed));
     });
 
     return (
@@ -120,11 +124,10 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
         colliders={false}
         enabledRotations={[false, true, false]}
         linearDamping={2.2}
-        mass={1.4}
         position={GARAGE_POSITION}
         ref={bodyRef}
       >
-        <CuboidCollider args={[1.45, 0.95, 1.7]} position={[0, 0.95, 0]} />
+        <CuboidCollider args={[1.45, 0.95, 1.7]} mass={1.4} position={[0, 0.95, 0]} />
         <group rotation={[0, Math.PI, 0]}>
           <VoxelFireTruck />
         </group>

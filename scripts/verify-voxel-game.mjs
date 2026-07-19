@@ -151,6 +151,9 @@ try {
   if (initialState.vehicle.forward[2] < 0.99) {
     throw new Error(`Vehicle initial forward is not aligned with the garage opening (${initialState.vehicle.forward.join(', ')}).`);
   }
+  if (!Number.isFinite(initialState.vehicle.mass) || Math.abs(initialState.vehicle.mass - 1.4) > 0.01) {
+    throw new Error(`Vehicle runtime mass is not 1.4 (${String(initialState.vehicle.mass)}).`);
+  }
 
   await page.keyboard.down('KeyW');
   await waitForFrames(page, 30);
@@ -175,7 +178,6 @@ try {
   if (afterSteer.vehicle.speed >= afterForward.vehicle.speed - 0.1) {
     throw new Error(`A burst did not release throttle and decelerate (${afterForward.vehicle.speed} -> ${afterSteer.vehicle.speed}).`);
   }
-
   await waitForFrames(page, 30);
   const afterCoast = await readGameState(page);
   results.afterCoast = afterCoast.vehicle;
@@ -183,7 +185,48 @@ try {
     throw new Error(`No-input burst accelerated the vehicle (${afterSteer.vehicle.speed} -> ${afterCoast.vehicle.speed}).`);
   }
 
-  const resetCountBefore = afterCoast.vehicle.resetCount;
+  const idleResetState = await resetAndReadGameState(page);
+  await page.keyboard.down('KeyW');
+  let idleStart;
+  try {
+    await page.waitForFunction(
+      () => {
+        const rendered = window.render_game_to_text?.();
+        return rendered ? JSON.parse(rendered).vehicle.speed >= 2 : false;
+      },
+      undefined,
+      { timeout: 3000 },
+    );
+    idleStart = await readGameState(page);
+  } finally {
+    await page.keyboard.up('KeyW');
+  }
+  const idleTargetSpeed = Math.max(0.35, idleStart.vehicle.speed * 0.35);
+  await page.waitForFunction(
+    (targetSpeed) => {
+      const rendered = window.render_game_to_text?.();
+      return rendered ? JSON.parse(rendered).vehicle.speed <= targetSpeed : false;
+    },
+    idleTargetSpeed,
+    { timeout: 3000 },
+  );
+  const idleEnd = await readGameState(page);
+  if (idleStart.vehicle.speed < 2) {
+    throw new Error(`Idle scenario has no observable starting speed (${idleStart.vehicle.speed}).`);
+  }
+  if (idleEnd.vehicle.speed > idleTargetSpeed) {
+    throw new Error(`Idle scenario did not decelerate (${idleStart.vehicle.speed} -> ${idleEnd.vehicle.speed}; target ${idleTargetSpeed}).`);
+  }
+  if (idleEnd.vehicle.resetCount !== idleResetState.vehicle.resetCount) {
+    throw new Error(`Vehicle reset during idle scenario (${idleResetState.vehicle.resetCount} -> ${idleEnd.vehicle.resetCount}).`);
+  }
+  results.idle = {
+    endSpeed: idleEnd.vehicle.speed,
+    startSpeed: idleStart.vehicle.speed,
+    targetSpeed: idleTargetSpeed,
+  };
+
+  const resetCountBefore = idleEnd.vehicle.resetCount;
   const afterResetImmediate = await resetAndReadGameState(page);
   results.afterReset = afterResetImmediate.vehicle;
   if (afterResetImmediate.vehicle.resetCount !== resetCountBefore + 1) {
@@ -213,6 +256,29 @@ try {
   await waitForFrames(page, 18);
   await page.keyboard.up('KeyA');
   await waitForFrames(page, 30);
+  const cameraAfterTurnState = await readGameState(page);
+  const cameraTurnForwardDelta = vectorDistance(
+    cameraDriveState.vehicle.forward,
+    cameraAfterTurnState.vehicle.forward,
+  );
+  const cameraTurnPositionDrift = vectorDistance(
+    cameraDriveState.vehicle.position,
+    cameraAfterTurnState.vehicle.position,
+  );
+  if (cameraAfterTurnState.vehicle.resetCount !== cameraDriveState.vehicle.resetCount) {
+    throw new Error(`Vehicle reset during camera turn (${cameraDriveState.vehicle.resetCount} -> ${cameraAfterTurnState.vehicle.resetCount}).`);
+  }
+  if (cameraTurnForwardDelta < 0.04) {
+    throw new Error(`Vehicle did not turn during camera comparison (${cameraTurnForwardDelta}).`);
+  }
+  if (cameraTurnPositionDrift > 0.15) {
+    throw new Error(`Vehicle moved during camera turn comparison (${cameraTurnPositionDrift}).`);
+  }
+  results.cameraTurn = {
+    forwardDelta: cameraTurnForwardDelta,
+    positionDrift: cameraTurnPositionDrift,
+    resetCount: cameraAfterTurnState.vehicle.resetCount,
+  };
   const cameraAfterTurn = await page.locator('.voxel-game-canvas canvas').screenshot();
   const worldTurnDifference = await imageDifferenceRatio(page, cameraBeforeTurn, cameraAfterTurn);
   results.worldTurnDifference = worldTurnDifference;
