@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
@@ -7,6 +7,11 @@ import {
   VoxelGameRuntime,
 } from './domain/VoxelGameRuntime';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
+import {
+  bindFullscreenControls,
+  isFullscreenAvailable,
+  toggleFullscreen,
+} from './input/fullscreenControls';
 import { VoxelGameScene } from './scene/VoxelGameScene';
 import type {
   VehicleControllerHandle,
@@ -31,6 +36,13 @@ import {
   GARAGE_POSITION,
   WORLD_BOUNDS,
 } from './scene/worldLayout';
+import { VoxelGameHud } from './ui/VoxelGameHud';
+
+const VEHICLE_VISUAL_BOUNDS = {
+  // 承認済み12×8×14 voxelを0.24 world unitで配置した実描画外接寸法。
+  offset: [0, 0.84, 0] as const,
+  scale: [2.88, 1.92, 3.36] as const,
+};
 
 /** 運転可能な箱庭Canvas、入力、段階的な自動検証hookを構成する。 */
 export function VoxelGameApp(): ReactElement {
@@ -95,6 +107,8 @@ export function VoxelGameApp(): ReactElement {
     targeted: false,
   });
   const [missionPhase, setMissionPhase] = useState(runtimeRef.current.getSnapshot().missionPhase);
+  const [fullscreen, setFullscreen] = useState(false);
+  const fullscreenAvailable = isFullscreenAvailable(document);
   const telemetryRef = useRef<VehicleTelemetry>({
     forward: [0, 0, 1],
     mass: 0,
@@ -103,30 +117,67 @@ export function VoxelGameApp(): ReactElement {
     speed: 0,
   });
 
+  /** click user activation内でfullscreen切替を開始し、拒否はhelper内で安全に吸収する。 */
+  const handleToggleFullscreen = useCallback((): void => {
+    void toggleFullscreen(document);
+  }, []);
+
+  useEffect(() => bindFullscreenControls({
+    documentTarget: document,
+    keyboardTarget: window,
+    onFullscreenChange: setFullscreen,
+  }), []);
+
   useEffect(() => {
     const unsubscribe = runtimeRef.current.subscribe((snapshot) => {
       setMissionPhase((current) => current === snapshot.missionPhase ? current : snapshot.missionPhase);
     });
     window.render_game_to_text = () => {
       const runtime = runtimeRef.current.getSnapshot();
+      const command = controls.commandRef.current;
+      const missionTelemetry = missionTelemetryRef.current;
+      const vehicle = telemetryRef.current;
       const breakables = breakablePoolHandleRef.current?.readActualTelemetry()
         ?? breakableTelemetryRef.current;
-      return JSON.stringify({
+      const payload: VoxelGameTextState = {
+        blocks: runtime.blocks.map((block) => ({ ...block })),
         coordinateSystem: 'origin=center, +x=right, +y=up, +z=toward-garage',
+        controls: { ...command },
+        fire: {
+          intensity: runtime.fireIntensity,
+          position: [...FIRE_POSITION],
+          targeted: missionTelemetry.targeted,
+        },
         landmarks: {
           breakableBlocks: BREAKABLE_BLOCKS.map(({ id, position }) => ({ id, position })),
           fire: FIRE_POSITION,
           garage: GARAGE_POSITION,
         },
         mode: 'drive-ready',
-        camera: cameraTelemetryRef.current,
+        camera: {
+          ...cameraTelemetryRef.current,
+          lookTarget: [...cameraTelemetryRef.current.lookTarget],
+          position: [...cameraTelemetryRef.current.position],
+          viewport: { ...cameraTelemetryRef.current.viewport },
+        },
         breakables,
-        mission: missionTelemetryRef.current,
+        mission: {
+          ...missionTelemetry,
+          direction: [...missionTelemetry.direction],
+          nozzleOrigin: [...missionTelemetry.nozzleOrigin],
+          phase: runtime.missionPhase,
+          routeVisible: runtime.routeVisible,
+        },
         runtime,
-        vehicle: telemetryRef.current,
+        vehicle: {
+          ...vehicle,
+          forward: [...vehicle.forward],
+          position: [...vehicle.position],
+        },
         visualLayout: {
           fireLayers: FIRE_LAYER_BOXES,
           starGroups: CELEBRATION_STAR_GROUPS,
+          vehicleBounds: VEHICLE_VISUAL_BOUNDS,
         },
         visuals: {
           fireLayerCount: getFireLayerCount(runtime.fireIntensity),
@@ -139,7 +190,8 @@ export function VoxelGameApp(): ReactElement {
           fragmentPoolSlotCount: breakables.poolSlotCount,
         },
         worldBounds: WORLD_BOUNDS,
-      });
+      };
+      return JSON.stringify(payload);
     };
     window.reset_voxel_game_vehicle = () => controllerRef.current?.resetVehicle();
     window.advanceTime = (milliseconds: number) => {
@@ -162,7 +214,7 @@ export function VoxelGameApp(): ReactElement {
       delete window.reset_voxel_game_vehicle;
       delete window.advanceTime;
     };
-  }, []);
+  }, [controls.commandRef]);
 
   return (
     <main className="voxel-game-shell">
@@ -180,10 +232,14 @@ export function VoxelGameApp(): ReactElement {
             telemetryRef={telemetryRef}
           />
         </Canvas>
-        {missionPhase === 'celebrating' ? (
-          <p aria-live="polite" className="voxel-game-success">できた！</p>
-        ) : null}
       </section>
+      <VoxelGameHud
+        controls={controls}
+        fullscreen={fullscreen}
+        fullscreenAvailable={fullscreenAvailable}
+        missionPhase={missionPhase}
+        onToggleFullscreen={handleToggleFullscreen}
+      />
     </main>
   );
 }

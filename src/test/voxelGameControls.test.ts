@@ -48,6 +48,14 @@ describe('voxel game controls', () => {
     expect(toDriveCommand(state)).toEqual({ spray: false, steer: 1, throttle: 1 });
   });
 
+  it('touch stickを中央へ解除した後はkeyboard入力へ戻る', () => {
+    let state = setDigitalAction(createControlState(), 'forward', true);
+    state = setTouchStick(state, 0.8, -0.6);
+    state = setTouchStick(state, 0, 0);
+
+    expect(toDriveCommand(state)).toEqual({ spray: false, steer: 0, throttle: 1 });
+  });
+
   it('keyboard、blur、hidden visibilityをcommand callbackへ反映する', () => {
     const keyboardTarget = new FakeEventTarget();
     const visibilityTarget = new FakeEventTarget();

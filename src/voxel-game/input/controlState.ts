@@ -29,12 +29,12 @@ export function setDigitalAction(state: ControlState, action: DigitalAction, pre
   return { ...state, digital: { ...state.digital, [action]: pressed } };
 }
 
-/** touch stickを-1から1へclampし、dead zone内なら中央へ戻す。 */
+/** touch stickを-1から1へclampし、dead zone内なら解除してkeyboardへ戻す。 */
 export function setTouchStick(state: ControlState, x: number, y: number): ControlState {
   const clampedX = Math.max(-1, Math.min(1, x));
   const clampedY = Math.max(-1, Math.min(1, y));
-  const touchStick: readonly [number, number] = Math.hypot(clampedX, clampedY) < TOUCH_STICK_DEAD_ZONE
-    ? [0, 0]
+  const touchStick: readonly [number, number] | null = Math.hypot(clampedX, clampedY) < TOUCH_STICK_DEAD_ZONE
+    ? null
     : [clampedX, clampedY];
   return { ...state, touchStick };
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import {
   createControlState,
@@ -14,6 +14,8 @@ export interface VoxelGameControls {
   readonly reset: () => void;
   readonly setSpray: (pressed: boolean) => void;
   readonly setTouchStick: (x: number, y: number) => void;
+  /** HUDのaria/見た目へ同期する放水の現在状態。 */
+  readonly sprayPressed: boolean;
 }
 
 /** browser APIに依存せずevent listenerを登録できる最小のtarget契約。 */
@@ -92,11 +94,14 @@ export function bindVoxelGameControlEvents({
 export function useVoxelGameControls(): VoxelGameControls {
   const stateRef = useRef(createControlState());
   const commandRef = useRef<DriveCommand>(toDriveCommand(stateRef.current));
+  const [sprayPressed, setSprayPressed] = useState(commandRef.current.spray);
 
-  /** 状態と外部公開commandを同時に更新する。 */
+  /** 状態と外部公開commandを更新し、放水変化だけHUD再描画へ通知する。 */
   const commit = useCallback((nextState: ReturnType<typeof createControlState>) => {
+    const previousSpray = commandRef.current.spray;
     stateRef.current = nextState;
     commandRef.current = toDriveCommand(nextState);
+    if (previousSpray !== commandRef.current.spray) setSprayPressed(commandRef.current.spray);
   }, []);
 
   /** すべての入力を解除して、フォーカス喪失後も車両が動かないようにする。 */
@@ -129,5 +134,5 @@ export function useVoxelGameControls(): VoxelGameControls {
     });
   }, [reset, setAction]);
 
-  return useMemo(() => ({ commandRef, reset, setSpray, setTouchStick }), [reset, setSpray, setTouchStick]);
+  return useMemo(() => ({ commandRef, reset, setSpray, setTouchStick, sprayPressed }), [reset, setSpray, setTouchStick, sprayPressed]);
 }
