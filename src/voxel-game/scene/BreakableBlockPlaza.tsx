@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ReactElement } from 'react';
-import { useFrame } from '@react-three/fiber';
 import {
   CuboidCollider,
   RigidBody,
@@ -9,7 +8,7 @@ import {
   type RapierRigidBody,
 } from '@react-three/rapier';
 import * as THREE from 'three';
-import type { BreakablePhase, VoxelGameRuntime } from '../domain/VoxelGameRuntime';
+import type { BreakablePhase, VoxelGameSnapshot, VoxelGameRuntime } from '../domain/VoxelGameRuntime';
 import type { VehicleTelemetryRef } from './VehicleController';
 import { BREAKABLE_BLOCKS } from './worldLayout';
 
@@ -36,14 +35,22 @@ export interface BreakableFragmentSlot {
 }
 
 export interface BreakableBlockTelemetry {
+  readonly bodyHandles: readonly number[];
+  readonly colliderHandles: readonly number[];
   readonly collisionEnabledFragmentCount: number;
   readonly fragmentVisibleCount: number;
   readonly id: string;
   readonly impactCount: number;
+  readonly intactBodyEnabledCount: number;
+  readonly intactBodyHandle: number | null;
+  readonly intactColliderEnabledCount: number;
+  readonly intactColliderHandle: number | null;
+  readonly intactEnabledCountAtFragmentActivation: number | null;
   readonly intactVisible: boolean;
   readonly maxImpactSpeed: number;
   readonly maxEventRelativeSpeed: number;
   readonly maxVehiclePreviousStepSpeed: number;
+  readonly meshUuids: readonly string[];
   readonly slotIds: readonly string[];
   readonly vehicleImpactCount: number;
 }
@@ -51,15 +58,34 @@ export interface BreakableBlockTelemetry {
 export interface BreakableTelemetry {
   readonly activeFragmentCount: number;
   readonly blocks: readonly BreakableBlockTelemetry[];
+  readonly bodyHandles: readonly number[];
+  readonly colliderHandles: readonly number[];
   readonly collisionEnabledFragmentCount: number;
+  readonly enabledBodyCount: number;
+  readonly meshUuids: readonly string[];
+  readonly mountedBodyCount: number;
+  readonly mountedColliderCount: number;
+  readonly mountedMeshCount: number;
   readonly poolSlotCount: number;
   readonly poolSlotIds: readonly string[];
+  readonly rapierSleepingFragmentCount: number;
   readonly sleepingFragmentCount: number;
+  readonly uniqueBodyHandleCount: number;
+  readonly uniqueColliderHandleCount: number;
+  readonly uniqueMeshUuidCount: number;
 }
 
 export type BreakableTelemetryRef = React.MutableRefObject<BreakableTelemetry>;
 
+export interface BreakablePoolHandle {
+  readActualTelemetry(): BreakableTelemetry;
+  syncAfterRuntimeAdvance(): void;
+}
+
+export type BreakablePoolHandleRef = React.MutableRefObject<BreakablePoolHandle | null>;
+
 interface BreakableBlockPlazaProps {
+  readonly breakablePoolHandleRef: BreakablePoolHandleRef;
   readonly runtime: VoxelGameRuntime;
   readonly telemetryRef: VehicleTelemetryRef;
   readonly breakableTelemetryRef: BreakableTelemetryRef;
@@ -72,6 +98,52 @@ interface FragmentRuntimeSlot {
   mesh: THREE.Mesh | null;
 }
 
+interface IntactRuntimeSlot {
+  body: RapierRigidBody | null;
+  collider: RapierCollider | null;
+  mesh: THREE.Mesh | null;
+}
+
+interface FragmentSnapshotBodyRef {
+  readonly handle: number;
+  isEnabled(): boolean;
+  isSleeping(): boolean;
+}
+
+interface FragmentSnapshotColliderRef {
+  readonly handle: number;
+  isEnabled(): boolean;
+}
+
+interface FragmentSnapshotMeshRef {
+  readonly uuid: string;
+  readonly visible: boolean;
+}
+
+export interface FragmentSnapshotSlot {
+  readonly body: FragmentSnapshotBodyRef | null;
+  readonly collider: FragmentSnapshotColliderRef | null;
+  readonly mesh: FragmentSnapshotMeshRef | null;
+}
+
+export interface ActualFragmentPoolSnapshot {
+  readonly activeFragmentCount: number;
+  readonly bodyHandles: readonly number[];
+  readonly colliderHandles: readonly number[];
+  readonly collisionEnabledFragmentCount: number;
+  readonly enabledBodyCount: number;
+  readonly meshUuids: readonly string[];
+  readonly mountedBodyCount: number;
+  readonly mountedColliderCount: number;
+  readonly mountedMeshCount: number;
+  readonly rapierSleepingFragmentCount: number;
+  readonly sleepingFragmentCount: number;
+  readonly uniqueBodyHandleCount: number;
+  readonly uniqueColliderHandleCount: number;
+  readonly uniqueMeshUuidCount: number;
+  readonly visibleFragmentCount: number;
+}
+
 export interface BlockImpactSpeedInput {
   readonly collisionBodyIsVehicle: boolean;
   readonly eventRelativeSpeed: number;
@@ -82,6 +154,7 @@ export const BREAKABLE_FRAGMENT_SLOTS_PER_BLOCK = 6;
 export const BREAKABLE_FRAGMENT_LIFETIME_MS = 1_200;
 const BLOCK_RESPAWN_DURATION_MS = 5_000;
 const FRAGMENT_WINDOW_END_REMAINING_MS = BLOCK_RESPAWN_DURATION_MS - BREAKABLE_FRAGMENT_LIFETIME_MS;
+const FRAGMENT_WINDOW_EPSILON_MS = 1e-6;
 const FRAGMENT_SCALE = [0.56, 0.56, 0.56] as const;
 const INACTIVE_FRAGMENT_POSITION = [0, -40, 0] as const;
 const ZERO_VELOCITY = { x: 0, y: 0, z: 0 } as const;
@@ -112,6 +185,73 @@ export function createBreakableFragmentPool(
 }
 
 export const BREAKABLE_FRAGMENT_POOL = createBreakableFragmentPool(BREAKABLE_BLOCKS);
+export const BREAKABLE_FRAGMENT_POOL_SLOT_IDS = BREAKABLE_FRAGMENT_POOL.map(({ id }) => id);
+export const BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK = BREAKABLE_BLOCKS.map((block) => (
+  BREAKABLE_FRAGMENT_POOL.reduce<number[]>((indices, slot, index) => {
+    if (slot.blockId === block.id) indices.push(index);
+    return indices;
+  }, [])
+));
+
+/** 実在するRapier/Three参照だけからpool数・状態・identityをsnapshot化する。 */
+export function createActualFragmentPoolSnapshot(
+  slots: readonly FragmentSnapshotSlot[],
+  slotIndices?: readonly number[],
+): ActualFragmentPoolSnapshot {
+  const bodyHandles: number[] = [];
+  const colliderHandles: number[] = [];
+  const meshUuids: string[] = [];
+  let activeFragmentCount = 0;
+  let collisionEnabledFragmentCount = 0;
+  let enabledBodyCount = 0;
+  let rapierSleepingFragmentCount = 0;
+  let sleepingFragmentCount = 0;
+  let visibleFragmentCount = 0;
+  const length = slotIndices?.length ?? slots.length;
+
+  for (let offset = 0; offset < length; offset += 1) {
+    const slot = slots[slotIndices?.[offset] ?? offset];
+    if (!slot) continue;
+    const bodyEnabled = slot.body?.isEnabled() ?? false;
+    const colliderEnabled = slot.collider?.isEnabled() ?? false;
+    const meshVisible = slot.mesh?.visible ?? false;
+    if (slot.body) {
+      bodyHandles.push(slot.body.handle);
+      if (bodyEnabled) enabledBodyCount += 1;
+      const rapierSleeping = slot.body.isSleeping();
+      if (rapierSleeping) rapierSleepingFragmentCount += 1;
+      // strictなisSleepingとは別に、より強い停止状態であるdisabledもdormantと数える。
+      if (rapierSleeping || !bodyEnabled) sleepingFragmentCount += 1;
+    }
+    if (slot.collider) {
+      colliderHandles.push(slot.collider.handle);
+      if (colliderEnabled) collisionEnabledFragmentCount += 1;
+    }
+    if (slot.mesh) {
+      meshUuids.push(slot.mesh.uuid);
+      if (meshVisible) visibleFragmentCount += 1;
+    }
+    if (bodyEnabled && colliderEnabled && meshVisible) activeFragmentCount += 1;
+  }
+
+  return {
+    activeFragmentCount,
+    bodyHandles,
+    colliderHandles,
+    collisionEnabledFragmentCount,
+    enabledBodyCount,
+    meshUuids,
+    mountedBodyCount: bodyHandles.length,
+    mountedColliderCount: colliderHandles.length,
+    mountedMeshCount: meshUuids.length,
+    rapierSleepingFragmentCount,
+    sleepingFragmentCount,
+    uniqueBodyHandleCount: new Set(bodyHandles).size,
+    uniqueColliderHandleCount: new Set(colliderHandles).size,
+    uniqueMeshUuidCount: new Set(meshUuids).size,
+    visibleFragmentCount,
+  };
+}
 
 /** 2つのRapier body線速度の差から衝突時の相対速度の大きさを返す。 */
 export function calculateRelativeLinearSpeed(
@@ -150,7 +290,8 @@ export function isFragmentWindowActive(
   phase: BreakablePhase,
   respawnRemainingMs: number,
 ): boolean {
-  return phase === 'broken' && respawnRemainingMs > FRAGMENT_WINDOW_END_REMAINING_MS;
+  return phase === 'broken'
+    && respawnRemainingMs > FRAGMENT_WINDOW_END_REMAINING_MS + FRAGMENT_WINDOW_EPSILON_MS;
 }
 
 /** collision payloadの実RigidBody APIから相対線速度を取得する。 */
@@ -206,128 +347,220 @@ function deactivateFragment(runtimeSlot: FragmentRuntimeSlot): void {
   if (runtimeSlot.mesh) runtimeSlot.mesh.visible = false;
   runtimeSlot.collider?.setEnabled(false);
   if (runtimeSlot.body) {
-    runtimeSlot.body.setLinvel(ZERO_VELOCITY, false);
-    runtimeSlot.body.setAngvel(ZERO_VELOCITY, false);
-    runtimeSlot.body.sleep();
-    runtimeSlot.body.setEnabled(false);
+    deactivateFragmentBody(runtimeSlot.body);
   }
   runtimeSlot.active = false;
 }
 
+interface DeactivatableFragmentBody {
+  setAngvel(velocity: LinearVelocity, wakeUp: boolean): void;
+  setEnabled(enabled: boolean): void;
+  setLinvel(velocity: LinearVelocity, wakeUp: boolean): void;
+  sleep(): void;
+}
+
+/** 一度動いた破片bodyにも、速度零・disable・sleepをすべて明示適用する。 */
+export function deactivateFragmentBody(body: DeactivatableFragmentBody): void {
+  body.setLinvel(ZERO_VELOCITY, false);
+  body.setAngvel(ZERO_VELOCITY, false);
+  body.setEnabled(false);
+  body.sleep();
+}
+
 /** 4つの壊せる積み木と、常時24slotだけを持つRapier破片poolを構成する。 */
 export function BreakableBlockPlaza({
+  breakablePoolHandleRef,
   breakableTelemetryRef,
   runtime,
   telemetryRef,
 }: BreakableBlockPlazaProps): ReactElement {
-  const [blockPhases, setBlockPhases] = useState<Record<string, BreakablePhase>>(() => Object.fromEntries(
-    runtime.getSnapshot().blocks.map(({ id, phase }) => [id, phase]),
-  ));
   const runtimeSlotsRef = useRef<FragmentRuntimeSlot[]>(BREAKABLE_FRAGMENT_POOL.map(() => ({
     active: false,
     body: null,
     collider: null,
     mesh: null,
   })));
-  const previousPhasesRef = useRef(new Map(
-    runtime.getSnapshot().blocks.map(({ id, phase }) => [id, phase]),
-  ));
-  const impactTelemetryRef = useRef(new Map(
-    BREAKABLE_BLOCKS.map(({ id }) => [id, {
+  const intactSlotsRef = useRef<IntactRuntimeSlot[]>(BREAKABLE_BLOCKS.map(() => ({
+    body: null,
+    collider: null,
+    mesh: null,
+  })));
+  const intactBodyRefCallbacks = useRef(BREAKABLE_BLOCKS.map((_, index) => (
+    (body: RapierRigidBody | null): void => {
+      const intactSlot = intactSlotsRef.current[index];
+      if (intactSlot) intactSlot.body = body;
+    }
+  ))).current;
+  const intactColliderRefCallbacks = useRef(BREAKABLE_BLOCKS.map((_, index) => (
+    (collider: RapierCollider | null): void => {
+      const intactSlot = intactSlotsRef.current[index];
+      if (intactSlot) intactSlot.collider = collider;
+    }
+  ))).current;
+  const intactMeshRefCallbacks = useRef(BREAKABLE_BLOCKS.map((_, index) => (
+    (mesh: THREE.Mesh | null): void => {
+      const intactSlot = intactSlotsRef.current[index];
+      if (intactSlot) intactSlot.mesh = mesh;
+    }
+  ))).current;
+  const fragmentBodyRefCallbacks = useRef(BREAKABLE_FRAGMENT_POOL.map((_, index) => (
+    (body: RapierRigidBody | null): void => {
+      const runtimeSlot = runtimeSlotsRef.current[index];
+      if (!runtimeSlot) return;
+      runtimeSlot.body = body;
+    }
+  ))).current;
+  const fragmentColliderRefCallbacks = useRef(BREAKABLE_FRAGMENT_POOL.map((_, index) => (
+    (collider: RapierCollider | null): void => {
+      const runtimeSlot = runtimeSlotsRef.current[index];
+      if (!runtimeSlot) return;
+      runtimeSlot.collider = collider;
+    }
+  ))).current;
+  const fragmentMeshRefCallbacks = useRef(BREAKABLE_FRAGMENT_POOL.map((_, index) => (
+    (mesh: THREE.Mesh | null): void => {
+      const runtimeSlot = runtimeSlotsRef.current[index];
+      if (!runtimeSlot) return;
+      runtimeSlot.mesh = mesh;
+    }
+  ))).current;
+  const impactTelemetryRef = useRef(BREAKABLE_BLOCKS.map(() => ({
       count: 0,
+      intactEnabledCountAtFragmentActivation: null as number | null,
       maxEventRelativeSpeed: 0,
       maxSpeed: 0,
       maxVehiclePreviousStepSpeed: 0,
       vehicleCount: 0,
-    }]),
-  ));
+  })));
+  const breakMutationTimersRef = useRef(new Set<number>());
 
-  useEffect(() => runtime.subscribe((snapshot) => {
-    setBlockPhases((current) => {
-      const next = Object.fromEntries(snapshot.blocks.map(({ id, phase }) => [id, phase]));
-      return snapshot.blocks.every(({ id, phase }) => current[id] === phase) ? current : next;
+  /** 公開telemetryを固定実体参照から遅延評価し、設定値の自己申告を避ける。 */
+  const refreshTelemetry = useCallback((): void => {
+    const fragmentSlots = runtimeSlotsRef.current;
+    const actualPool = createActualFragmentPoolSnapshot(fragmentSlots);
+    const runtimeSnapshot = runtime.getSnapshot();
+    const blocks = BREAKABLE_BLOCKS.map((block, blockIndex) => {
+      const slotIndices = BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[blockIndex] ?? [];
+      const actualFragments = createActualFragmentPoolSnapshot(fragmentSlots, slotIndices);
+      const intact = intactSlotsRef.current[blockIndex];
+      const impact = impactTelemetryRef.current[blockIndex];
+      const runtimeBlock = runtimeSnapshot.blocks[blockIndex];
+      return {
+        bodyHandles: actualFragments.bodyHandles,
+        colliderHandles: actualFragments.colliderHandles,
+        collisionEnabledFragmentCount: actualFragments.collisionEnabledFragmentCount,
+        fragmentVisibleCount: actualFragments.visibleFragmentCount,
+        id: block.id,
+        impactCount: impact?.count ?? 0,
+        intactBodyEnabledCount: intact?.body?.isEnabled() ? 1 : 0,
+        intactBodyHandle: intact?.body?.handle ?? null,
+        intactColliderEnabledCount: intact?.collider?.isEnabled() ? 1 : 0,
+        intactColliderHandle: intact?.collider?.handle ?? null,
+        intactEnabledCountAtFragmentActivation: impact?.intactEnabledCountAtFragmentActivation ?? null,
+        intactVisible: runtimeBlock?.phase === 'intact' && (intact?.mesh?.visible ?? false),
+        maxImpactSpeed: impact?.maxSpeed ?? 0,
+        maxEventRelativeSpeed: impact?.maxEventRelativeSpeed ?? 0,
+        maxVehiclePreviousStepSpeed: impact?.maxVehiclePreviousStepSpeed ?? 0,
+        meshUuids: actualFragments.meshUuids,
+        slotIds: slotIndices.map((slotIndex) => BREAKABLE_FRAGMENT_POOL_SLOT_IDS[slotIndex] ?? ''),
+        vehicleImpactCount: impact?.vehicleCount ?? 0,
+      } satisfies BreakableBlockTelemetry;
     });
-  }), [runtime]);
+
+    breakableTelemetryRef.current = {
+      activeFragmentCount: actualPool.activeFragmentCount,
+      blocks,
+      bodyHandles: actualPool.bodyHandles,
+      colliderHandles: actualPool.colliderHandles,
+      collisionEnabledFragmentCount: actualPool.collisionEnabledFragmentCount,
+      enabledBodyCount: actualPool.enabledBodyCount,
+      meshUuids: actualPool.meshUuids,
+      mountedBodyCount: actualPool.mountedBodyCount,
+      mountedColliderCount: actualPool.mountedColliderCount,
+      mountedMeshCount: actualPool.mountedMeshCount,
+      poolSlotCount: actualPool.mountedBodyCount,
+      poolSlotIds: BREAKABLE_FRAGMENT_POOL_SLOT_IDS,
+      rapierSleepingFragmentCount: actualPool.rapierSleepingFragmentCount,
+      sleepingFragmentCount: actualPool.sleepingFragmentCount,
+      uniqueBodyHandleCount: actualPool.uniqueBodyHandleCount,
+      uniqueColliderHandleCount: actualPool.uniqueColliderHandleCount,
+      uniqueMeshUuidCount: actualPool.uniqueMeshUuidCount,
+    };
+  }, [breakableTelemetryRef, runtime]);
+
+  /** runtime phaseを固定intact実体とfragment poolへ同期し、React unmountでRapier handleを捨てない。 */
+  const syncRuntimeBodies = useCallback((snapshot: VoxelGameSnapshot): void => {
+    const runtimeSlots = runtimeSlotsRef.current;
+    let changedAnyBody = false;
+    for (let blockIndex = 0; blockIndex < BREAKABLE_BLOCKS.length; blockIndex += 1) {
+      const blockSnapshot = snapshot.blocks[blockIndex];
+      if (!blockSnapshot) continue;
+      const intact = intactSlotsRef.current[blockIndex];
+      const shouldShowIntact = blockSnapshot.phase === 'intact';
+      if (intact?.body && intact.body.isEnabled() !== shouldShowIntact) {
+        intact.body.setEnabled(shouldShowIntact);
+        changedAnyBody = true;
+      }
+      if (intact?.collider && intact.collider.isEnabled() !== shouldShowIntact) {
+        intact.collider.setEnabled(shouldShowIntact);
+        changedAnyBody = true;
+      }
+      if (intact?.mesh && intact.mesh.visible !== shouldShowIntact) {
+        intact.mesh.visible = shouldShowIntact;
+        changedAnyBody = true;
+      }
+      if (isFragmentWindowActive(
+        blockSnapshot.phase,
+        blockSnapshot.respawnRemainingMs,
+      )) continue;
+      for (const slotIndex of BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[blockIndex] ?? []) {
+        const runtimeSlot = runtimeSlots[slotIndex];
+        if (!runtimeSlot || !(
+          runtimeSlot.active
+          || runtimeSlot.body?.isEnabled()
+          || runtimeSlot.collider?.isEnabled()
+          || runtimeSlot.mesh?.visible
+        )) continue;
+        deactivateFragment(runtimeSlot);
+        changedAnyBody = true;
+      }
+    }
+    if (changedAnyBody) {
+      refreshTelemetry();
+    }
+  }, [refreshTelemetry]);
 
   useEffect(() => {
     const runtimeSlots = runtimeSlotsRef.current;
     runtimeSlots.forEach(deactivateFragment);
+    refreshTelemetry();
     return () => runtimeSlots.forEach((slot) => {
       if (slot.mesh) slot.mesh.visible = false;
       slot.active = false;
     });
+  }, [refreshTelemetry]);
+
+  useEffect(() => () => {
+    for (const timer of breakMutationTimersRef.current) window.clearTimeout(timer);
+    breakMutationTimersRef.current.clear();
   }, []);
 
-  useFrame(() => {
-    const snapshot = runtime.getSnapshot();
-    const runtimeSlots = runtimeSlotsRef.current;
-
-    for (const block of BREAKABLE_BLOCKS) {
-      runtime.setBlockClear(
-        block.id,
-        isBlockRespawnAreaClear(block.position, telemetryRef.current.position),
-      );
-      const blockSnapshot = snapshot.blocks.find(({ id }) => id === block.id);
-      if (!blockSnapshot) continue;
-      const previousPhase = previousPhasesRef.current.get(block.id);
-      const fragmentWindowActive = isFragmentWindowActive(
-        blockSnapshot.phase,
-        blockSnapshot.respawnRemainingMs,
-      );
-
-      BREAKABLE_FRAGMENT_POOL.forEach((slot, slotIndex) => {
-        if (slot.blockId !== block.id) return;
-        const runtimeSlot = runtimeSlots[slotIndex];
-        if (!runtimeSlot) return;
-        if (blockSnapshot.phase === 'broken' && previousPhase !== 'broken') {
-          activateFragment(slot, runtimeSlot, block.position);
-        }
-        if (!fragmentWindowActive && runtimeSlot.active) deactivateFragment(runtimeSlot);
-      });
-      previousPhasesRef.current.set(block.id, blockSnapshot.phase);
-    }
-
-    const blockSnapshotById = new Map(snapshot.blocks.map((block) => [block.id, block]));
-    const blocks = BREAKABLE_BLOCKS.map((block) => {
-      const slotIndexes = BREAKABLE_FRAGMENT_POOL
-        .map((slot, index) => slot.blockId === block.id ? index : -1)
-        .filter((index) => index >= 0);
-      const blockRuntimeSlots = slotIndexes.map((index) => runtimeSlots[index]);
-      const impact = impactTelemetryRef.current.get(block.id);
-      return {
-        collisionEnabledFragmentCount: blockRuntimeSlots.filter((slot) => (
-          slot?.body?.isEnabled() && slot.collider?.isEnabled()
-        )).length,
-        fragmentVisibleCount: blockRuntimeSlots.filter((slot) => slot?.mesh?.visible).length,
-        id: block.id,
-        impactCount: impact?.count ?? 0,
-        intactVisible: blockSnapshotById.get(block.id)?.phase === 'intact',
-        maxImpactSpeed: impact?.maxSpeed ?? 0,
-        maxEventRelativeSpeed: impact?.maxEventRelativeSpeed ?? 0,
-        maxVehiclePreviousStepSpeed: impact?.maxVehiclePreviousStepSpeed ?? 0,
-        slotIds: slotIndexes.map((index) => BREAKABLE_FRAGMENT_POOL[index]?.id ?? ''),
-        vehicleImpactCount: impact?.vehicleCount ?? 0,
-      } satisfies BreakableBlockTelemetry;
-    });
-    breakableTelemetryRef.current = {
-      activeFragmentCount: runtimeSlots.filter((slot) => slot.active).length,
-      blocks,
-      collisionEnabledFragmentCount: runtimeSlots.filter((slot) => (
-        slot.body?.isEnabled() && slot.collider?.isEnabled()
-      )).length,
-      poolSlotCount: BREAKABLE_FRAGMENT_POOL.length,
-      poolSlotIds: BREAKABLE_FRAGMENT_POOL.map(({ id }) => id),
-      sleepingFragmentCount: runtimeSlots.filter((slot) => slot.body?.isSleeping()).length,
-    };
-  });
+  useImperativeHandle(breakablePoolHandleRef, () => ({
+    readActualTelemetry: () => {
+      refreshTelemetry();
+      return breakableTelemetryRef.current;
+    },
+    syncAfterRuntimeAdvance: () => syncRuntimeBodies(runtime.getSnapshot()),
+  }), [breakableTelemetryRef, refreshTelemetry, runtime, syncRuntimeBodies]);
 
   return (
     <group>
-      {BREAKABLE_BLOCKS.map((block, index) => blockPhases[block.id] === 'intact' ? (
+      {BREAKABLE_BLOCKS.map((block, index) => (
         <RigidBody
           colliders={false}
           key={block.id}
           onCollisionEnter={(payload) => {
+            if (runtime.getSnapshot().blocks[index]?.phase !== 'intact') return;
             const eventRelativeSpeed = getCollisionRelativeLinearSpeed(payload);
             const collisionBodyIsVehicle = isCollisionBodyVehicle(
               payload.other.rigidBody,
@@ -338,7 +571,7 @@ export function BreakableBlockPlaza({
               eventRelativeSpeed,
               vehiclePreviousStepSpeed: telemetryRef.current.speed,
             });
-            const impact = impactTelemetryRef.current.get(block.id);
+            const impact = impactTelemetryRef.current[index];
             if (impact) {
               impact.count += 1;
               impact.maxEventRelativeSpeed = Math.max(impact.maxEventRelativeSpeed, eventRelativeSpeed);
@@ -351,19 +584,47 @@ export function BreakableBlockPlaza({
                 );
               }
             }
-            runtime.registerBlockImpact(block.id, speed);
+            const newlyBroken = runtime.registerBlockImpact(block.id, speed);
+            if (!newlyBroken) {
+              refreshTelemetry();
+              return;
+            }
+
+            const breakMutationTimer = window.setTimeout(() => {
+              breakMutationTimersRef.current.delete(breakMutationTimer);
+              const intactSlot = intactSlotsRef.current[index];
+              intactSlot?.collider?.setEnabled(false);
+              intactSlot?.body?.setEnabled(false);
+              if (intactSlot?.mesh) intactSlot.mesh.visible = false;
+              if (impact) {
+                impact.intactEnabledCountAtFragmentActivation = Number(
+                  intactSlot?.body?.isEnabled() ?? false,
+                ) + Number(intactSlot?.collider?.isEnabled() ?? false);
+              }
+              for (const slotIndex of BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[index] ?? []) {
+                const slot = BREAKABLE_FRAGMENT_POOL[slotIndex];
+                const runtimeSlot = runtimeSlotsRef.current[slotIndex];
+                if (slot && runtimeSlot) activateFragment(slot, runtimeSlot, block.position);
+              }
+              refreshTelemetry();
+            }, 0);
+            breakMutationTimersRef.current.add(breakMutationTimer);
           }}
           position={block.position}
+          ref={intactBodyRefCallbacks[index]}
           rotation={[0, index * 0.22, 0]}
           type="fixed"
         >
-          <CuboidCollider args={[0.75, 0.75, 0.75]} />
-          <mesh>
+          <CuboidCollider
+            args={[0.75, 0.75, 0.75]}
+            ref={intactColliderRefCallbacks[index]}
+          />
+          <mesh ref={intactMeshRefCallbacks[index]}>
             <boxGeometry args={[1.5, 1.5, 1.5]} />
             <meshLambertMaterial color={block.color} />
           </mesh>
         </RigidBody>
-      ) : null)}
+      ))}
       {BREAKABLE_FRAGMENT_POOL.map((slot, index) => (
         <RigidBody
           angularDamping={1.4}
@@ -371,25 +632,16 @@ export function BreakableBlockPlaza({
           key={slot.id}
           linearDamping={0.6}
           position={INACTIVE_FRAGMENT_POSITION}
-          ref={(body) => {
-            const runtimeSlot = runtimeSlotsRef.current[index];
-            if (runtimeSlot) runtimeSlot.body = body;
-          }}
+          ref={fragmentBodyRefCallbacks[index]}
         >
           <CuboidCollider
             args={[slot.scale[0] / 2, slot.scale[1] / 2, slot.scale[2] / 2]}
             friction={0.75}
-            ref={(collider) => {
-              const runtimeSlot = runtimeSlotsRef.current[index];
-              if (runtimeSlot) runtimeSlot.collider = collider;
-            }}
+            ref={fragmentColliderRefCallbacks[index]}
             restitution={0.22}
           />
           <mesh
-            ref={(mesh) => {
-              const runtimeSlot = runtimeSlotsRef.current[index];
-              if (runtimeSlot) runtimeSlot.mesh = mesh;
-            }}
+            ref={fragmentMeshRefCallbacks[index]}
             visible={false}
           >
             <boxGeometry args={slot.scale} />

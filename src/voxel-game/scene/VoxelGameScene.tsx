@@ -1,20 +1,30 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
 import type { DriveCommand } from '../input/controlState';
-import { advanceRuntimeFrame, type VoxelGameRuntime } from '../domain/VoxelGameRuntime';
+import {
+  advanceRuntimeFrame,
+  syncBlockClearance,
+  type VoxelGameRuntime,
+} from '../domain/VoxelGameRuntime';
 import {
   VehicleController,
   type VehicleControllerHandle,
   type VehicleTelemetryRef,
 } from './VehicleController';
-import { BreakableBlockPlaza, type BreakableTelemetryRef } from './BreakableBlockPlaza';
+import {
+  BreakableBlockPlaza,
+  type BreakablePoolHandleRef,
+  type BreakableTelemetryRef,
+} from './BreakableBlockPlaza';
 import { VoxelWorld } from './VoxelWorld';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
 import { WorldFixedCamera, type WorldCameraTelemetryRef } from './WorldFixedCamera';
+import { BREAKABLE_BLOCKS } from './worldLayout';
 
 interface VoxelGameSceneProps {
+  readonly breakablePoolHandleRef: BreakablePoolHandleRef;
   readonly breakableTelemetryRef: BreakableTelemetryRef;
   readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
   readonly commandRef: RefObject<DriveCommand>;
@@ -47,20 +57,33 @@ function SceneReadySignal(): null {
 }
 
 interface RuntimeClockProps {
+  readonly breakablePoolHandleRef: BreakablePoolHandleRef;
   readonly manualClockRef: React.MutableRefObject<boolean>;
   readonly runtime: VoxelGameRuntime;
+  readonly telemetryRef: VehicleTelemetryRef;
 }
 
-/** 通常frameだけruntimeを進め、手動clock直後の1frameは二重加算を避ける。 */
-function RuntimeClock({ manualClockRef, runtime }: RuntimeClockProps): null {
+/** 最新車両位置を復元判定へ同期してから通常clockを進める。 */
+function RuntimeClock({
+  breakablePoolHandleRef,
+  manualClockRef,
+  runtime,
+  telemetryRef,
+}: RuntimeClockProps): null {
+  const syncLatestBlockClearance = useCallback(() => {
+    syncBlockClearance(runtime, BREAKABLE_BLOCKS, telemetryRef.current.position);
+  }, [runtime, telemetryRef]);
+
   useFrame((_state, delta) => {
-    advanceRuntimeFrame(runtime, manualClockRef, delta);
+    advanceRuntimeFrame(runtime, manualClockRef, delta, syncLatestBlockClearance);
+    breakablePoolHandleRef.current?.syncAfterRuntimeAdvance();
   });
   return null;
 }
 
 /** 箱庭の照明、世界方向固定camera、物理空間、運転可能な消防車を構成する。 */
 export function VoxelGameScene({
+  breakablePoolHandleRef,
   breakableTelemetryRef,
   cameraTelemetryRef,
   commandRef,
@@ -75,13 +98,19 @@ export function VoxelGameScene({
       <color attach="background" args={['#ead4b3']} />
       <WorldFixedCamera cameraTelemetryRef={cameraTelemetryRef} telemetryRef={telemetryRef} />
       <SceneReadySignal />
-      <RuntimeClock manualClockRef={manualClockRef} runtime={runtime} />
+      <RuntimeClock
+        breakablePoolHandleRef={breakablePoolHandleRef}
+        manualClockRef={manualClockRef}
+        runtime={runtime}
+        telemetryRef={telemetryRef}
+      />
       <ambientLight intensity={1.5} />
       <directionalLight intensity={2.1} position={[20, 34, 18]} />
       <directionalLight color="#cbe0ff" intensity={0.75} position={[-18, 20, -14]} />
       <Physics gravity={[0, -18, 0]}>
         <VoxelWorld />
         <BreakableBlockPlaza
+          breakablePoolHandleRef={breakablePoolHandleRef}
           breakableTelemetryRef={breakableTelemetryRef}
           runtime={runtime}
           telemetryRef={telemetryRef}

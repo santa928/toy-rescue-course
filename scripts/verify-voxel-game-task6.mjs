@@ -34,20 +34,38 @@ async function readGameState(page) {
   return state;
 }
 
+/** 次のtimer macrotask後のactual telemetryを読む。 */
+async function readGameStateAfterMacrotask(page) {
+  const rendered = await page.evaluate(() => new Promise((resolve) => {
+    setTimeout(() => resolve(window.render_game_to_text?.()), 0);
+  }));
+  if (!rendered) throw new Error('Voxel Game text state is unavailable after macrotask.');
+  return JSON.parse(rendered);
+}
+
 /** scene ready、公開hook、24-slot pool準備まで待つ。 */
 async function openGamePage(browser, scenario, errors) {
   const page = await browser.newPage({ viewport: { height: 720, width: 1280 } });
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(`${scenario}: ${message.text()}`);
+    if (message.type() === 'error') {
+      errors.push(`${scenario}: ${message.text()}`);
+      console.error(`${scenario}: ${message.text()}`);
+    }
   });
-  page.on('pageerror', (error) => errors.push(`${scenario}: ${String(error)}`));
+  page.on('pageerror', (error) => {
+    errors.push(`${scenario}: ${String(error)}`);
+    console.error(`${scenario}: ${String(error)}`);
+  });
   await page.goto(`${baseUrl}/voxel-game.html?task6=${scenario}-${Date.now()}`, { waitUntil: 'networkidle' });
   await page.locator('.voxel-game-canvas canvas').waitFor({ state: 'visible' });
   await page.waitForFunction(
     () => {
       const rendered = window.render_game_to_text?.();
       if (document.documentElement.dataset.voxelSceneReady !== 'true' || !rendered) return false;
-      return JSON.parse(rendered).breakables?.poolSlotCount === 24;
+      const pool = JSON.parse(rendered).breakables;
+      return pool?.poolSlotCount === 24
+        && pool.mountedColliderCount === 24
+        && pool.mountedMeshCount === 24;
     },
     undefined,
     { timeout: 5_000 },
@@ -55,6 +73,11 @@ async function openGamePage(browser, scenario, errors) {
   const state = await readGameState(page);
   assert.equal(state.breakables.activeFragmentCount, 0, `${scenario}: fragments start active.`);
   assert.equal(state.breakables.collisionEnabledFragmentCount, 0, `${scenario}: fragment colliders start enabled.`);
+  assert.equal(state.breakables.enabledBodyCount, 0, `${scenario}: fragment bodies start enabled.`);
+  assert.equal(state.breakables.sleepingFragmentCount, 24, `${scenario}: inactive fragment bodies are not sleeping.`);
+  assert.equal(state.breakables.uniqueBodyHandleCount, 24, `${scenario}: fragment body handles are not unique.`);
+  assert.equal(state.breakables.uniqueColliderHandleCount, 24, `${scenario}: fragment collider handles are not unique.`);
+  assert.equal(state.breakables.uniqueMeshUuidCount, 24, `${scenario}: fragment mesh UUIDs are not unique.`);
   assert.equal(state.visuals.intactBlockCount, 4, `${scenario}: intact block count is not four.`);
   return page;
 }
@@ -91,13 +114,14 @@ async function turnVehicleToward(page, targetX, targetZ) {
 
 /** Wの公開keyboard経路だけで指定座標条件まで走る。 */
 async function driveUntil(page, predicate, description, maxBursts = 180) {
+  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
   await page.keyboard.down('KeyW');
   try {
     for (let burst = 0; burst < maxBursts; burst += 1) {
       await waitForFrames(page, 2);
       const state = await readGameState(page);
       if (predicate(state)) return state;
-      assert.equal(state.vehicle.resetCount, 0, `${description}: vehicle reset unexpectedly.`);
+      assert.equal(state.vehicle.resetCount, initialResetCount, `${description}: vehicle reset unexpectedly.`);
     }
     throw new Error(`${description}: destination was not reached.`);
   } finally {
@@ -143,7 +167,7 @@ async function collideAtEffectiveSpeed(page) {
   }
 }
 
-/** page内rAFだけで実車破壊を待ち、3810→3800→0msのtimer chainを決定的に観測する。 */
+/** page内rAFで実車破壊を待ち、3810→3800msのtimerとscene frameを決定的に観測する。 */
 async function collideAtEffectiveSpeedThroughTimer(page) {
   await page.keyboard.down('KeyW');
   try {
@@ -166,20 +190,20 @@ async function collideAtEffectiveSpeedThroughTimer(page) {
           requestAnimationFrame(tick);
           return;
         }
+        if (broken.breakables.activeFragmentCount !== 6) {
+          requestAnimationFrame(tick);
+          return;
+        }
         window.advanceTime?.(Math.max(0, brokenBlock.respawnRemainingMs - 3_810));
         requestAnimationFrame(() => {
           const almostExpired = read();
           window.advanceTime?.(10);
           requestAnimationFrame(() => {
-            const expired = read();
-            const expiredBlock = expired.runtime.blocks.find(({ id }) => id === 'plaza-red');
-            window.advanceTime?.(expiredBlock?.respawnRemainingMs ?? 0);
-            requestAnimationFrame(() => resolve({
+            setTimeout(() => resolve({
               almostExpired,
               broken,
-              expired,
-              nearAfterFiveSeconds: read(),
-            }));
+              expired: read(),
+            }), 0);
           });
         });
       };
@@ -190,11 +214,93 @@ async function collideAtEffectiveSpeedThroughTimer(page) {
   }
 }
 
-/** 5frame以下の短い加速と完全減速を繰り返し、4未満の実衝突を起こす。 */
+/** 赤block中心と車両のXZ距離を返す。 */
+function distanceFromRedBlock(state) {
+  return Math.hypot(state.vehicle.position[0] + 13, state.vehicle.position[2]);
+}
+
+/** 復元期限直前に実keyboardでclear側から半径3内へ入り、0msでbroken維持後に離れる。 */
+async function verifySafeRestoreBoundary(page) {
+  await page.keyboard.down('KeyS');
+  try {
+    for (let frame = 0; frame < 180; frame += 1) {
+      await waitForFrames(page, 1);
+      if (distanceFromRedBlock(await readGameState(page)) > 4.2) break;
+      if (frame === 179) throw new Error('Vehicle did not leave red respawn radius before deadline setup.');
+    }
+  } finally {
+    await page.keyboard.up('KeyS');
+  }
+  await brakeVehicle(page);
+  const outside = await readGameState(page);
+  assert(distanceFromRedBlock(outside) > 3, 'Vehicle is not outside red respawn radius.');
+
+  await page.keyboard.down('KeyW');
+  try {
+    for (let frame = 0; frame < 180; frame += 1) {
+      await waitForFrames(page, 1);
+      const approaching = await readGameState(page);
+      const distance = distanceFromRedBlock(approaching);
+      if (distance > 3.6 && distance <= 3.9) break;
+      if (frame === 179) throw new Error(`Vehicle missed outside boundary band: ${distance}.`);
+    }
+  } finally {
+    await page.keyboard.up('KeyW');
+  }
+
+  const justOutside = await readGameState(page);
+  const beforeDeadlineBlock = justOutside.runtime.blocks.find(({ id }) => id === 'plaza-red');
+  assert(distanceFromRedBlock(justOutside) > 3, 'Deadline setup crossed inside too early.');
+  await windowAdvance(page, Math.max(0, (beforeDeadlineBlock?.respawnRemainingMs ?? 0) - 500));
+  const justBeforeDeadline = await readGameState(page);
+  assert.equal(justBeforeDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase, 'broken');
+  assert(distanceFromRedBlock(justBeforeDeadline) > 3, 'Vehicle is not clear immediately before keyboard entry.');
+
+  await page.keyboard.down('KeyW');
+  let inside;
+  try {
+    for (let frame = 0; frame < 30; frame += 1) {
+      await waitForFrames(page, 1);
+      inside = await readGameState(page);
+      if (distanceFromRedBlock(inside) <= 3) break;
+    }
+  } finally {
+    await page.keyboard.up('KeyW');
+  }
+  assert(inside && distanceFromRedBlock(inside) <= 3, 'Keyboard drive did not enter red respawn radius.');
+  const insideBlock = inside.runtime.blocks.find(({ id }) => id === 'plaza-red');
+  await page.evaluate((milliseconds) => window.advanceTime?.(milliseconds), insideBlock?.respawnRemainingMs ?? 0);
+  await waitForFrames(page, 1);
+  const atDeadline = await readGameState(page);
+  assert.equal(atDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red')?.respawnRemainingMs, 0);
+  assert.equal(atDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase, 'broken',
+    'Red block restored at deadline while vehicle was inside three units.');
+
+  await page.keyboard.down('KeyS');
+  try {
+    await page.waitForFunction(() => {
+      const rendered = window.render_game_to_text?.();
+      if (!rendered) return false;
+      const state = JSON.parse(rendered);
+      return state.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase === 'intact'
+        && state.visuals.intactBlockCount === 4;
+    }, undefined, { timeout: 5_000 });
+  } finally {
+    await page.keyboard.up('KeyS');
+  }
+  return { atDeadline, inside, justBeforeDeadline };
+}
+
+/** manual clockをpage上で同期加算する。 */
+async function windowAdvance(page, milliseconds) {
+  await page.evaluate((value) => window.advanceTime?.(value), milliseconds);
+}
+
+/** 3frameの短い加速と完全減速を繰り返し、4未満の実衝突を起こす。 */
 async function collideBelowThreshold(page) {
   for (let pulse = 0; pulse < 12; pulse += 1) {
     await page.keyboard.down('KeyW');
-    await waitForFrames(page, 5);
+    await waitForFrames(page, 3);
     await page.keyboard.up('KeyW');
     await brakeVehicle(page);
     const state = await readGameState(page);
@@ -222,42 +328,67 @@ try {
     assert.equal(brokenRed?.fragmentVisibleCount, 6, 'Broken red block does not show six fragments.');
     assert.equal(brokenRed?.collisionEnabledFragmentCount, 6, 'Broken red fragment colliders are not all enabled.');
     assert.equal(brokenRendered.breakables.activeFragmentCount, 6, 'Pool active count is not six after break.');
+    assert.equal(brokenRendered.breakables.enabledBodyCount, 6, 'Six fragment bodies are not actually enabled.');
     assert.equal(brokenRendered.breakables.poolSlotCount, 24, 'Pool grew beyond or below 24 slots.');
+    assert.equal(brokenRendered.breakables.uniqueBodyHandleCount, 24, 'Actual body handle count changed on break.');
+    assert.equal(brokenRendered.breakables.uniqueColliderHandleCount, 24, 'Actual collider handle count changed on break.');
+    assert.equal(brokenRendered.breakables.uniqueMeshUuidCount, 24, 'Actual mesh UUID count changed on break.');
+    assert.equal(brokenRed?.impactCount, 1, 'Fast collision emitted duplicate red block impacts.');
+    assert.equal(brokenRed?.vehicleImpactCount, 1, 'Fast collision was not counted exactly once as vehicle impact.');
+    assert.equal(brokenRed?.intactEnabledCountAtFragmentActivation, 0,
+      'Fragments activated before the old intact body/collider were disabled.');
+    assert.equal(brokenRed?.intactBodyEnabledCount, 0, 'Old intact body remains enabled after break.');
+    assert.equal(brokenRed?.intactColliderEnabledCount, 0, 'Old intact collider remains enabled after break.');
+    for (const block of brokenRendered.breakables.blocks.filter(({ id }) => id !== 'plaza-red')) {
+      assert.equal(block.impactCount, 0, `${block.id} received an impact during red break.`);
+    }
     const originalSlotIds = brokenRed.slotIds;
+    const originalBodyHandles = brokenRendered.breakables.bodyHandles;
+    const originalColliderHandles = brokenRendered.breakables.colliderHandles;
+    const originalMeshUuids = brokenRendered.breakables.meshUuids;
     const almostExpired = timerChain.almostExpired;
+    assert(Math.abs(
+      almostExpired.runtime.blocks.find(({ id }) => id === 'plaza-red')?.respawnRemainingMs - 3_810,
+    ) <= 1e-6, 'Runtime did not expose exactly 3810ms before fragment expiry.');
     assert.equal(almostExpired.breakables.activeFragmentCount, 6,
       `Fragments expired before 1.19 seconds: ${JSON.stringify({
         block: almostExpired.runtime.blocks.find(({ id }) => id === 'plaza-red'),
         breakables: almostExpired.breakables,
         brokenBlock: brokenRendered.runtime.blocks.find(({ id }) => id === 'plaza-red'),
       })}`);
-    const expired = timerChain.expired;
-    assert.equal(expired.breakables.activeFragmentCount, 0, 'Fragments remain visible at 1.2 seconds.');
+    const expiredTimer = timerChain.expired;
+    assert(Math.abs(
+      expiredTimer.runtime.blocks.find(({ id }) => id === 'plaza-red')?.respawnRemainingMs - 3_800,
+    ) <= 1e-6, 'Runtime did not expose exactly 3800ms at fragment expiry.');
+    const expiredAfterOneMacrotask = await readGameStateAfterMacrotask(chainPage);
+    const expiredAfterTwoMacrotasks = await readGameStateAfterMacrotask(chainPage);
+    await waitForFrames(chainPage, 5);
+    const expired = await readGameState(chainPage);
+    assert.equal(expired.breakables.activeFragmentCount, 0,
+      `Fragments remain visible at 1.2 seconds: ${JSON.stringify(expired.breakables)}`);
     assert.equal(expired.breakables.collisionEnabledFragmentCount, 0, 'Fragment collisions remain enabled at 1.2 seconds.');
+    assert.equal(expired.breakables.enabledBodyCount, 0, 'Fragment bodies remain enabled at expiry.');
+    assert.equal(expired.breakables.sleepingFragmentCount, 24, 'Expired fragment bodies are not all sleeping.');
+    assert.deepEqual(expired.breakables.bodyHandles, originalBodyHandles, 'Expiry replaced body handles.');
+    assert.deepEqual(expired.breakables.colliderHandles, originalColliderHandles, 'Expiry replaced collider handles.');
+    assert.deepEqual(expired.breakables.meshUuids, originalMeshUuids, 'Expiry replaced mesh UUIDs.');
 
-    const nearAfterFiveSeconds = timerChain.nearAfterFiveSeconds;
-    assert.equal(nearAfterFiveSeconds.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase, 'broken',
-      'Red block restored while vehicle remained within three units.');
-
-    await chainPage.keyboard.down('KeyS');
-    try {
-      await chainPage.waitForFunction(() => {
-        const rendered = window.render_game_to_text?.();
-        if (!rendered) return false;
-        const state = JSON.parse(rendered);
-        return state.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase === 'intact';
-      }, undefined, { timeout: 5_000 });
-    } finally {
-      await chainPage.keyboard.up('KeyS');
-    }
+    const safeBoundary = await verifySafeRestoreBoundary(chainPage);
     await brakeVehicle(chainPage);
     const restored = await readGameState(chainPage);
     assert.equal(restored.visuals.intactBlockCount, 4, 'Restored scene does not contain exactly four intact blocks.');
     assert.equal(restored.breakables.activeFragmentCount, 0, 'Restored scene retains visible fragments.');
     assert.equal(restored.breakables.collisionEnabledFragmentCount, 0, 'Restored scene retains fragment collisions.');
+    assert.equal(restored.breakables.enabledBodyCount, 0, 'Restored scene retains enabled fragment bodies.');
+    assert.equal(restored.breakables.sleepingFragmentCount, 24, 'Restored scene fragment bodies are not sleeping.');
+    assert.deepEqual(restored.breakables.bodyHandles, originalBodyHandles, 'Restore replaced body handles.');
+    assert.deepEqual(restored.breakables.colliderHandles, originalColliderHandles, 'Restore replaced collider handles.');
+    assert.deepEqual(restored.breakables.meshUuids, originalMeshUuids, 'Restore replaced mesh UUIDs.');
     await chainPage.screenshot({ path: `${outputDirectory}/block-restored.png` });
 
-    await turnVehicleToward(chainPage, 1, 0);
+    await chainPage.evaluate(() => window.reset_voxel_game_vehicle?.());
+    await waitForFrames(chainPage, 2);
+    await driveToRedBlockApproach(chainPage);
     const rebroken = await collideAtEffectiveSpeed(chainPage);
     await waitForFrames(chainPage, 1);
     const rebrokenRendered = await readGameState(chainPage);
@@ -265,12 +396,27 @@ try {
     assert.equal(rebrokenRed?.fragmentVisibleCount, 6, 'Re-break did not reactivate six slots.');
     assert.deepEqual(rebrokenRed?.slotIds, originalSlotIds, 'Re-break replaced fragment slot identities.');
     assert.equal(rebrokenRendered.breakables.poolSlotCount, 24, 'Re-break changed pool size.');
+    assert.deepEqual(rebrokenRendered.breakables.bodyHandles, originalBodyHandles, 'Re-break replaced body handles.');
+    assert.deepEqual(rebrokenRendered.breakables.colliderHandles, originalColliderHandles, 'Re-break replaced collider handles.');
+    assert.deepEqual(rebrokenRendered.breakables.meshUuids, originalMeshUuids, 'Re-break replaced mesh UUIDs.');
     await chainPage.screenshot({ path: `${outputDirectory}/block-broken.png` });
     results.chain = {
       broken: brokenState.runtime.blocks.find(({ id }) => id === 'plaza-red'),
       effectiveImpactSpeed: brokenRed.maxImpactSpeed,
       expired: expired.breakables,
-      nearAfterFiveSeconds: nearAfterFiveSeconds.runtime.blocks.find(({ id }) => id === 'plaza-red'),
+      sleepCheckpoints: {
+        exactBoundaryRead: expiredTimer.breakables.rapierSleepingFragmentCount,
+        afterOneMacrotask: expiredAfterOneMacrotask.breakables.rapierSleepingFragmentCount,
+        afterTwoMacrotasks: expiredAfterTwoMacrotasks.breakables.rapierSleepingFragmentCount,
+        afterExpirationFrames: expired.breakables.rapierSleepingFragmentCount,
+        afterRestore: restored.breakables.rapierSleepingFragmentCount,
+      },
+      safeBoundary: {
+        atDeadline: safeBoundary.atDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red'),
+        insideDistance: distanceFromRedBlock(safeBoundary.inside),
+        justBeforeDeadline: safeBoundary.justBeforeDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red'),
+        justOutsideDistance: distanceFromRedBlock(safeBoundary.justBeforeDeadline),
+      },
       restored: restored.runtime.blocks.find(({ id }) => id === 'plaza-red'),
       reusedSlotIds: rebrokenRed.slotIds,
       rebroken: rebroken.runtime.blocks.find(({ id }) => id === 'plaza-red'),

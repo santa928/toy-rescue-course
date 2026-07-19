@@ -29,6 +29,11 @@ export interface ManualClockFlag {
   current: boolean;
 }
 
+export interface BlockClearanceDefinition {
+  readonly id: string;
+  readonly position: readonly [number, number, number];
+}
+
 interface MutableBreakableState {
   clear: boolean;
   id: string;
@@ -107,12 +112,13 @@ export class VoxelGameRuntime {
     if (block) block.clear = clear;
   }
 
-  /** 有効衝突を受けた指定blockを破壊状態へ移す。 */
-  public registerBlockImpact(id: string, impactSpeed: number): void {
+  /** 有効衝突で新たに破壊状態へ移した場合だけtrueを返す。 */
+  public registerBlockImpact(id: string, impactSpeed: number): boolean {
     const block = this.blocks.find((entry) => entry.id === id);
-    if (!block || block.phase === 'broken' || impactSpeed < BREAK_IMPACT_THRESHOLD) return;
+    if (!block || block.phase === 'broken' || impactSpeed < BREAK_IMPACT_THRESHOLD) return false;
     block.phase = 'broken';
     block.respawnRemainingMs = RESPAWN_DURATION_MS;
+    return true;
   }
 
   /** runtimeを指定ミリ秒だけ決定的に進める。 */
@@ -180,14 +186,29 @@ export class VoxelGameRuntime {
   }
 }
 
+/** 最新の車両XZ位置で、全blockの復元半径3がclearか一括更新する。 */
+export function syncBlockClearance(
+  runtime: VoxelGameRuntime,
+  blocks: readonly BlockClearanceDefinition[],
+  vehiclePosition: readonly [number, number, number],
+): void {
+  for (const block of blocks) {
+    const xDistance = block.position[0] - vehiclePosition[0];
+    const zDistance = block.position[2] - vehiclePosition[2];
+    runtime.setBlockClear(block.id, Math.hypot(xDistance, zDistance) > 3);
+  }
+}
+
 /** 正の有限時間だけを同期加算し、直後の通常frame skipを予約する。 */
 export function advanceManualClock(
   runtime: VoxelGameRuntime,
   manualClockFlag: ManualClockFlag,
   milliseconds: number,
+  beforeAdvance?: () => void,
 ): void {
   if (!Number.isFinite(milliseconds) || milliseconds <= 0) return;
   manualClockFlag.current = true;
+  beforeAdvance?.();
   advanceInFixedSteps(milliseconds, (deltaMs) => runtime.advance(deltaMs));
 }
 
@@ -196,10 +217,12 @@ export function advanceRuntimeFrame(
   runtime: VoxelGameRuntime,
   manualClockFlag: ManualClockFlag,
   deltaSeconds: number,
+  beforeAdvance?: () => void,
 ): void {
   if (manualClockFlag.current) {
     manualClockFlag.current = false;
     return;
   }
+  beforeAdvance?.();
   runtime.advance(Math.min(deltaSeconds, 0.05) * 1_000);
 }

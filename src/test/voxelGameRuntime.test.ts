@@ -3,6 +3,7 @@ import {
   advanceInFixedSteps,
   advanceManualClock,
   advanceRuntimeFrame,
+  syncBlockClearance,
   VoxelGameRuntime,
 } from '../voxel-game/domain/VoxelGameRuntime';
 
@@ -114,6 +115,31 @@ describe('VoxelGameRuntime', () => {
     expect(runtime.getSnapshot().elapsedMs).toBe(80);
   });
 
+  it('通常・手動clockともadvance直前の最新車両位置でclearを一括更新する', () => {
+    const blocks = [{ id: 'plaza-red', position: [0, 0, 0] as const }];
+    const runtime = new VoxelGameRuntime(['plaza-red']);
+    const manualClockFlag = { current: false };
+    runtime.registerBlockImpact('plaza-red', 4);
+
+    advanceManualClock(runtime, manualClockFlag, 5_000, () => {
+      syncBlockClearance(runtime, blocks, [3, 99, 0]);
+    });
+    expect(runtime.getSnapshot().blocks[0]).toMatchObject({
+      phase: 'broken',
+      respawnRemainingMs: 0,
+    });
+
+    advanceRuntimeFrame(runtime, manualClockFlag, 0.05, () => {
+      syncBlockClearance(runtime, blocks, [3.001, -99, 0]);
+    });
+    expect(runtime.getSnapshot().blocks[0]?.phase).toBe('broken');
+
+    advanceRuntimeFrame(runtime, manualClockFlag, 0.05, () => {
+      syncBlockClearance(runtime, blocks, [3.001, -99, 0]);
+    });
+    expect(runtime.getSnapshot().blocks[0]?.phase).toBe('intact');
+  });
+
   it('有効放水2500msで消火し、お礼演出後に自由走行へ移る', () => {
     const runtime = new VoxelGameRuntime(['plaza-red']);
     runtime.setSignals({ sprayActive: true, sprayOnFire: true });
@@ -162,10 +188,12 @@ describe('VoxelGameRuntime', () => {
 
   it('衝突速度4未満では壊さず、4以上で壊す', () => {
     const runtime = new VoxelGameRuntime(['plaza-red']);
-    runtime.registerBlockImpact('plaza-red', 3.99);
+    expect(runtime.registerBlockImpact('missing', 4)).toBe(false);
+    expect(runtime.registerBlockImpact('plaza-red', 3.99)).toBe(false);
     expect(runtime.getSnapshot().blocks[0]?.phase).toBe('intact');
-    runtime.registerBlockImpact('plaza-red', 4);
+    expect(runtime.registerBlockImpact('plaza-red', 4)).toBe(true);
     expect(runtime.getSnapshot().blocks[0]).toMatchObject({ phase: 'broken', respawnRemainingMs: 5_000 });
+    expect(runtime.registerBlockImpact('plaza-red', 7)).toBe(false);
   });
 
   it('5秒後も車両が復元領域内なら待機し、離れたら復元する', () => {

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { advanceManualClock, VoxelGameRuntime } from './domain/VoxelGameRuntime';
+import {
+  advanceManualClock,
+  syncBlockClearance,
+  VoxelGameRuntime,
+} from './domain/VoxelGameRuntime';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
 import { VoxelGameScene } from './scene/VoxelGameScene';
 import type {
@@ -16,7 +20,9 @@ import {
 } from './scene/WaterAndFire';
 import type { WorldCameraTelemetry } from './scene/WorldFixedCamera';
 import {
-  BREAKABLE_FRAGMENT_POOL,
+  BREAKABLE_FRAGMENT_POOL_SLOT_IDS,
+  BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK,
+  type BreakablePoolHandle,
   type BreakableTelemetry,
 } from './scene/BreakableBlockPlaza';
 import {
@@ -29,24 +35,46 @@ import {
 /** 運転可能な箱庭Canvas、入力、段階的な自動検証hookを構成する。 */
 export function VoxelGameApp(): ReactElement {
   const controls = useVoxelGameControls();
+  const breakablePoolHandleRef = useRef<BreakablePoolHandle>(null);
   const breakableTelemetryRef = useRef<BreakableTelemetry>({
     activeFragmentCount: 0,
-    blocks: BREAKABLE_BLOCKS.map(({ id }) => ({
+    blocks: BREAKABLE_BLOCKS.map(({ id }, blockIndex) => ({
+      bodyHandles: [],
+      colliderHandles: [],
       collisionEnabledFragmentCount: 0,
       fragmentVisibleCount: 0,
       id,
       impactCount: 0,
+      intactBodyEnabledCount: 0,
+      intactBodyHandle: null,
+      intactColliderEnabledCount: 0,
+      intactColliderHandle: null,
+      intactEnabledCountAtFragmentActivation: null,
       intactVisible: true,
       maxImpactSpeed: 0,
       maxEventRelativeSpeed: 0,
       maxVehiclePreviousStepSpeed: 0,
-      slotIds: BREAKABLE_FRAGMENT_POOL.filter(({ blockId }) => blockId === id).map(({ id: slotId }) => slotId),
+      meshUuids: [],
+      slotIds: (BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[blockIndex] ?? []).map(
+        (slotIndex) => BREAKABLE_FRAGMENT_POOL_SLOT_IDS[slotIndex] ?? '',
+      ),
       vehicleImpactCount: 0,
     })),
+    bodyHandles: [],
+    colliderHandles: [],
     collisionEnabledFragmentCount: 0,
-    poolSlotCount: BREAKABLE_FRAGMENT_POOL.length,
-    poolSlotIds: BREAKABLE_FRAGMENT_POOL.map(({ id }) => id),
+    enabledBodyCount: 0,
+    meshUuids: [],
+    mountedBodyCount: 0,
+    mountedColliderCount: 0,
+    mountedMeshCount: 0,
+    poolSlotCount: 0,
+    poolSlotIds: BREAKABLE_FRAGMENT_POOL_SLOT_IDS,
+    rapierSleepingFragmentCount: 0,
     sleepingFragmentCount: 0,
+    uniqueBodyHandleCount: 0,
+    uniqueColliderHandleCount: 0,
+    uniqueMeshUuidCount: 0,
   });
   const controllerRef = useRef<VehicleControllerHandle>(null);
   const cameraTelemetryRef = useRef<WorldCameraTelemetry>({
@@ -80,6 +108,8 @@ export function VoxelGameApp(): ReactElement {
     });
     window.render_game_to_text = () => {
       const runtime = runtimeRef.current.getSnapshot();
+      const breakables = breakablePoolHandleRef.current?.readActualTelemetry()
+        ?? breakableTelemetryRef.current;
       return JSON.stringify({
         coordinateSystem: 'origin=center, +x=right, +y=up, +z=toward-garage',
         landmarks: {
@@ -89,7 +119,7 @@ export function VoxelGameApp(): ReactElement {
         },
         mode: 'drive-ready',
         camera: cameraTelemetryRef.current,
-        breakables: breakableTelemetryRef.current,
+        breakables,
         mission: missionTelemetryRef.current,
         runtime,
         vehicle: telemetryRef.current,
@@ -102,20 +132,28 @@ export function VoxelGameApp(): ReactElement {
           routeCubeCount: runtime.routeVisible ? 12 : 0,
           starCubeCount: runtime.missionPhase === 'celebrating' ? 30 : 0,
           waterCubeCount: missionTelemetryRef.current.sprayActive ? 18 : 0,
-          intactBlockCount: breakableTelemetryRef.current.blocks.filter(({ intactVisible }) => intactVisible).length,
-          fragmentVisibleCount: breakableTelemetryRef.current.activeFragmentCount,
-          fragmentCollisionEnabledCount: breakableTelemetryRef.current.collisionEnabledFragmentCount,
-          fragmentPoolSlotCount: breakableTelemetryRef.current.poolSlotCount,
+          intactBlockCount: breakables.blocks.filter(({ intactVisible }) => intactVisible).length,
+          fragmentVisibleCount: breakables.activeFragmentCount,
+          fragmentCollisionEnabledCount: breakables.collisionEnabledFragmentCount,
+          fragmentPoolSlotCount: breakables.poolSlotCount,
         },
         worldBounds: WORLD_BOUNDS,
       });
     };
     window.reset_voxel_game_vehicle = () => controllerRef.current?.resetVehicle();
-    window.advanceTime = (milliseconds: number) => advanceManualClock(
-      runtimeRef.current,
-      manualClockRef,
-      milliseconds,
-    );
+    window.advanceTime = (milliseconds: number) => {
+      advanceManualClock(
+        runtimeRef.current,
+        manualClockRef,
+        milliseconds,
+        () => syncBlockClearance(
+          runtimeRef.current,
+          BREAKABLE_BLOCKS,
+          telemetryRef.current.position,
+        ),
+      );
+      breakablePoolHandleRef.current?.syncAfterRuntimeAdvance();
+    };
 
     return () => {
       unsubscribe();
@@ -130,6 +168,7 @@ export function VoxelGameApp(): ReactElement {
       <section className="voxel-game-canvas" aria-label="純ボクセル消防車の箱庭">
         <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}>
           <VoxelGameScene
+            breakablePoolHandleRef={breakablePoolHandleRef}
             breakableTelemetryRef={breakableTelemetryRef}
             cameraTelemetryRef={cameraTelemetryRef}
             commandRef={controls.commandRef}
