@@ -528,10 +528,12 @@ export const BREAKABLE_BLOCKS = [
 - [ ] **Step 4: Vehicle Labを壊さず消防車group propsを受け取れるようにする**
 
 ```tsx
-import type { GroupProps } from '@react-three/fiber';
+import type { ThreeElements } from '@react-three/fiber';
+
+type VoxelFireTruckProps = ThreeElements['group'];
 
 /** 純ボクセル消防車を色別instanceバッチで描画する。 */
-export function VoxelFireTruck(props: GroupProps): ReactElement {
+export function VoxelFireTruck(props: VoxelFireTruckProps): ReactElement {
   assertValidVoxelModel(FIRE_TRUCK_VOXELS, FIRE_TRUCK_PALETTE_IDS);
   return (
     <group {...props}>
@@ -653,11 +655,12 @@ git commit -m "純ボクセル消防車の箱庭エントリを追加"
 - Create: `src/voxel-game/scene/WorldFixedCamera.tsx`
 - Modify: `src/voxel-game/scene/VoxelGameScene.tsx`
 - Modify: `src/voxel-game/VoxelGameApp.tsx`
+- Modify: `src/global.d.ts`
 - Modify: `progress.md`
 
 **Interfaces:**
 - Consumes: `DriveCommand` ref、`GARAGE_POSITION`、`WORLD_BOUNDS`、`VoxelFireTruck`。
-- Produces: `VehicleTelemetryRef`、`VehicleController`、`WorldFixedCamera`、`resetVehicle()`。
+- Produces: `VehicleTelemetryRef`、`VehicleController`、`WorldFixedCamera`、`resetVehicle()`、車両情報を含む初期`render_game_to_text()`、`reset_voxel_game_vehicle()`。
 
 - [ ] **Step 1: 車両telemetry interfaceを定義する**
 
@@ -693,7 +696,11 @@ OrthographicCameraの目標positionを `vehicle.position + [10, 12, 12]`、look 
 
 `VoxelGameApp` が `useVoxelGameControls()` を生成し、`commandRef` を `VoxelGameScene` へ渡す。static消防車は削除し、`VehicleController`へ置換する。HUDはまだ作らず、PC keyboardだけで走れる状態にする。
 
-- [ ] **Step 5: Docker内test/buildを実行する**
+- [ ] **Step 5: 車両検証hookを段階的に公開する**
+
+`src/global.d.ts` へ `render_game_to_text?: () => string` と `reset_voxel_game_vehicle?: () => void` を追加する。`VoxelGameApp` は座標系、現在のruntime snapshot、`VehicleTelemetry`をJSON化し、reset要求をcontrollerへ渡す。Task 5で火とmanual clock、Task 6で積み木、Task 7でcontrolsと最終型を追加するため、後続Taskは同じhook名を上書きせずpayloadだけを拡張する。
+
+- [ ] **Step 6: Docker内test/buildを実行する**
 
 ```bash
 docker compose run --rm web npm test
@@ -702,15 +709,15 @@ docker compose run --rm web npm run build
 
 Expected: 全test PASS、3 HTML build SUCCESS。
 
-- [ ] **Step 6: short input burstで前進、旋回、停止、境界復帰を確認する**
+- [ ] **Step 7: short input burstで前進、旋回、停止、境界復帰を確認する**
 
 Playwrightで `voxel-game.html?verify=<timestamp>` を開き、Wを30frame、Aを18frame、無入力30frameの順に送る。各burst後に `render_game_to_text()` の `vehicle.position`、`forward`、`speed`を読み、前進で位置変化、旋回でforward変化、無入力で減速を確認する。境界外へ移すtest APIは追加せず、E2E専用の `window.reset_voxel_game_vehicle()` で車庫resetと`resetCount`増加を確認する。
 
-- [ ] **Step 7: desktopとmobile landscape screenshotを目視する**
+- [ ] **Step 8: desktopとmobile landscape screenshotを目視する**
 
 消防車が欠けず、進行方向の道路が見え、カメラが車両yawで回転しないことを2枚以上の画像で確認する。
 
-- [ ] **Step 8: progressへ追記してコミットする**
+- [ ] **Step 9: progressへ追記してコミットする**
 
 ```bash
 git add src/voxel-game/scene/VehicleController.tsx src/voxel-game/scene/WorldFixedCamera.tsx src/voxel-game/scene/VoxelGameScene.tsx src/voxel-game/VoxelGameApp.tsx
@@ -726,11 +733,12 @@ git commit -m "純ボクセル消防車の運転と追従カメラを追加"
 - Modify: `src/voxel-game/scene/VoxelGameScene.tsx`
 - Modify: `src/voxel-game/VoxelGameApp.tsx`
 - Modify: `src/voxel-game/domain/VoxelGameRuntime.ts`
+- Modify: `src/global.d.ts`
 - Modify: `progress.md`
 
 **Interfaces:**
 - Consumes: `resolveSprayTarget()`、`VoxelGameRuntime`、`VehicleTelemetryRef`、`FIRE_POSITION`、`DriveCommand.spray`。
-- Produces: `WaterAndFire`、`MissionTelemetry`、fire intensityの3段階表示。
+- Produces: `WaterAndFire`、`MissionTelemetry`、fire intensityの3段階表示、`window.advanceTime()`。
 
 - [ ] **Step 1: runtimeへ火の強さ変化通知を購読する軽量snapshot APIを追加する**
 
@@ -752,7 +760,7 @@ git commit -m "純ボクセル消防車の運転と追従カメラを追加"
 
 - [ ] **Step 4: frame clockをruntimeへ接続する**
 
-通常描画中は `useFrame((_, delta) => runtime.advance(Math.min(delta, 0.05) * 1000))` を使う。E2Eの `window.advanceTime()` が呼ばれたframeでは同じ時間を二重加算しないよう、manual clock flagを1frameだけ立てる。
+通常描画中は `useFrame((_, delta) => runtime.advance(Math.min(delta, 0.05) * 1000))` を使う。`window.advanceTime(milliseconds)` は60Hz固定stepへ分割してruntimeを進め、manual clock flagを1frameだけ立てて通常clockとの二重加算を防ぐ。`src/global.d.ts` へ同hook型を追加する。
 
 - [ ] **Step 5: Docker unit/buildを実行する**
 
@@ -842,7 +850,7 @@ git commit -m "箱庭に壊れて戻る積み木を追加"
 
 **Interfaces:**
 - Consumes: `VoxelGameControls`、runtime snapshot、`VehicleTelemetryRef`。
-- Produces: `window.render_game_to_text()`、`window.advanceTime()`、`window.reset_voxel_game_vehicle()`、touch controls、fullscreen button。
+- Produces: 完成版`render_game_to_text()` payload、既存`advanceTime()`／`reset_voxel_game_vehicle()`の型整合、touch controls、fullscreen button。
 
 - [ ] **Step 1: HUD componentを実装する**
 
@@ -872,7 +880,7 @@ pointerdown/up/cancel/lostpointercaptureで入力を確実に解除する。butt
 
 縦が390pxのmobile landscapeではmission pillの下端、joystickとspray buttonの上端、Canvas内の車両safe rectangleをruntime座標で測り、重ならないことをE2E assertionにする。
 
-- [ ] **Step 3: telemetry型と公開hookを実装する**
+- [ ] **Step 3: telemetry型と公開hook payloadを完成させる**
 
 ```ts
 export interface VoxelGameTextState {
@@ -885,7 +893,7 @@ export interface VoxelGameTextState {
 }
 ```
 
-`render_game_to_text()` は上記をJSON stringifyして返す。`advanceTime(ms)` は60Hz固定stepへ分割してruntimeを進める。`reset_voxel_game_vehicle()` はcontrollerのreset request counterを増やす。
+Task 4の `render_game_to_text()` payloadへfire、mission、blocks、controlsを追加して上記をJSON stringifyする。Task 5の `advanceTime(ms)` とTask 4の `reset_voxel_game_vehicle()` は同じ実装を維持し、global型とcleanupを完成させる。
 
 - [ ] **Step 4: fullscreenを実装する**
 
