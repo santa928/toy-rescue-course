@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import * as THREE from 'three';
-import { BREAKABLE_BLOCKS, PARK_CENTER } from './worldLayout';
+import { PARK_CENTER } from './worldLayout';
 
 interface BoxInstance {
   readonly position: readonly [number, number, number];
@@ -148,7 +148,7 @@ function VoxelFireBuilding(): ReactElement {
   );
 }
 
-/** 西側の積み木広場と契約済み4ブロックを描画する。 */
+/** 西側の積み木広場の土台を描画する。 */
 function VoxelBlockPlaza(): ReactElement {
   return (
     <group>
@@ -156,12 +156,6 @@ function VoxelBlockPlaza(): ReactElement {
         <boxGeometry args={[6.6, 0.34, 7]} />
         <meshLambertMaterial color="#e1c78c" />
       </mesh>
-      {BREAKABLE_BLOCKS.map((block, index) => (
-        <mesh key={block.id} position={block.position} rotation={[0, index * 0.22, 0]}>
-          <boxGeometry args={[1.5, 1.5, 1.5]} />
-          <meshLambertMaterial color={block.color} />
-        </mesh>
-      ))}
     </group>
   );
 }

@@ -9,11 +9,13 @@ import {
   type VehicleControllerHandle,
   type VehicleTelemetryRef,
 } from './VehicleController';
+import { BreakableBlockPlaza, type BreakableTelemetryRef } from './BreakableBlockPlaza';
 import { VoxelWorld } from './VoxelWorld';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
 import { WorldFixedCamera, type WorldCameraTelemetryRef } from './WorldFixedCamera';
 
 interface VoxelGameSceneProps {
+  readonly breakableTelemetryRef: BreakableTelemetryRef;
   readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
   readonly commandRef: RefObject<DriveCommand>;
   readonly controllerRef: RefObject<VehicleControllerHandle | null>;
@@ -59,6 +61,7 @@ function RuntimeClock({ manualClockRef, runtime }: RuntimeClockProps): null {
 
 /** 箱庭の照明、世界方向固定camera、物理空間、運転可能な消防車を構成する。 */
 export function VoxelGameScene({
+  breakableTelemetryRef,
   cameraTelemetryRef,
   commandRef,
   controllerRef,
@@ -78,6 +81,11 @@ export function VoxelGameScene({
       <directionalLight color="#cbe0ff" intensity={0.75} position={[-18, 20, -14]} />
       <Physics gravity={[0, -18, 0]}>
         <VoxelWorld />
+        <BreakableBlockPlaza
+          breakableTelemetryRef={breakableTelemetryRef}
+          runtime={runtime}
+          telemetryRef={telemetryRef}
+        />
         <WaterAndFire
           commandRef={commandRef}
           missionTelemetryRef={missionTelemetryRef}

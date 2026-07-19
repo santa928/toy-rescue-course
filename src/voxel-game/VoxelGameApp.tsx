@@ -16,6 +16,10 @@ import {
 } from './scene/WaterAndFire';
 import type { WorldCameraTelemetry } from './scene/WorldFixedCamera';
 import {
+  BREAKABLE_FRAGMENT_POOL,
+  type BreakableTelemetry,
+} from './scene/BreakableBlockPlaza';
+import {
   BREAKABLE_BLOCKS,
   FIRE_POSITION,
   GARAGE_POSITION,
@@ -25,6 +29,25 @@ import {
 /** 運転可能な箱庭Canvas、入力、段階的な自動検証hookを構成する。 */
 export function VoxelGameApp(): ReactElement {
   const controls = useVoxelGameControls();
+  const breakableTelemetryRef = useRef<BreakableTelemetry>({
+    activeFragmentCount: 0,
+    blocks: BREAKABLE_BLOCKS.map(({ id }) => ({
+      collisionEnabledFragmentCount: 0,
+      fragmentVisibleCount: 0,
+      id,
+      impactCount: 0,
+      intactVisible: true,
+      maxImpactSpeed: 0,
+      maxEventRelativeSpeed: 0,
+      maxVehiclePreviousStepSpeed: 0,
+      slotIds: BREAKABLE_FRAGMENT_POOL.filter(({ blockId }) => blockId === id).map(({ id: slotId }) => slotId),
+      vehicleImpactCount: 0,
+    })),
+    collisionEnabledFragmentCount: 0,
+    poolSlotCount: BREAKABLE_FRAGMENT_POOL.length,
+    poolSlotIds: BREAKABLE_FRAGMENT_POOL.map(({ id }) => id),
+    sleepingFragmentCount: 0,
+  });
   const controllerRef = useRef<VehicleControllerHandle>(null);
   const cameraTelemetryRef = useRef<WorldCameraTelemetry>({
     lookTarget: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 0.8, GARAGE_POSITION[2] - 1.5],
@@ -66,6 +89,7 @@ export function VoxelGameApp(): ReactElement {
         },
         mode: 'drive-ready',
         camera: cameraTelemetryRef.current,
+        breakables: breakableTelemetryRef.current,
         mission: missionTelemetryRef.current,
         runtime,
         vehicle: telemetryRef.current,
@@ -78,6 +102,10 @@ export function VoxelGameApp(): ReactElement {
           routeCubeCount: runtime.routeVisible ? 12 : 0,
           starCubeCount: runtime.missionPhase === 'celebrating' ? 30 : 0,
           waterCubeCount: missionTelemetryRef.current.sprayActive ? 18 : 0,
+          intactBlockCount: breakableTelemetryRef.current.blocks.filter(({ intactVisible }) => intactVisible).length,
+          fragmentVisibleCount: breakableTelemetryRef.current.activeFragmentCount,
+          fragmentCollisionEnabledCount: breakableTelemetryRef.current.collisionEnabledFragmentCount,
+          fragmentPoolSlotCount: breakableTelemetryRef.current.poolSlotCount,
         },
         worldBounds: WORLD_BOUNDS,
       });
@@ -102,6 +130,7 @@ export function VoxelGameApp(): ReactElement {
       <section className="voxel-game-canvas" aria-label="純ボクセル消防車の箱庭">
         <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}>
           <VoxelGameScene
+            breakableTelemetryRef={breakableTelemetryRef}
             cameraTelemetryRef={cameraTelemetryRef}
             commandRef={controls.commandRef}
             controllerRef={controllerRef}
