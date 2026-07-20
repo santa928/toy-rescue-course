@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { VehicleTelemetryRef } from './VehicleController';
 import { resolveWorldFixedCameraZoom } from './WorldFixedCameraLayout';
+import { WORLD_CAMERA_LOOK_OFFSET, WORLD_CAMERA_OFFSET } from './worldCameraConfig';
 
 interface WorldFixedCameraProps {
   readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
@@ -20,8 +21,8 @@ export interface WorldCameraTelemetry {
 
 export type WorldCameraTelemetryRef = MutableRefObject<WorldCameraTelemetry>;
 
-const CAMERA_OFFSET = new THREE.Vector3(10, 12, 12);
-const LOOK_OFFSET = new THREE.Vector3(0, 0.8, -1.5);
+const CAMERA_OFFSET = new THREE.Vector3(...WORLD_CAMERA_OFFSET);
+const LOOK_OFFSET = new THREE.Vector3(...WORLD_CAMERA_LOOK_OFFSET);
 const smoothedPositionTarget = new THREE.Vector3();
 const cameraTarget = new THREE.Vector3();
 const lookTarget = new THREE.Vector3();
@@ -67,7 +68,11 @@ export function WorldFixedCamera({ cameraTelemetryRef, telemetryRef }: WorldFixe
   return (
     <OrthographicCamera
       makeDefault
-      position={[vehicleX + 10, vehicleY + 12, vehicleZ + 12]}
+      position={[
+        vehicleX + WORLD_CAMERA_OFFSET[0],
+        vehicleY + WORLD_CAMERA_OFFSET[1],
+        vehicleZ + WORLD_CAMERA_OFFSET[2],
+      ]}
       ref={cameraRef}
       zoom={56}
     />

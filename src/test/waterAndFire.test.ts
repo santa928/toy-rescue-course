@@ -51,7 +51,7 @@ describe('WaterAndFire', () => {
         resetCount: 0,
         speed: 0,
       },
-      { spray: true, steer: 0, throttle: 0 },
+      { moveX: 0, moveY: 0, spray: true },
     );
     const behind = resolveWaterAndFireFrame(
       {
@@ -61,7 +61,7 @@ describe('WaterAndFire', () => {
         resetCount: 0,
         speed: 0,
       },
-      { spray: true, steer: 0, throttle: 0 },
+      { moveX: 0, moveY: 0, spray: true },
     );
 
     expect(targeted).toMatchObject({ sprayActive: true, sprayOnFire: true, targeted: true });
@@ -78,7 +78,7 @@ describe('WaterAndFire', () => {
         resetCount: 0,
         speed: 0,
       },
-      { spray: true, steer: 0, throttle: 0 },
+      { moveX: 0, moveY: 0, spray: true },
     );
 
     runtime.setSignals({ sprayActive: frame.sprayActive, sprayOnFire: frame.sprayOnFire });

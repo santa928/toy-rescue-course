@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { VoxelFireTruck } from '../../vehicle-lab/scene/VoxelFireTruck';
 import type { DriveCommand } from '../input/controlState';
 import { GARAGE_POSITION, WORLD_BOUNDS } from './worldLayout';
+import { resolveScreenRelativeMovement, shortestAngleDelta } from './screenRelativeMovement';
 
 export interface VehicleTelemetry {
   readonly forward: readonly [number, number, number];
@@ -105,17 +106,19 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       forward.copy(BASE_FORWARD).applyQuaternion(quaternion).normalize();
 
       const command = commandRef.current;
+      const movement = resolveScreenRelativeMovement(command);
       const velocity = body.linvel();
-      const currentForwardSpeed = velocity.x * forward.x + velocity.z * forward.z;
-      const targetSpeed = command.throttle * 7.4;
-      const response = command.throttle === 0 ? 4.8 : 7.5;
-      const nextSpeed = THREE.MathUtils.damp(currentForwardSpeed, targetSpeed, response, delta);
-      const steeringScale = THREE.MathUtils.clamp(Math.abs(nextSpeed) / 2.5, 0.35, 1);
-      const targetYawVelocity = command.steer * 1.9 * steeringScale;
+      const moving = movement.magnitude > 0 && movement.targetYaw !== null;
+      const response = moving ? 7.5 : 4.8;
+      const nextVelocityX = THREE.MathUtils.damp(velocity.x, movement.velocity[0], response, delta);
+      const nextVelocityZ = THREE.MathUtils.damp(velocity.z, movement.velocity[2], response, delta);
+      const targetYawVelocity = moving
+        ? THREE.MathUtils.clamp(shortestAngleDelta(yaw, movement.targetYaw) * 8, -5.2, 5.2)
+        : 0;
 
-      body.setLinvel({ x: forward.x * nextSpeed, y: velocity.y, z: forward.z * nextSpeed }, true);
+      body.setLinvel({ x: nextVelocityX, y: velocity.y, z: nextVelocityZ }, true);
       body.setAngvel({ x: 0, y: targetYawVelocity, z: 0 }, true);
-      updateTelemetry(telemetryRef, position, forward, body.mass(), Math.abs(nextSpeed));
+      updateTelemetry(telemetryRef, position, forward, body.mass(), Math.hypot(nextVelocityX, nextVelocityZ));
     });
 
     return (
