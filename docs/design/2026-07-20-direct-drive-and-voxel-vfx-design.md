@@ -3,7 +3,7 @@
 ## 状態
 
 - 会話設計: 2026-07-20 承認済み
-- Written spec: ユーザーレビュー待ち
+- Written spec: 2026-07-20 承認済み
 - 対象entry: `voxel-game.html`
 - 基準設計: `docs/design/2026-07-19-voxel-firetruck-gameplay-slice-design.md`
 
