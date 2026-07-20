@@ -36,6 +36,7 @@ interface BreakableBlockDefinition {
   readonly position: readonly [number, number, number];
 }
 
+/** 元blockに固定所属し、再生成せず再利用するRapier主破片slot。 */
 export interface BreakableFragmentSlot {
   readonly blockId: string;
   readonly color: string;
@@ -73,6 +74,15 @@ export interface ActiveBreakableFragmentTelemetry {
   readonly scale: readonly [number, number, number];
 }
 
+/** 単一InstancedMeshへ実際に反映された補助chip一片の公開状態。 */
+export interface BreakableChipTelemetry {
+  readonly active: boolean;
+  readonly position: readonly [number, number, number];
+  readonly scale: number;
+  readonly slot: number;
+}
+
+/** 固定主破片poolと補助chip描画の実参照から組み立てる公開telemetry。 */
 export interface BreakableTelemetry {
   readonly activeFragments: readonly ActiveBreakableFragmentTelemetry[];
   readonly activeFragmentCount: number;
@@ -81,12 +91,7 @@ export interface BreakableTelemetry {
   readonly colliderHandles: readonly number[];
   readonly collisionEnabledFragmentCount: number;
   readonly chipPoolSlotCount: number;
-  readonly chips: readonly {
-    readonly active: boolean;
-    readonly position: readonly [number, number, number];
-    readonly scale: number;
-    readonly slot: number;
-  }[];
+  readonly chips: readonly BreakableChipTelemetry[];
   readonly enabledBodyCount: number;
   readonly meshUuids: readonly string[];
   readonly mountedBodyCount: number;
@@ -130,9 +135,16 @@ interface IntactRuntimeSlot {
   mesh: THREE.Mesh | null;
 }
 
+/** block専用chip burstの描画入力と、初回frameでarmする開始時刻。 */
 interface ChipBurstRuntime {
   readonly blockColor: string;
   readonly origin: readonly [number, number, number];
+  readonly startedAtSeconds: number | null;
+}
+
+/** chip burstの開始時刻と現在frameで使う経過秒。 */
+export interface ResolvedChipBurstAge {
+  readonly ageSeconds: number;
   readonly startedAtSeconds: number;
 }
 
@@ -229,6 +241,40 @@ export function combineChipBurstFrames(
     }
   }
   return instances;
+}
+
+/**
+ * capture済みchip meshの全instanceをzero scaleへ戻す。
+ * 渡されたtransformとcolorは再利用バッファとして更新し、GPU属性をdirtyにする。
+ */
+export function resetChipInstances(
+  mesh: THREE.InstancedMesh,
+  transform: THREE.Object3D,
+  color: THREE.Color,
+): void {
+  color.set('#000000');
+  transform.position.set(...INACTIVE_FRAGMENT_POSITION);
+  transform.rotation.set(0, 0, 0);
+  transform.scale.setScalar(0);
+  transform.updateMatrix();
+  for (let slot = 0; slot < CHIP_POOL_SIZE; slot += 1) {
+    mesh.setMatrixAt(slot, transform.matrix);
+    mesh.setColorAt(slot, color);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+}
+
+/** 未armなら現在frameを開始時刻にし、以降は非負の経過秒を返す。 */
+export function resolveChipBurstAge(
+  startedAtSeconds: number | null,
+  currentElapsedSeconds: number,
+): ResolvedChipBurstAge {
+  const resolvedStart = startedAtSeconds ?? currentElapsedSeconds;
+  return {
+    ageSeconds: Math.max(0, currentElapsedSeconds - resolvedStart),
+    startedAtSeconds: resolvedStart,
+  };
 }
 
 export const BREAKABLE_FRAGMENT_POOL = createBreakableFragmentPool(BREAKABLE_BLOCKS);
@@ -485,7 +531,6 @@ export function BreakableBlockPlaza({
   const chipBurstsRef = useRef<(ChipBurstRuntime | null)[]>(BREAKABLE_BLOCKS.map(() => null));
   const chipTransformRef = useRef(new THREE.Object3D());
   const chipColorRef = useRef(new THREE.Color());
-  const latestFrameElapsedSecondsRef = useRef(0);
   const impactForwardRef = useRef<([number, number, number])[]>(
     BREAKABLE_BLOCKS.map(() => [0, 0, 1]),
   );
@@ -499,7 +544,7 @@ export function BreakableBlockPlaza({
     chipBurstsRef.current[blockIndex] = {
       blockColor,
       origin,
-      startedAtSeconds: latestFrameElapsedSecondsRef.current,
+      startedAtSeconds: null,
     };
   }, []);
 
@@ -507,10 +552,16 @@ export function BreakableBlockPlaza({
     const mesh = chipMeshRef.current;
     if (!mesh) return;
     const elapsedSeconds = clock.elapsedTime;
-    latestFrameElapsedSecondsRef.current = elapsedSeconds;
     const activeFrames = chipBurstsRef.current.flatMap((burst, blockIndex) => {
       if (!burst) return [];
-      const ageSeconds = Math.max(0, elapsedSeconds - burst.startedAtSeconds);
+      const resolvedAge = resolveChipBurstAge(burst.startedAtSeconds, elapsedSeconds);
+      if (burst.startedAtSeconds === null) {
+        chipBurstsRef.current[blockIndex] = {
+          ...burst,
+          startedAtSeconds: resolvedAge.startedAtSeconds,
+        };
+      }
+      const { ageSeconds } = resolvedAge;
       if (ageSeconds >= CHIP_LIFETIME_SECONDS) {
         chipBurstsRef.current[blockIndex] = null;
         return [];
@@ -673,23 +724,11 @@ export function BreakableBlockPlaza({
 
   useEffect(() => {
     const runtimeSlots = runtimeSlotsRef.current;
-    const resetChipInstances = (): void => {
-      const mesh = chipMeshRef.current;
-      if (!mesh) return;
-      const transform = chipTransformRef.current;
-      const color = chipColorRef.current.set('#000000');
-      transform.position.set(...INACTIVE_FRAGMENT_POSITION);
-      transform.scale.setScalar(0);
-      transform.updateMatrix();
-      for (let slot = 0; slot < CHIP_POOL_SIZE; slot += 1) {
-        mesh.setMatrixAt(slot, transform.matrix);
-        mesh.setColorAt(slot, color);
-      }
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    };
+    const capturedChipMesh = chipMeshRef.current;
     runtimeSlots.forEach(deactivateFragment);
-    resetChipInstances();
+    if (capturedChipMesh) {
+      resetChipInstances(capturedChipMesh, chipTransformRef.current, chipColorRef.current);
+    }
     refreshTelemetry();
     return () => {
       runtimeSlots.forEach((slot) => {
@@ -697,7 +736,9 @@ export function BreakableBlockPlaza({
         slot.active = false;
       });
       chipBurstsRef.current.fill(null);
-      resetChipInstances();
+      if (capturedChipMesh) {
+        resetChipInstances(capturedChipMesh, chipTransformRef.current, chipColorRef.current);
+      }
     };
   }, [refreshTelemetry]);
 

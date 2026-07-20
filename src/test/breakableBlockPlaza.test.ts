@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import {
   BREAKABLE_FRAGMENT_LIFETIME_MS,
   BREAKABLE_FRAGMENT_SLOTS_PER_BLOCK,
@@ -9,7 +10,9 @@ import {
   deactivateFragmentBody,
   isBlockRespawnAreaClear,
   isFragmentWindowActive,
+  resetChipInstances,
   resolveBlockImpactSpeed,
+  resolveChipBurstAge,
 } from '../voxel-game/scene/BreakableBlockPlaza';
 import {
   CHIP_BURST_SIZE,
@@ -118,6 +121,40 @@ describe('BreakableBlockPlaza', () => {
       expect(instances.slice(startSlot, startSlot + CHIP_BURST_SIZE)
         .every(({ color }) => color === BREAKABLE_BLOCKS[blockIndex]?.color)).toBe(true);
     }
+  });
+
+  it('capture済みchip meshの全32slotをzero scaleへ戻す', () => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial();
+    const mesh = new THREE.InstancedMesh(geometry, material, CHIP_POOL_SIZE);
+    const transform = new THREE.Object3D();
+    const matrix = new THREE.Matrix4();
+    const scale = new THREE.Vector3();
+    transform.position.set(1, 2, 3);
+    transform.scale.setScalar(0.5);
+    transform.updateMatrix();
+    for (let slot = 0; slot < CHIP_POOL_SIZE; slot += 1) {
+      mesh.setMatrixAt(slot, transform.matrix);
+    }
+
+    resetChipInstances(mesh, transform, new THREE.Color('#ffffff'));
+
+    for (let slot = 0; slot < CHIP_POOL_SIZE; slot += 1) {
+      mesh.getMatrixAt(slot, matrix);
+      scale.setFromMatrixScale(matrix);
+      expect(scale.toArray()).toEqual([0, 0, 0]);
+    }
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('未arm burstは長いframe gapでもage 0から始まり次frameで経過する', () => {
+    const firstFrame = resolveChipBurstAge(null, 120);
+    const nextFrame = resolveChipBurstAge(firstFrame.startedAtSeconds, 120.125);
+
+    expect(firstFrame).toEqual({ ageSeconds: 0, startedAtSeconds: 120 });
+    expect(nextFrame.startedAtSeconds).toBe(120);
+    expect(nextFrame.ageSeconds).toBeCloseTo(0.125);
   });
 
   it('Rapier bodyの線速度差から符号に依存しない実相対速度を返す', () => {
