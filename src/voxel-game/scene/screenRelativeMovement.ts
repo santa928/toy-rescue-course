@@ -3,10 +3,15 @@ import type { DriveCommand } from '../input/controlState';
 import { WORLD_CAMERA_LOOK_OFFSET, WORLD_CAMERA_OFFSET } from './worldCameraConfig';
 
 export interface ScreenRelativeMovement {
+  /** world XZ平面における単位移動方向。 */
   readonly direction: readonly [number, number, number];
+  /** commandの入力強度を0から1へclampした無次元値。 */
   readonly magnitude: number;
+  /** camera画面の右・上を正とする正規化済み2次元入力。 */
   readonly screenProjection: readonly [number, number];
+  /** world XZ平面でdirectionを向くためのラジアンyaw。停止時はnull。 */
   readonly targetYaw: number | null;
+  /** world XZ平面上の目標速度。単位はworld unit/秒。 */
   readonly velocity: readonly [number, number, number];
 }
 
