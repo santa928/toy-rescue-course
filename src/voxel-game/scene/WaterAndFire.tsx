@@ -6,6 +6,11 @@ import type { VoxelGameRuntime, VoxelGameSnapshot } from '../domain/VoxelGameRun
 import { resolveSprayTarget } from '../domain/sprayTargeting';
 import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetry, VehicleTelemetryRef } from './VehicleController';
+import {
+  createWaterFlowFrame,
+  WATER_INSTANCE_COUNT,
+  type WaterInstanceTransform,
+} from './waterFlow';
 import { FIRE_POSITION } from './worldLayout';
 
 export interface VoxelBox {
@@ -31,7 +36,9 @@ export interface MissionTelemetry {
   readonly distance: number;
   readonly nozzleOrigin: readonly [number, number, number];
   readonly sprayActive: boolean;
+  readonly sprayElapsedSeconds: number;
   readonly sprayOnFire: boolean;
+  readonly splashElapsedSeconds: number;
   readonly targeted: boolean;
 }
 
@@ -45,13 +52,9 @@ interface MissionVisualState {
 
 const NOZZLE_FORWARD_OFFSET = 1.7;
 const NOZZLE_HEIGHT = 2.15;
-const WATER_CUBE_COUNT = 18;
 const WATER_TARGET_STOP_OFFSET = 1.9;
-const WATER_CUBE_SCALE = new THREE.Vector3(0.18, 0.18, 0.18);
-const WATER_BLUE_INDICES = Array.from({ length: WATER_CUBE_COUNT }, (_, index) => index)
-  .filter((index) => index % 3 !== 2);
-const WATER_WHITE_INDICES = Array.from({ length: WATER_CUBE_COUNT }, (_, index) => index)
-  .filter((index) => index % 3 === 2);
+const WATER_BLUE_INSTANCE_COUNT = 22;
+const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
 
 const ROUTE_POSITIONS: readonly (readonly [number, number, number])[] = [
   [3, 0.52, 15], [6, 0.52, 15], [9, 0.52, 15], [12, 0.52, 15],
@@ -138,6 +141,8 @@ export function getFireLayerCount(intensity: number): number {
 export function resolveWaterAndFireFrame(
   telemetry: VehicleTelemetry,
   command: DriveCommand,
+  sprayElapsedSeconds = 0,
+  splashElapsedSeconds = 0,
 ): MissionTelemetry {
   const horizontalLength = Math.hypot(telemetry.forward[0], telemetry.forward[2]) || 1;
   const forward: readonly [number, number, number] = [
@@ -156,7 +161,9 @@ export function resolveWaterAndFireFrame(
     distance: target.distance,
     nozzleOrigin,
     sprayActive: command.spray,
+    sprayElapsedSeconds,
     sprayOnFire: command.spray && target.targeted,
+    splashElapsedSeconds,
     targeted: target.targeted,
   };
 }
@@ -177,29 +184,26 @@ export function getWaterVisibleDistance(distance: number, targeted: boolean): nu
     : 6;
 }
 
-/** 放水cubeをnozzleから照準方向へ最大18個配置する。 */
+/** 色別の固定poolへ、水流pure transformをslot順に反映する。 */
 function updateWaterBatch(
   mesh: THREE.InstancedMesh | null,
-  indices: readonly number[],
-  telemetry: MissionTelemetry,
+  color: WaterInstanceTransform['color'],
+  instances: readonly WaterInstanceTransform[],
+  sprayActive: boolean,
 ): void {
   if (!mesh) return;
-  mesh.visible = telemetry.sprayActive;
-  if (!telemetry.sprayActive) return;
+  mesh.visible = sprayActive;
 
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
-  const visibleDistance = getWaterVisibleDistance(telemetry.distance, telemetry.targeted);
-  indices.forEach((waterIndex, instanceIndex) => {
-    const distance = ((waterIndex + 1) / WATER_CUBE_COUNT) * visibleDistance;
-    position.set(
-      telemetry.nozzleOrigin[0] + telemetry.direction[0] * distance,
-      telemetry.nozzleOrigin[1] + telemetry.direction[1] * distance,
-      telemetry.nozzleOrigin[2] + telemetry.direction[2] * distance,
-    );
-    matrix.compose(position, quaternion, WATER_CUBE_SCALE);
-    mesh.setMatrixAt(instanceIndex, matrix);
+  const scale = new THREE.Vector3();
+  const colorInstances = instances.filter((instance) => instance.color === color);
+  colorInstances.forEach((instance, index) => {
+    position.fromArray(instance.position);
+    scale.setScalar(instance.active ? instance.scale : 0);
+    matrix.compose(position, quaternion, scale);
+    mesh.setMatrixAt(index, matrix);
   });
   mesh.instanceMatrix.needsUpdate = true;
 }
@@ -214,6 +218,8 @@ export function WaterAndFire({
   const [visualState, setVisualState] = useState(() => selectMissionVisualState(runtime.getSnapshot()));
   const blueWaterRef = useRef<THREE.InstancedMesh>(null);
   const whiteWaterRef = useRef<THREE.InstancedMesh>(null);
+  const sprayElapsedRef = useRef(0);
+  const splashElapsedRef = useRef(0);
 
   useEffect(() => runtime.subscribe((snapshot) => {
     const next = selectMissionVisualState(snapshot);
@@ -226,15 +232,34 @@ export function WaterAndFire({
     ));
   }), [runtime]);
 
-  useFrame(() => {
-    const missionTelemetry = resolveWaterAndFireFrame(telemetryRef.current, commandRef.current);
+  useFrame((_state, delta) => {
+    sprayElapsedRef.current = commandRef.current.spray ? sprayElapsedRef.current + delta : 0;
+    const preview = resolveWaterAndFireFrame(
+      telemetryRef.current,
+      commandRef.current,
+      sprayElapsedRef.current,
+      splashElapsedRef.current,
+    );
+    splashElapsedRef.current = preview.sprayOnFire
+      ? (splashElapsedRef.current + delta) % 0.22
+      : 0;
+    const missionTelemetry = { ...preview, splashElapsedSeconds: splashElapsedRef.current };
+    const frame = createWaterFlowFrame({
+      direction: missionTelemetry.direction,
+      nozzleOrigin: missionTelemetry.nozzleOrigin,
+      splashElapsedSeconds: missionTelemetry.splashElapsedSeconds,
+      sprayActive: missionTelemetry.sprayActive,
+      sprayElapsedSeconds: missionTelemetry.sprayElapsedSeconds,
+      targeted: missionTelemetry.targeted,
+      visibleDistance: getWaterVisibleDistance(missionTelemetry.distance, missionTelemetry.targeted),
+    });
     missionTelemetryRef.current = missionTelemetry;
     runtime.setSignals({
       sprayActive: missionTelemetry.sprayActive,
       sprayOnFire: missionTelemetry.sprayOnFire,
     });
-    updateWaterBatch(blueWaterRef.current, WATER_BLUE_INDICES, missionTelemetry);
-    updateWaterBatch(whiteWaterRef.current, WATER_WHITE_INDICES, missionTelemetry);
+    updateWaterBatch(blueWaterRef.current, 'blue', frame.instances, missionTelemetry.sprayActive);
+    updateWaterBatch(whiteWaterRef.current, 'white', frame.instances, missionTelemetry.sprayActive);
   }, -1);
 
   return (
@@ -258,7 +283,7 @@ export function WaterAndFire({
         </mesh>
       ) : null}
       <instancedMesh
-        args={[undefined, undefined, WATER_BLUE_INDICES.length]}
+        args={[undefined, undefined, WATER_BLUE_INSTANCE_COUNT]}
         frustumCulled={false}
         ref={blueWaterRef}
         visible={false}
@@ -267,7 +292,7 @@ export function WaterAndFire({
         <meshLambertMaterial color="#67c7df" emissive="#3ba6c4" emissiveIntensity={0.2} />
       </instancedMesh>
       <instancedMesh
-        args={[undefined, undefined, WATER_WHITE_INDICES.length]}
+        args={[undefined, undefined, WATER_WHITE_INSTANCE_COUNT]}
         frustumCulled={false}
         ref={whiteWaterRef}
         visible={false}

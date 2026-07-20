@@ -46,6 +46,13 @@ declare global {
       readonly routeCubeCount: number;
       readonly starCubeCount: number;
       readonly waterCubeCount: number;
+      readonly waterInstances: readonly {
+        readonly active: boolean;
+        readonly kind: 'stream' | 'splash';
+        readonly position: readonly [number, number, number];
+        readonly scale: number;
+        readonly slot: number;
+      }[];
     };
     readonly worldBounds: {
       readonly maxX: number;

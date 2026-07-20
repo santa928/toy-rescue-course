@@ -24,8 +24,10 @@ import {
   CELEBRATION_STAR_GROUPS,
   FIRE_LAYER_BOXES,
   getFireLayerCount,
+  getWaterVisibleDistance,
   type MissionTelemetry,
 } from './scene/WaterAndFire';
+import { createWaterFlowFrame } from './scene/waterFlow';
 import type { WorldCameraTelemetry } from './scene/WorldFixedCamera';
 import {
   BREAKABLE_FRAGMENT_POOL_SLOT_IDS,
@@ -106,7 +108,9 @@ export function VoxelGameApp(): ReactElement {
     distance: Number.POSITIVE_INFINITY,
     nozzleOrigin: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 2.15, GARAGE_POSITION[2] + 1.7],
     sprayActive: false,
+    sprayElapsedSeconds: 0,
     sprayOnFire: false,
+    splashElapsedSeconds: 0,
     targeted: false,
   });
   const renderTelemetryRef = useRef<VoxelGameRenderTelemetry>({
@@ -143,6 +147,15 @@ export function VoxelGameApp(): ReactElement {
       const runtime = runtimeRef.current.getSnapshot();
       const command = controls.commandRef.current;
       const missionTelemetry = missionTelemetryRef.current;
+      const waterFrame = createWaterFlowFrame({
+        direction: missionTelemetry.direction,
+        nozzleOrigin: missionTelemetry.nozzleOrigin,
+        splashElapsedSeconds: missionTelemetry.splashElapsedSeconds,
+        sprayActive: missionTelemetry.sprayActive,
+        sprayElapsedSeconds: missionTelemetry.sprayElapsedSeconds,
+        targeted: missionTelemetry.targeted,
+        visibleDistance: getWaterVisibleDistance(missionTelemetry.distance, missionTelemetry.targeted),
+      });
       const vehicle = telemetryRef.current;
       const breakables = breakablePoolHandleRef.current?.readActualTelemetry()
         ?? breakableTelemetryRef.current;
@@ -191,7 +204,14 @@ export function VoxelGameApp(): ReactElement {
           fireLayerCount: getFireLayerCount(runtime.fireIntensity),
           routeCubeCount: runtime.routeVisible ? 12 : 0,
           starCubeCount: runtime.missionPhase === 'celebrating' ? 30 : 0,
-          waterCubeCount: missionTelemetryRef.current.sprayActive ? 18 : 0,
+          waterCubeCount: waterFrame.instances.filter(({ active }) => active).length,
+          waterInstances: waterFrame.instances.map(({ active, kind, position, scale, slot }) => ({
+            active,
+            kind,
+            position: [...position] as [number, number, number],
+            scale,
+            slot,
+          })),
           intactBlockCount: breakables.blocks.filter(({ intactVisible }) => intactVisible).length,
           fragmentVisibleCount: breakables.activeFragmentCount,
           fragmentCollisionEnabledCount: breakables.collisionEnabledFragmentCount,

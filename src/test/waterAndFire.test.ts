@@ -43,6 +43,7 @@ describe('WaterAndFire', () => {
   });
 
   it('前方6unit内へ放水したときだけtargetedな消火signalを作る', () => {
+    const command = { moveX: 0, moveY: 0, spray: true } as const;
     const targeted = resolveWaterAndFireFrame(
       {
         forward: [0, 0, -1],
@@ -51,7 +52,9 @@ describe('WaterAndFire', () => {
         resetCount: 0,
         speed: 0,
       },
-      { moveX: 0, moveY: 0, spray: true },
+      command,
+      0.4,
+      0.1,
     );
     const behind = resolveWaterAndFireFrame(
       {
@@ -61,10 +64,18 @@ describe('WaterAndFire', () => {
         resetCount: 0,
         speed: 0,
       },
-      { moveX: 0, moveY: 0, spray: true },
+      command,
+      0.4,
+      0,
     );
 
-    expect(targeted).toMatchObject({ sprayActive: true, sprayOnFire: true, targeted: true });
+    expect(targeted).toMatchObject({
+      sprayActive: true,
+      sprayElapsedSeconds: 0.4,
+      sprayOnFire: true,
+      splashElapsedSeconds: 0.1,
+      targeted: true,
+    });
     expect(behind).toMatchObject({ sprayActive: true, sprayOnFire: false, targeted: false });
   });
 
