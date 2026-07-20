@@ -27,25 +27,45 @@ class FakeEventTarget {
 }
 
 describe('voxel game controls', () => {
-  it('前後と左右を-1から1へ正規化する', () => {
+  it('W+Aを画面上・左の長さ1のcommandへ正規化する', () => {
     let state = createControlState();
     state = setDigitalAction(state, 'forward', true);
     state = setDigitalAction(state, 'left', true);
 
-    expect(toDriveCommand(state)).toEqual({ spray: false, steer: -1, throttle: 1 });
+    const command = toDriveCommand(state);
+    expect(command).toEqual({ moveX: -Math.SQRT1_2, moveY: Math.SQRT1_2, spray: false });
+    expect(Math.hypot(command.moveX, command.moveY)).toBeCloseTo(1, 9);
+    expect(command).not.toHaveProperty('steer');
+    expect(command).not.toHaveProperty('throttle');
   });
 
-  it('touch stickをkeyboardより優先し、dead zone内を0にする', () => {
+  it.each([
+    ['left', -1, 0],
+    ['right', 1, 0],
+    ['forward', 0, 1],
+    ['backward', 0, -1],
+  ] as const)('%sを対応する画面方向へ変換する', (action, moveX, moveY) => {
+    const state = setDigitalAction(createControlState(), action, true);
+    expect(toDriveCommand(state)).toEqual({ moveX, moveY, spray: false });
+  });
+
+  it('touch stickをkeyboardより優先し、DOM上方向をmoveY正へ変換する', () => {
     const state = setTouchStick(createControlState(), 0.8, -0.6);
-
-    expect(toDriveCommand(state)).toEqual({ spray: false, steer: 0.8, throttle: 0.6 });
-    expect(toDriveCommand(setTouchStick(state, 0.05, 0.05))).toEqual({ spray: false, steer: 0, throttle: 0 });
+    expect(toDriveCommand(state)).toEqual({ moveX: 0.8, moveY: 0.6, spray: false });
+    expect(toDriveCommand(setTouchStick(state, 0.05, 0.05)))
+      .toEqual({ moveX: 0, moveY: 0, spray: false });
   });
 
-  it('touch stickを入力可能な範囲へclampする', () => {
-    const state = setTouchStick(createControlState(), 2, -3);
+  it('非有限touch値を停止commandへ正規化する', () => {
+    const state = setTouchStick(createControlState(), Number.NaN, Number.POSITIVE_INFINITY);
+    expect(toDriveCommand(state)).toEqual({ moveX: 0, moveY: 0, spray: false });
+  });
 
-    expect(toDriveCommand(state)).toEqual({ spray: false, steer: 1, throttle: 1 });
+  it('touch stickを半径1へ収めて斜め最高速度を増やさない', () => {
+    const command = toDriveCommand(setTouchStick(createControlState(), 2, -3));
+    expect(command.moveX).toBeCloseTo(Math.SQRT1_2, 9);
+    expect(command.moveY).toBeCloseTo(Math.SQRT1_2, 9);
+    expect(Math.hypot(command.moveX, command.moveY)).toBeCloseTo(1, 9);
   });
 
   it('touch stickを中央へ解除した後はkeyboard入力へ戻る', () => {
@@ -53,7 +73,7 @@ describe('voxel game controls', () => {
     state = setTouchStick(state, 0.8, -0.6);
     state = setTouchStick(state, 0, 0);
 
-    expect(toDriveCommand(state)).toEqual({ spray: false, steer: 0, throttle: 1 });
+    expect(toDriveCommand(state)).toEqual({ moveX: 0, moveY: 1, spray: false });
   });
 
   it('keyboard、blur、hidden visibilityをcommand callbackへ反映する', () => {
