@@ -35,12 +35,27 @@ describe('waterFlow', () => {
     expect(moved.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('全stream粒をnozzleからvisible endの間へ収める', () => {
-    const frame = createWaterFlowFrame(baseInput);
+  it('全stream粒を斜めのnozzleからvisible endの間へ収め、横ずれを制限する', () => {
+    const direction = [1, 1, -1] as const;
+    const nozzleOrigin = [3, 2, 4] as const;
+    const visibleDistance = 6;
+    const directionLength = Math.hypot(...direction);
+    const normalizedDirection = direction.map((value) => value / directionLength) as [number, number, number];
+    const frame = createWaterFlowFrame({ ...baseInput, direction, nozzleOrigin, visibleDistance });
+
     for (const instance of frame.instances.filter(({ active, kind }) => active && kind === 'stream')) {
-      const distance = 4 - instance.position[2];
+      const offset = instance.position.map((value, axis) => value - nozzleOrigin[axis]) as [number, number, number];
+      const distance = offset[0] * normalizedDirection[0]
+        + offset[1] * normalizedDirection[1]
+        + offset[2] * normalizedDirection[2];
+      const orthogonalOffset = Math.hypot(
+        offset[0] - normalizedDirection[0] * distance,
+        offset[1] - normalizedDirection[1] * distance,
+        offset[2] - normalizedDirection[2] * distance,
+      );
       expect(distance).toBeGreaterThanOrEqual(0);
-      expect(distance).toBeLessThanOrEqual(6);
+      expect(distance).toBeLessThanOrEqual(visibleDistance);
+      expect(orthogonalOffset).toBeLessThanOrEqual(0.25);
     }
   });
 
@@ -51,5 +66,13 @@ describe('waterFlow', () => {
     expect(untargeted.instances.some(({ active, kind }) => active && kind === 'splash')).toBe(false);
     expect(targeted.instances.some(({ active, kind }) => active && kind === 'splash')).toBe(true);
     expect(expired.instances.filter(({ kind }) => kind === 'splash').every(({ scale }) => scale === 0)).toBe(true);
+  });
+
+  it('停止中は全slotをinactiveかつscale 0にし、splash slotを24から31へ固定する', () => {
+    const frame = createWaterFlowFrame({ ...baseInput, sprayActive: false, targeted: true, splashElapsedSeconds: 0.1 });
+    expect(frame.instances.every(({ active, scale }) => !active && scale === 0)).toBe(true);
+    expect(frame.instances.filter(({ kind }) => kind === 'splash').map(({ slot }) => slot)).toEqual([
+      24, 25, 26, 27, 28, 29, 30, 31,
+    ]);
   });
 });

@@ -5,6 +5,10 @@ const STREAM_EMISSION_INTERVAL_SECONDS = 0.032;
 const STREAM_PERIOD_SECONDS = 1.15;
 const SPLASH_LIFETIME_SECONDS = 0.22;
 
+/**
+ * 水流フレーム計算の入力。座標はワールド空間、時刻は秒単位で、
+ * direction はノズルから着弾点へ向かうベクトル、visibleDistance はその可視距離を表す。
+ */
 export interface WaterFlowInput {
   readonly direction: readonly [number, number, number];
   readonly nozzleOrigin: readonly [number, number, number];
@@ -15,6 +19,10 @@ export interface WaterFlowInput {
   readonly visibleDistance: number;
 }
 
+/**
+ * 固定slotへ割り当てる水粒の描画変換。position はワールド座標、scale は無次元倍率、
+ * slot はstream 0〜23またはsplash 24〜31、color は青または白の粒色を表す。
+ */
 export interface WaterInstanceTransform {
   readonly active: boolean;
   readonly color: 'blue' | 'white';
@@ -24,6 +32,7 @@ export interface WaterInstanceTransform {
   readonly slot: number;
 }
 
+/** 固定32slotのstreamとsplashを、その時点の描画transformへ変換した結果。 */
 export interface WaterFlowFrame {
   readonly instances: readonly WaterInstanceTransform[];
 }
