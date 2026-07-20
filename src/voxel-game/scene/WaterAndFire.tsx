@@ -31,6 +31,10 @@ interface WaterAndFireProps {
   readonly telemetryRef: VehicleTelemetryRef;
 }
 
+/**
+ * 描画とtext telemetryで共有する放水照準・VFX状態。elapsed値は秒単位で、
+ * stream/splashのpure transformを同一時刻から再現するために保持する。
+ */
 export interface MissionTelemetry {
   readonly direction: readonly [number, number, number];
   readonly distance: number;
@@ -50,9 +54,26 @@ interface MissionVisualState {
   readonly routeVisible: boolean;
 }
 
+/** VFX時計を進める入力。elapsed値とdeltaは秒単位で扱う。 */
+export interface WaterVfxClockInput {
+  readonly deltaSeconds: number;
+  readonly resetEvent: boolean;
+  readonly sprayActive: boolean;
+  readonly sprayElapsedSeconds: number;
+  readonly sprayOnFire: boolean;
+  readonly splashElapsedSeconds: number;
+}
+
+/** VFX描画とtext telemetryに書き戻す、秒単位の放水・飛沫経過時計。 */
+export interface WaterVfxClock {
+  readonly sprayElapsedSeconds: number;
+  readonly splashElapsedSeconds: number;
+}
+
 const NOZZLE_FORWARD_OFFSET = 1.7;
 const NOZZLE_HEIGHT = 2.15;
 const WATER_TARGET_STOP_OFFSET = 1.9;
+const WATER_SPLASH_CYCLE_SECONDS = 0.22;
 const WATER_BLUE_INSTANCE_COUNT = 22;
 const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
 
@@ -168,6 +189,30 @@ export function resolveWaterAndFireFrame(
   };
 }
 
+/** vehicle resetまたはfreeRoamからassignedへの任務開始でVFX時計をリセットする。 */
+export function isWaterVfxResetEvent(
+  previousResetCount: number,
+  currentResetCount: number,
+  previousMissionPhase: VoxelGameSnapshot['missionPhase'],
+  currentMissionPhase: VoxelGameSnapshot['missionPhase'],
+): boolean {
+  return previousResetCount !== currentResetCount
+    || (previousMissionPhase === 'freeRoam' && currentMissionPhase === 'assigned');
+}
+
+/** reset・放水・照準状態を加味して、描画用の2本のVFX時計を決定的に進める。 */
+export function advanceWaterVfxClock(input: WaterVfxClockInput): WaterVfxClock {
+  const sprayBaseSeconds = input.resetEvent ? 0 : input.sprayElapsedSeconds;
+  const splashBaseSeconds = input.resetEvent ? 0 : input.splashElapsedSeconds;
+
+  return {
+    sprayElapsedSeconds: input.sprayActive ? sprayBaseSeconds + input.deltaSeconds : 0,
+    splashElapsedSeconds: input.sprayOnFire
+      ? (splashBaseSeconds + input.deltaSeconds) % WATER_SPLASH_CYCLE_SECONDS
+      : 0,
+  };
+}
+
 /** runtime snapshotからReactで切り替える3種類の低頻度表示状態だけを取り出す。 */
 function selectMissionVisualState(snapshot: VoxelGameSnapshot): MissionVisualState {
   return {
@@ -208,7 +253,7 @@ function updateWaterBatch(
   mesh.instanceMatrix.needsUpdate = true;
 }
 
-/** 純ボクセルの3段階炎、最大18cubeの水、道しるべ、成功星を描画する。 */
+/** 純ボクセルの3段階炎、stream 24＋splash 8を2色固定poolで描く水、道しるべ、成功星を描画する。 */
 export function WaterAndFire({
   commandRef,
   missionTelemetryRef,
@@ -220,6 +265,8 @@ export function WaterAndFire({
   const whiteWaterRef = useRef<THREE.InstancedMesh>(null);
   const sprayElapsedRef = useRef(0);
   const splashElapsedRef = useRef(0);
+  const previousResetCountRef = useRef<number | null>(null);
+  const previousMissionPhaseRef = useRef<VoxelGameSnapshot['missionPhase'] | null>(null);
 
   useEffect(() => runtime.subscribe((snapshot) => {
     const next = selectMissionVisualState(snapshot);
@@ -233,17 +280,29 @@ export function WaterAndFire({
   }), [runtime]);
 
   useFrame((_state, delta) => {
-    sprayElapsedRef.current = commandRef.current.spray ? sprayElapsedRef.current + delta : 0;
-    const preview = resolveWaterAndFireFrame(
-      telemetryRef.current,
-      commandRef.current,
-      sprayElapsedRef.current,
-      splashElapsedRef.current,
-    );
-    splashElapsedRef.current = preview.sprayOnFire
-      ? (splashElapsedRef.current + delta) % 0.22
-      : 0;
-    const missionTelemetry = { ...preview, splashElapsedSeconds: splashElapsedRef.current };
+    const missionSnapshot = runtime.getSnapshot();
+    const resetEvent = previousResetCountRef.current !== null && previousMissionPhaseRef.current !== null
+      && isWaterVfxResetEvent(
+        previousResetCountRef.current,
+        telemetryRef.current.resetCount,
+        previousMissionPhaseRef.current,
+        missionSnapshot.missionPhase,
+      );
+    previousResetCountRef.current = telemetryRef.current.resetCount;
+    previousMissionPhaseRef.current = missionSnapshot.missionPhase;
+
+    const preview = resolveWaterAndFireFrame(telemetryRef.current, commandRef.current);
+    const clock = advanceWaterVfxClock({
+      deltaSeconds: delta,
+      resetEvent,
+      sprayActive: preview.sprayActive,
+      sprayElapsedSeconds: sprayElapsedRef.current,
+      sprayOnFire: preview.sprayOnFire,
+      splashElapsedSeconds: splashElapsedRef.current,
+    });
+    sprayElapsedRef.current = clock.sprayElapsedSeconds;
+    splashElapsedRef.current = clock.splashElapsedSeconds;
+    const missionTelemetry = { ...preview, ...clock };
     const frame = createWaterFlowFrame({
       direction: missionTelemetry.direction,
       nozzleOrigin: missionTelemetry.nozzleOrigin,

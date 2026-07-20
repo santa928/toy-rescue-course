@@ -3,8 +3,10 @@ import { VoxelGameRuntime } from '../voxel-game/domain/VoxelGameRuntime';
 import {
   CELEBRATION_STAR_CENTERS,
   FIRE_LAYER_POSITIONS,
+  advanceWaterVfxClock,
   getFireLayerCount,
   getWaterVisibleDistance,
+  isWaterVfxResetEvent,
   resolveWaterAndFireFrame,
 } from '../voxel-game/scene/WaterAndFire';
 
@@ -96,5 +98,55 @@ describe('WaterAndFire', () => {
     runtime.advance(2_500);
 
     expect(runtime.getSnapshot()).toMatchObject({ fireIntensity: 0, missionPhase: 'celebrating' });
+  });
+
+  it('放水を押し続けたvehicle resetCount変化では時計をdeltaから再開する', () => {
+    const resetEvent = isWaterVfxResetEvent(0, 1, 'assigned', 'assigned');
+
+    expect(resetEvent).toBe(true);
+    expect(advanceWaterVfxClock({
+      deltaSeconds: 0.016,
+      resetEvent,
+      sprayActive: true,
+      sprayElapsedSeconds: 0.8,
+      sprayOnFire: true,
+      splashElapsedSeconds: 0.18,
+    })).toEqual({ sprayElapsedSeconds: 0.016, splashElapsedSeconds: 0.016 });
+  });
+
+  it('放水を押し続けたfreeRoamからassignedへの遷移では時計をdeltaから再開する', () => {
+    const resetEvent = isWaterVfxResetEvent(4, 4, 'freeRoam', 'assigned');
+
+    expect(resetEvent).toBe(true);
+    expect(advanceWaterVfxClock({
+      deltaSeconds: 0.016,
+      resetEvent,
+      sprayActive: true,
+      sprayElapsedSeconds: 0.8,
+      sprayOnFire: true,
+      splashElapsedSeconds: 0.18,
+    })).toEqual({ sprayElapsedSeconds: 0.016, splashElapsedSeconds: 0.016 });
+  });
+
+  it('通常の放水は時計を累積し、飛沫は0.22秒で循環する', () => {
+    expect(advanceWaterVfxClock({
+      deltaSeconds: 0.05,
+      resetEvent: false,
+      sprayActive: true,
+      sprayElapsedSeconds: 0.4,
+      sprayOnFire: true,
+      splashElapsedSeconds: 0.2,
+    })).toEqual({ sprayElapsedSeconds: 0.45, splashElapsedSeconds: 0.03 });
+  });
+
+  it('放水停止時は両方の時計を0へ戻す', () => {
+    expect(advanceWaterVfxClock({
+      deltaSeconds: 0.016,
+      resetEvent: false,
+      sprayActive: false,
+      sprayElapsedSeconds: 0.8,
+      sprayOnFire: false,
+      splashElapsedSeconds: 0.18,
+    })).toEqual({ sprayElapsedSeconds: 0, splashElapsedSeconds: 0 });
   });
 });
