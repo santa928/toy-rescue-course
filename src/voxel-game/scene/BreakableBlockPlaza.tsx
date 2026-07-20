@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ReactElement } from 'react';
+import { useFrame } from '@react-three/fiber';
 import {
   CuboidCollider,
   RigidBody,
@@ -9,8 +10,19 @@ import {
 } from '@react-three/rapier';
 import * as THREE from 'three';
 import type { BreakablePhase, VoxelGameSnapshot, VoxelGameRuntime } from '../domain/VoxelGameRuntime';
+import {
+  CHIP_BURST_SIZE,
+  CHIP_LIFETIME_SECONDS,
+  CHIP_POOL_SIZE,
+  createChipBurstFrame,
+  createMainFragmentDefinitions,
+  resolveMainFragmentVelocity,
+  type ChipBurstFrame,
+  type ChipInstanceTransform,
+  type MainFragmentDefinition,
+} from './breakableVfx';
 import type { VehicleTelemetryRef } from './VehicleController';
-import { BLOCK_PLAZA, BREAKABLE_BLOCKS } from './worldLayout';
+import { BREAKABLE_BLOCKS } from './worldLayout';
 
 interface LinearVelocity {
   readonly x: number;
@@ -29,9 +41,9 @@ export interface BreakableFragmentSlot {
   readonly color: string;
   readonly id: string;
   readonly index: number;
+  readonly launch: MainFragmentDefinition;
   readonly localPosition: readonly [number, number, number];
   readonly scale: readonly [number, number, number];
-  readonly velocity: readonly [number, number, number];
 }
 
 export interface BreakableBlockTelemetry {
@@ -68,6 +80,13 @@ export interface BreakableTelemetry {
   readonly bodyHandles: readonly number[];
   readonly colliderHandles: readonly number[];
   readonly collisionEnabledFragmentCount: number;
+  readonly chipPoolSlotCount: number;
+  readonly chips: readonly {
+    readonly active: boolean;
+    readonly position: readonly [number, number, number];
+    readonly scale: number;
+    readonly slot: number;
+  }[];
   readonly enabledBodyCount: number;
   readonly meshUuids: readonly string[];
   readonly mountedBodyCount: number;
@@ -109,6 +128,12 @@ interface IntactRuntimeSlot {
   body: RapierRigidBody | null;
   collider: RapierCollider | null;
   mesh: THREE.Mesh | null;
+}
+
+interface ChipBurstRuntime {
+  readonly blockColor: string;
+  readonly origin: readonly [number, number, number];
+  readonly startedAtSeconds: number;
 }
 
 interface FragmentSnapshotBodyRef {
@@ -162,60 +187,48 @@ export const BREAKABLE_FRAGMENT_LIFETIME_MS = 1_200;
 const BLOCK_RESPAWN_DURATION_MS = 5_000;
 const FRAGMENT_WINDOW_END_REMAINING_MS = BLOCK_RESPAWN_DURATION_MS - BREAKABLE_FRAGMENT_LIFETIME_MS;
 const FRAGMENT_WINDOW_EPSILON_MS = 1e-6;
-const FRAGMENT_SCALE = [0.56, 0.56, 0.56] as const;
 const INACTIVE_FRAGMENT_POSITION = [0, -40, 0] as const;
 const ZERO_VELOCITY = { x: 0, y: 0, z: 0 } as const;
 const IDENTITY_ROTATION = { w: 1, x: 0, y: 0, z: 0 } as const;
-
-const FRAGMENT_TEMPLATES = [
-  { localPosition: [3, 0.87, -2.2] as const, velocity: [0.05, 0.2, 0] as const },
-  { localPosition: [4.2, 1.67, -0.2] as const, velocity: [0.06, 0.25, 0.15] as const },
-  { localPosition: [1.8, 1.27, -4] as const, velocity: [0.07, 0.3, -0.15] as const },
-  { localPosition: [3.8, 1.27, -2.8] as const, velocity: [0.08, 0.35, -0.2] as const },
-  { localPosition: [5, 2.07, -0.8] as const, velocity: [0.09, 0.4, -0.25] as const },
-  { localPosition: [2.6, 0.07, -4.6] as const, velocity: [0.1, 0.45, -0.3] as const },
-] as const;
-
-const FRAGMENT_LOCAL_POSITIONS_BY_BLOCK_ID: Readonly<Record<
-  string,
-  readonly (readonly [number, number, number])[]
->> = {
-  'plaza-red': FRAGMENT_TEMPLATES.map(({ localPosition }) => localPosition),
-  'plaza-yellow': [
-    [0.4, 0.87, -0.2], [0, 1.67, 1], [-1.2, 1.27, -0.6],
-    [-1.6, 1.27, 0.6], [-2.4, 2.07, 1.4], [-3.6, 0.07, -0.2],
-  ],
-  'plaza-blue': [
-    [0.2, 0.87, 0.4], [-1.4, 1.67, 0], [-1, 1.27, -1.2],
-    [0.2, 1.27, -1.6], [-0.2, 2.07, 1.6], [-1.8, 0.07, 1.2],
-  ],
-  'plaza-green': [
-    [-0.4, 0.87, -0.3], [1.2, 1.67, 0.1], [0, 1.27, -1.5],
-    [0.8, 1.27, 1.3], [-0.4, 2.07, 1.7], [1.6, 0.07, -1.1],
-  ],
-};
 
 /** block定義ごとに専用6片を割り当て、再生成しない固定pool定義を返す。 */
 export function createBreakableFragmentPool(
   blocks: readonly BreakableBlockDefinition[],
 ): readonly BreakableFragmentSlot[] {
-  return blocks.flatMap((block) => {
-    const inwardX = Math.sign(BLOCK_PLAZA.position[0] - block.position[0]) || 1;
-    const positions = FRAGMENT_LOCAL_POSITIONS_BY_BLOCK_ID[block.id];
-    return FRAGMENT_TEMPLATES.map((template, index) => ({
-      blockId: block.id,
-      color: block.color,
-      id: `${block.id}:fragment-${index}`,
-      index,
-      localPosition: positions?.[index] ?? template.localPosition,
-      scale: FRAGMENT_SCALE,
-      velocity: [
-        Math.abs(template.velocity[0]) * inwardX,
-        template.velocity[1],
-        template.velocity[2],
-      ] as const,
-    }));
-  });
+  const definitions = createMainFragmentDefinitions();
+  return blocks.flatMap((block) => definitions.map((definition, index) => ({
+    blockId: block.id,
+    color: block.color,
+    id: `${block.id}:fragment-${index}`,
+    index,
+    launch: definition,
+    localPosition: definition.localPosition,
+    scale: definition.scale,
+  })));
+}
+
+/** 複数burstのactive slotだけを合成し、別burstのinactive slotによる上書きを防ぐ。 */
+export function combineChipBurstFrames(
+  frames: readonly ChipBurstFrame[],
+): readonly ChipInstanceTransform[] {
+  const instances: ChipInstanceTransform[] = Array.from(
+    { length: CHIP_POOL_SIZE },
+    (_, slot) => ({
+      active: false,
+      color: '#000000',
+      position: INACTIVE_FRAGMENT_POSITION,
+      scale: 0,
+      slot,
+    }),
+  );
+  for (const frame of frames) {
+    for (const instance of frame.instances) {
+      if (instance.active && instance.slot >= 0 && instance.slot < CHIP_POOL_SIZE) {
+        instances[instance.slot] = instance;
+      }
+    }
+  }
+  return instances;
 }
 
 export const BREAKABLE_FRAGMENT_POOL = createBreakableFragmentPool(BREAKABLE_BLOCKS);
@@ -353,9 +366,11 @@ function activateFragment(
   slot: BreakableFragmentSlot,
   runtimeSlot: FragmentRuntimeSlot,
   blockPosition: readonly [number, number, number],
+  impactForward: readonly [number, number, number],
 ): void {
   const body = runtimeSlot.body;
   if (!body) return;
+  const velocity = resolveMainFragmentVelocity(slot.launch, impactForward);
   body.setEnabled(true);
   runtimeSlot.collider?.setEnabled(true);
   body.setTranslation({
@@ -364,11 +379,11 @@ function activateFragment(
     z: blockPosition[2] + slot.localPosition[2],
   }, true);
   body.setRotation(IDENTITY_ROTATION, true);
-  body.setLinvel({ x: slot.velocity[0], y: slot.velocity[1], z: slot.velocity[2] }, true);
+  body.setLinvel({ x: velocity[0], y: velocity[1], z: velocity[2] }, true);
   body.setAngvel({
-    x: slot.velocity[2] * 0.45,
-    y: slot.velocity[0] * 0.3,
-    z: -slot.velocity[0] * 0.45,
+    x: velocity[2] * 0.45,
+    y: velocity[0] * 0.3,
+    z: -velocity[0] * 0.45,
   }, true);
   body.wakeUp();
   if (runtimeSlot.mesh) runtimeSlot.mesh.visible = true;
@@ -466,6 +481,60 @@ export function BreakableBlockPlaza({
       vehicleCount: 0,
   })));
   const breakMutationTimersRef = useRef(new Set<number>());
+  const chipMeshRef = useRef<THREE.InstancedMesh>(null);
+  const chipBurstsRef = useRef<(ChipBurstRuntime | null)[]>(BREAKABLE_BLOCKS.map(() => null));
+  const chipTransformRef = useRef(new THREE.Object3D());
+  const chipColorRef = useRef(new THREE.Color());
+  const latestFrameElapsedSecondsRef = useRef(0);
+  const impactForwardRef = useRef<([number, number, number])[]>(
+    BREAKABLE_BLOCKS.map(() => [0, 0, 1]),
+  );
+
+  /** block専用8slotのchip burstを、最新描画clockを基準に開始する。 */
+  const triggerChipBurst = useCallback((
+    blockIndex: number,
+    origin: readonly [number, number, number],
+    blockColor: string,
+  ): void => {
+    chipBurstsRef.current[blockIndex] = {
+      blockColor,
+      origin,
+      startedAtSeconds: latestFrameElapsedSecondsRef.current,
+    };
+  }, []);
+
+  useFrame(({ clock }) => {
+    const mesh = chipMeshRef.current;
+    if (!mesh) return;
+    const elapsedSeconds = clock.elapsedTime;
+    latestFrameElapsedSecondsRef.current = elapsedSeconds;
+    const activeFrames = chipBurstsRef.current.flatMap((burst, blockIndex) => {
+      if (!burst) return [];
+      const ageSeconds = Math.max(0, elapsedSeconds - burst.startedAtSeconds);
+      if (ageSeconds >= CHIP_LIFETIME_SECONDS) {
+        chipBurstsRef.current[blockIndex] = null;
+        return [];
+      }
+      return [createChipBurstFrame({
+        ageSeconds,
+        blockColor: burst.blockColor,
+        origin: burst.origin,
+        startSlot: blockIndex * CHIP_BURST_SIZE,
+      })];
+    });
+    const instances = combineChipBurstFrames(activeFrames);
+    const transform = chipTransformRef.current;
+    const color = chipColorRef.current;
+    for (const instance of instances) {
+      transform.position.set(...instance.position);
+      transform.scale.setScalar(instance.scale);
+      transform.updateMatrix();
+      mesh.setMatrixAt(instance.slot, transform.matrix);
+      mesh.setColorAt(instance.slot, color.set(instance.color));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  });
 
   /** 公開telemetryを固定実体参照から遅延評価し、設定値の自己申告を避ける。 */
   const refreshTelemetry = useCallback((): void => {
@@ -484,6 +553,30 @@ export function BreakableBlockPlaza({
       }];
     });
     const runtimeSnapshot = runtime.getSnapshot();
+    const chipMesh = chipMeshRef.current;
+    const chipMatrix = new THREE.Matrix4();
+    const chipPosition = new THREE.Vector3();
+    const chipScale = new THREE.Vector3();
+    const chips = Array.from({ length: CHIP_POOL_SIZE }, (_, slot) => {
+      if (!chipMesh) {
+        return {
+          active: false,
+          position: INACTIVE_FRAGMENT_POSITION,
+          scale: 0,
+          slot,
+        } as const;
+      }
+      chipMesh.getMatrixAt(slot, chipMatrix);
+      chipPosition.setFromMatrixPosition(chipMatrix);
+      chipScale.setFromMatrixScale(chipMatrix);
+      const scale = Math.max(chipScale.x, chipScale.y, chipScale.z);
+      return {
+        active: scale > 0,
+        position: [chipPosition.x, chipPosition.y, chipPosition.z] as const,
+        scale,
+        slot,
+      } as const;
+    });
     const blocks = BREAKABLE_BLOCKS.map((block, blockIndex) => {
       const slotIndices = BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[blockIndex] ?? [];
       const actualFragments = createActualFragmentPoolSnapshot(fragmentSlots, slotIndices);
@@ -517,6 +610,8 @@ export function BreakableBlockPlaza({
       activeFragmentCount: actualPool.activeFragmentCount,
       blocks,
       bodyHandles: actualPool.bodyHandles,
+      chipPoolSlotCount: CHIP_POOL_SIZE,
+      chips,
       colliderHandles: actualPool.colliderHandles,
       collisionEnabledFragmentCount: actualPool.collisionEnabledFragmentCount,
       enabledBodyCount: actualPool.enabledBodyCount,
@@ -578,12 +673,32 @@ export function BreakableBlockPlaza({
 
   useEffect(() => {
     const runtimeSlots = runtimeSlotsRef.current;
+    const resetChipInstances = (): void => {
+      const mesh = chipMeshRef.current;
+      if (!mesh) return;
+      const transform = chipTransformRef.current;
+      const color = chipColorRef.current.set('#000000');
+      transform.position.set(...INACTIVE_FRAGMENT_POSITION);
+      transform.scale.setScalar(0);
+      transform.updateMatrix();
+      for (let slot = 0; slot < CHIP_POOL_SIZE; slot += 1) {
+        mesh.setMatrixAt(slot, transform.matrix);
+        mesh.setColorAt(slot, color);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    };
     runtimeSlots.forEach(deactivateFragment);
+    resetChipInstances();
     refreshTelemetry();
-    return () => runtimeSlots.forEach((slot) => {
-      if (slot.mesh) slot.mesh.visible = false;
-      slot.active = false;
-    });
+    return () => {
+      runtimeSlots.forEach((slot) => {
+        if (slot.mesh) slot.mesh.visible = false;
+        slot.active = false;
+      });
+      chipBurstsRef.current.fill(null);
+      resetChipInstances();
+    };
   }, [refreshTelemetry]);
 
   useEffect(() => () => {
@@ -636,6 +751,13 @@ export function BreakableBlockPlaza({
               return;
             }
 
+            impactForwardRef.current[index] = [
+              telemetryRef.current.forward[0],
+              0,
+              telemetryRef.current.forward[2],
+            ];
+            triggerChipBurst(index, block.position, block.color);
+
             const breakMutationTimer = window.setTimeout(() => {
               breakMutationTimersRef.current.delete(breakMutationTimer);
               const intactSlot = intactSlotsRef.current[index];
@@ -650,7 +772,14 @@ export function BreakableBlockPlaza({
               for (const slotIndex of BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[index] ?? []) {
                 const slot = BREAKABLE_FRAGMENT_POOL[slotIndex];
                 const runtimeSlot = runtimeSlotsRef.current[slotIndex];
-                if (slot && runtimeSlot) activateFragment(slot, runtimeSlot, block.position);
+                if (slot && runtimeSlot) {
+                  activateFragment(
+                    slot,
+                    runtimeSlot,
+                    block.position,
+                    impactForwardRef.current[index] ?? [0, 0, 1],
+                  );
+                }
               }
               refreshTelemetry();
             }, 0);
@@ -695,6 +824,14 @@ export function BreakableBlockPlaza({
           </mesh>
         </RigidBody>
       ))}
+      <instancedMesh
+        args={[undefined, undefined, CHIP_POOL_SIZE]}
+        frustumCulled={false}
+        ref={chipMeshRef}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshLambertMaterial vertexColors />
+      </instancedMesh>
     </group>
   );
 }

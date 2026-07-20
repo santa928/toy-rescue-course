@@ -35,6 +35,7 @@ import {
   type BreakablePoolHandle,
   type BreakableTelemetry,
 } from './scene/BreakableBlockPlaza';
+import { CHIP_POOL_SIZE } from './scene/breakableVfx';
 import {
   BREAKABLE_BLOCKS,
   FIRE_POSITION,
@@ -56,6 +57,13 @@ export function VoxelGameApp(): ReactElement {
   const breakableTelemetryRef = useRef<BreakableTelemetry>({
     activeFragments: [],
     activeFragmentCount: 0,
+    chipPoolSlotCount: CHIP_POOL_SIZE,
+    chips: Array.from({ length: CHIP_POOL_SIZE }, (_, slot) => ({
+      active: false,
+      position: [0, -40, 0] as const,
+      scale: 0,
+      slot,
+    })),
     blocks: BREAKABLE_BLOCKS.map(({ id }, blockIndex) => ({
       bodyHandles: [],
       colliderHandles: [],

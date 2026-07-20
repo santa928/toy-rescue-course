@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import * as THREE from 'three';
 import {
   BREAKABLE_FRAGMENT_LIFETIME_MS,
   BREAKABLE_FRAGMENT_SLOTS_PER_BLOCK,
   calculateRelativeLinearSpeed,
+  combineChipBurstFrames,
   createActualFragmentPoolSnapshot,
   createBreakableFragmentPool,
   deactivateFragmentBody,
@@ -11,54 +11,13 @@ import {
   isFragmentWindowActive,
   resolveBlockImpactSpeed,
 } from '../voxel-game/scene/BreakableBlockPlaza';
-import { BLOCK_PLAZA, BREAKABLE_BLOCKS } from '../voxel-game/scene/worldLayout';
-
-interface ScreenRect {
-  readonly bottom: number;
-  readonly left: number;
-  readonly right: number;
-  readonly top: number;
-}
-
-/** 実ゲームのdesktop固定cameraで、地面へ落ちたcubeのscreen矩形を返す。 */
-function projectRestingCube(
-  position: readonly [number, number, number],
-  scale: readonly [number, number, number],
-): ScreenRect {
-  const camera = new THREE.OrthographicCamera(1280 / -2, 1280 / 2, 720 / 2, 720 / -2);
-  camera.position.set(-5, 12, 12);
-  camera.zoom = 68.44444444444444;
-  camera.lookAt(new THREE.Vector3(-15, 0.8, -1.5));
-  camera.updateProjectionMatrix();
-  camera.updateMatrixWorld(true);
-  const rect = { bottom: -Infinity, left: Infinity, right: -Infinity, top: Infinity };
-  for (const xSign of [-1, 1]) {
-    for (const ySign of [-1, 1]) {
-      for (const zSign of [-1, 1]) {
-        const corner = new THREE.Vector3(
-          position[0] + scale[0] / 2 * xSign,
-          position[1] + scale[1] / 2 * ySign,
-          position[2] + scale[2] / 2 * zSign,
-        ).project(camera);
-        const x = (corner.x + 1) * 640;
-        const y = (1 - corner.y) * 360;
-        rect.left = Math.min(rect.left, x);
-        rect.right = Math.max(rect.right, x);
-        rect.top = Math.min(rect.top, y);
-        rect.bottom = Math.max(rect.bottom, y);
-      }
-    }
-  }
-  return rect;
-}
-
-/** 重なる矩形は0、離れた矩形は最短pixel距離を返す。 */
-function screenRectGap(first: ScreenRect, second: ScreenRect): number {
-  return Math.hypot(
-    Math.max(first.left - second.right, second.left - first.right, 0),
-    Math.max(first.top - second.bottom, second.top - first.bottom, 0),
-  );
-}
+import {
+  CHIP_BURST_SIZE,
+  CHIP_POOL_SIZE,
+  createChipBurstFrame,
+  resolveMainFragmentVelocity,
+} from '../voxel-game/scene/breakableVfx';
+import { BREAKABLE_BLOCKS } from '../voxel-game/scene/worldLayout';
 
 describe('BreakableBlockPlaza', () => {
   it('設定値でなく実body・collider・mesh参照からpool状態とidentityを数える', () => {
@@ -121,58 +80,43 @@ describe('BreakableBlockPlaza', () => {
     }
   });
 
-  it('6片を積み木広場内側の異なる方向へ飛ばし、別blockを連鎖破壊しない速度に保つ', () => {
-    const slots = createBreakableFragmentPool(BREAKABLE_BLOCKS)
-      .filter(({ blockId }) => blockId === BREAKABLE_BLOCKS[0].id);
-
-    expect(new Set(slots.map(({ velocity }) => velocity.join(','))).size).toBe(6);
-    expect(slots.every(({ velocity }) => velocity[0] > 0)).toBe(true);
-    expect(slots.some(({ velocity }) => velocity[1] > 0)).toBe(true);
-    expect(slots.some(({ velocity }) => velocity[2] > 0)).toBe(true);
-    expect(slots.some(({ velocity }) => velocity[2] < 0)).toBe(true);
-    expect(slots.every(({ velocity }) => Math.hypot(...velocity) < 4)).toBe(true);
+  it('全24主破片の初期AABBを所属block AABB内へ収める', () => {
+    const slots = createBreakableFragmentPool(BREAKABLE_BLOCKS);
+    expect(slots).toHaveLength(24);
+    for (const slot of slots) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        expect(Math.abs(slot.localPosition[axis]) + slot.scale[axis] / 2).toBeLessThanOrEqual(0.75);
+      }
+    }
   });
 
-  it('全4blockの6片を広場内へ収め、地面へ落ちた後も互いに10px以上分離する', () => {
-    const slots = createBreakableFragmentPool(BREAKABLE_BLOCKS);
-    const plazaMinX = BLOCK_PLAZA.position[0] - BLOCK_PLAZA.scale[0] / 2;
-    const plazaMaxX = BLOCK_PLAZA.position[0] + BLOCK_PLAZA.scale[0] / 2;
-    const plazaMinZ = BLOCK_PLAZA.position[2] - BLOCK_PLAZA.scale[2] / 2;
-    const plazaMaxZ = BLOCK_PLAZA.position[2] + BLOCK_PLAZA.scale[2] / 2;
+  it('同じslotでも衝突forwardに応じて主な飛散方向を変える', () => {
+    const slot = createBreakableFragmentPool(BREAKABLE_BLOCKS)[0];
+    if (!slot) throw new Error('fragment slot is missing');
+    const east = resolveMainFragmentVelocity(slot.launch, [1, 0, 0]);
+    const west = resolveMainFragmentVelocity(slot.launch, [-1, 0, 0]);
+    expect(east[0]).toBeGreaterThan(0);
+    expect(west[0]).toBeLessThan(0);
+    expect(east[1]).toBeGreaterThan(0);
+    expect(west[1]).toBeGreaterThan(0);
+  });
 
-    for (const block of BREAKABLE_BLOCKS) {
-      const blockSlots = slots.filter(({ blockId }) => blockId === block.id);
-      const fragmentRects = blockSlots.map(({ localPosition, scale }) => {
-        const worldPosition = [
-          block.position[0] + localPosition[0],
-          0.28,
-          block.position[2] + localPosition[2],
-        ] as const;
-        expect(worldPosition[0] - scale[0] / 2, `${block.id} fragment leaves west`).toBeGreaterThanOrEqual(plazaMinX);
-        expect(worldPosition[0] + scale[0] / 2, `${block.id} fragment leaves east`).toBeLessThanOrEqual(plazaMaxX);
-        expect(worldPosition[2] - scale[2] / 2, `${block.id} fragment leaves north`).toBeGreaterThanOrEqual(plazaMinZ);
-        expect(worldPosition[2] + scale[2] / 2, `${block.id} fragment leaves south`).toBeLessThanOrEqual(plazaMaxZ);
-        return projectRestingCube(worldPosition, scale);
-      });
-      const fragmentGaps = fragmentRects.flatMap((fragmentRect, fragmentIndex) => (
-        fragmentRects.slice(fragmentIndex + 1).map((other, offset) => ({
-          gap: screenRectGap(fragmentRect, other),
-          pair: `${block.id}:fragment-${fragmentIndex}/fragment-${fragmentIndex + offset + 1}`,
-        }))
-      ));
-      const intactGaps = fragmentRects.flatMap((fragmentRect, fragmentIndex) => (
-        BREAKABLE_BLOCKS
-          .filter(({ id }) => id !== block.id)
-          .map((intactBlock) => ({
-            gap: screenRectGap(fragmentRect, projectRestingCube(intactBlock.position, [1.5, 1.5, 1.5])),
-            pair: `${block.id}:fragment-${fragmentIndex}/${intactBlock.id}`,
-          }))
-      ));
-      const minimum = [...fragmentGaps, ...intactGaps].reduce((current, candidate) => (
-        candidate.gap < current.gap ? candidate : current
-      ));
+  it('4blockの同時chip burstを互いのinactive slotで上書きしない', () => {
+    const frames = BREAKABLE_BLOCKS.map((block, blockIndex) => createChipBurstFrame({
+      ageSeconds: 0.1,
+      blockColor: block.color,
+      origin: block.position,
+      startSlot: blockIndex * CHIP_BURST_SIZE,
+    }));
 
-      expect(minimum.gap, minimum.pair).toBeGreaterThanOrEqual(10);
+    const instances = combineChipBurstFrames(frames);
+
+    expect(instances).toHaveLength(CHIP_POOL_SIZE);
+    expect(instances.filter(({ active }) => active)).toHaveLength(CHIP_POOL_SIZE);
+    for (let blockIndex = 0; blockIndex < BREAKABLE_BLOCKS.length; blockIndex += 1) {
+      const startSlot = blockIndex * CHIP_BURST_SIZE;
+      expect(instances.slice(startSlot, startSlot + CHIP_BURST_SIZE)
+        .every(({ color }) => color === BREAKABLE_BLOCKS[blockIndex]?.color)).toBe(true);
     }
   });
 
