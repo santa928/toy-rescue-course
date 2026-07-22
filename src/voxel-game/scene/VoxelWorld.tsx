@@ -1,7 +1,14 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
+import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 import { BLOCK_PLAZA, PARK_CENTER } from './worldLayout';
+import {
+  FIRE_BUILDING_BODY,
+  TREE_TRUNKS,
+  WORLD_SOLID_BOXES,
+  scaleToHalfExtents,
+} from './worldCollisionLayout';
 
 interface BoxInstance {
   readonly position: readonly [number, number, number];
@@ -25,12 +32,6 @@ const ROAD_LINES: readonly BoxInstance[] = [
   { position: [0, 0.19, 15], scale: [30, 0.05, 0.22] },
   { position: [-15, 0.19, 0], scale: [0.22, 0.05, 26] },
   { position: [15, 0.19, 0], scale: [0.22, 0.05, 26] },
-];
-
-const TREE_TRUNKS: readonly BoxInstance[] = [
-  { position: [-4, 1.25, -2], scale: [0.7, 2.2, 0.7] },
-  { position: [-4.5, 1.25, 2], scale: [0.7, 2.2, 0.7] },
-  { position: [4.4, 1.25, 2.1], scale: [0.7, 2.2, 0.7] },
 ];
 
 const TREE_CROWNS: readonly BoxInstance[] = TREE_TRUNKS.map(({ position }) => ({
@@ -128,8 +129,8 @@ function VoxelGarage(): ReactElement {
 function VoxelFireBuilding(): ReactElement {
   return (
     <group>
-      <mesh position={[9.5, 1.8, -9.5]}>
-        <boxGeometry args={[6, 3.4, 5]} />
+      <mesh position={FIRE_BUILDING_BODY.position}>
+        <boxGeometry args={FIRE_BUILDING_BODY.scale} />
         <meshLambertMaterial color="#a86f3f" />
       </mesh>
       <mesh position={[9.5, 3.75, -9.5]}>
@@ -145,6 +146,17 @@ function VoxelFireBuilding(): ReactElement {
         <meshLambertMaterial color="#7ed1e6" />
       </mesh>
     </group>
+  );
+}
+
+/** 共有visual定義から木の幹3本と火災建物本体の固定衝突を構成する。 */
+function WorldSolidColliders(): ReactElement {
+  return (
+    <RigidBody colliders={false} type="fixed">
+      {WORLD_SOLID_BOXES.map(({ id, position, scale }) => (
+        <CuboidCollider args={scaleToHalfExtents(scale)} key={id} position={position} />
+      ))}
+    </RigidBody>
   );
 }
 
@@ -174,6 +186,7 @@ export function VoxelWorld(): ReactElement {
       <VoxelGarage />
       <VoxelFireBuilding />
       <VoxelBlockPlaza />
+      <WorldSolidColliders />
     </group>
   );
 }
