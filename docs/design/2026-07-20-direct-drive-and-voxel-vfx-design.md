@@ -4,6 +4,7 @@
 
 - 会話設計: 2026-07-20 承認済み
 - Written spec: 2026-07-20 承認済み
+- Collision follow-up: 2026-07-22 承認済み
 - 対象entry: `voxel-game.html`
 - 基準設計: `docs/design/2026-07-19-voxel-firetruck-gameplay-slice-design.md`
 
@@ -43,6 +44,8 @@
 | BREAK-003 | 追加 | 破壊直後に小さな補助片を短時間だけ表示する | 32slot以下の固定InstancedMeshを使い、物理colliderは持たせない。 |
 | REG-001 | 維持 | 24個のRapier破片body/collider/mesh identityを再利用する | poolの増減、破壊ごとのReact再mount、新規mesh割当を禁止する。 |
 | REG-002 | 維持 | PC/touch、消火、帰庫再開、全4色破壊、旧Vehicle Labを回帰確認する | 操作変更の影響範囲が大きいため、既存最終E2Eを新操作へ移植する。 |
+| COLL-001 | 追加 | 消防車は中央公園の木の幹3本と火災建物の外形を貫通しない | 見えている主要障害物と物理挙動を一致させる。固定Rapier colliderを描画位置と同じ定義から作る。 |
+| COLL-002 | 追加 | 樹冠・窓・屋根装飾は非衝突とし、消防署の既存出入り動線を維持する | 玩具らしい単純な当たり判定と完全ミッションの走行可能性を両立する。消防署全壁のsolid化は車庫構造の再設計まで非対象とする。 |
 
 保留・削除するユーザー向け機能はない。旧旋回操作だけを、承認されたダイレクト操作へ置換する。
 
@@ -176,6 +179,8 @@ desiredWorld = screenRight * moveX + screenUp * moveY
 - 有効着弾時にだけ短い飛沫が見える。
 - 破壊frameの6主破片は元block内部から開始し、その後に物理的に分離する。
 - 全4色の破壊、他block非破壊、1.2秒消失、5秒安全復元、24slot identityが維持される。
+- 車両は木の幹3本と火災建物の外形へ進入せず、衝突後も転倒・境界外reset・操作不能にならない。
+- 樹冠や窓などの装飾へ不要な大判colliderを置かず、車庫→火災現場→帰庫の動線を塞がない。
 - PC/touchの完全ミッションループと旧Vehicle Lab回帰がPASSする。
 - 代表3 viewportの動画相当frame列と静止画を目視し、欠け・HUD重複・瞬間移動に見える破綻がない。
 
@@ -186,6 +191,7 @@ desiredWorld = screenRight * moveX + screenUp * moveY
 - ブロックの任意分割、破片数の動的増加、破片による連鎖破壊。
 - カメラ回転、追加車両、乗り換え、スコア、制限時間。
 - 旧ゲーム削除と`/`への昇格。
+- 消防署外形の全面solid化と、それに伴う車庫開口部・初期位置・道路の再設計。
 
 ## 性能目標
 
@@ -193,6 +199,7 @@ desiredWorld = screenRight * moveX + screenUp * moveY
 - 水流・飛沫は2色2 draw calls以内を目標とする。
 - 主破片は既存24slot固定、補助片は32instance以下・1 draw callを目標とする。
 - 物理bodyは主破片24と車両・既存worldだけ。水と補助片へbodyを追加しない。
+- 木・火災建物は1個の固定RigidBody配下へ4個のcuboid colliderとして追加し、動的bodyを増やさない。
 - 物理GPUでDesktop 60fps、Mobile/Tablet 30fpsの既存目標を維持する。
 - SwiftShaderでは実測値を保存するが`certified:false`とし、物理GPU達成を主張しない。
 
@@ -206,6 +213,8 @@ desiredWorld = screenRight * moveX + screenUp * moveY
 | 破片が広場外や他blockへ飛ぶ | block別初速を決定的にし、150〜350ms時点のworld AABBと他block impact 0を全色E2Eで検証する。 |
 | 補助片でdraw callやallocationが増える | 単一InstancedMesh・固定32slot・instance colorを使い、破壊ごとの生成を禁止する。 |
 | VFXを強くしすぎて車両やHUDが読めない | 3 viewportのframe列を原寸目視し、scale・lifetime・instance数を一度に1変数ずつ調整する。 |
+| 火災建物colliderで消火距離や道路を塞ぐ | 描画本体のAABBだけをsolid化し、火のcamera側外壁へ既存6unit内から放水できることをE2Eで確認する。 |
+| 消防署colliderで初期車両を閉じ込める | 今回は消防署全面をsolid化せず、既存の車庫出入り・帰庫再開を回帰gateとして維持する。 |
 
 ## 採用判断
 
