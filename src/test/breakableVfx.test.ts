@@ -20,6 +20,20 @@ describe('breakableVfx', () => {
     }
   });
 
+  it('破壊frameの6主破片を互いにpenetrationしない3列×2段へ配置する', () => {
+    const fragments = createMainFragmentDefinitions();
+
+    for (const [index, fragment] of fragments.entries()) {
+      for (const other of fragments.slice(index + 1)) {
+        const separatedOnSomeAxis = fragment.localPosition.some((position, axis) => (
+          Math.abs(position - other.localPosition[axis])
+            >= (fragment.scale[axis] + other.scale[axis]) / 2
+        ));
+        expect(separatedOnSomeAxis).toBe(true);
+      }
+    }
+  });
+
   it('6slotを衝突forward側かつ上へ異なる速度で飛ばす', () => {
     const velocities = createMainFragmentDefinitions()
       .map((definition) => resolveMainFragmentVelocity(definition, [1, 0, 0]));

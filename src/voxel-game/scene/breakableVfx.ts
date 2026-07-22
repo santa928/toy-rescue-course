@@ -34,12 +34,12 @@ export interface ChipBurstFrame {
 }
 
 const MAIN_FRAGMENT_DEFINITIONS: readonly MainFragmentDefinition[] = [
-  { forwardSpeed: 2.1, lateralSpeed: -1.15, localPosition: [-0.25, -0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 2.2 },
+  { forwardSpeed: 2.1, lateralSpeed: -1.15, localPosition: [-0.5, -0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 2.2 },
   { forwardSpeed: 2.4, lateralSpeed: 0, localPosition: [0, -0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 2.6 },
-  { forwardSpeed: 2.7, lateralSpeed: 1.1, localPosition: [0.25, -0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 2.35 },
-  { forwardSpeed: 2.9, lateralSpeed: -0.9, localPosition: [-0.25, 0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 3.1 },
+  { forwardSpeed: 2.7, lateralSpeed: 1.1, localPosition: [0.5, -0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 2.35 },
+  { forwardSpeed: 2.9, lateralSpeed: -0.9, localPosition: [-0.5, 0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 3.1 },
   { forwardSpeed: 3.2, lateralSpeed: 0.2, localPosition: [0, 0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 3.8 },
-  { forwardSpeed: 3.45, lateralSpeed: 0.95, localPosition: [0.25, 0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 3.35 },
+  { forwardSpeed: 3.45, lateralSpeed: 0.95, localPosition: [0.5, 0.25, 0], scale: [0.5, 0.5, 0.5], upwardSpeed: 3.35 },
 ];
 
 const CHIP_DIRECTIONS = [
