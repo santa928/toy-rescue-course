@@ -150,7 +150,7 @@ function VoxelFireBuilding(): ReactElement {
 }
 
 /** 共有visual定義から木の幹3本と火災建物本体の固定衝突を構成する。 */
-function WorldSolidColliders(): ReactElement {
+export function WorldSolidColliders(): ReactElement {
   return (
     <RigidBody colliders={false} type="fixed">
       {WORLD_SOLID_BOXES.map(({ id, position, scale }) => (
