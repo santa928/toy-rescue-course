@@ -212,7 +212,9 @@ async function verifyDesktop(browser, errors, results) {
     await page.keyboard.down('Space');
     await waitForFrames(page, 2);
     const pressed = await readGameState(page);
-    assert(pressed.controls.throttle === 1 && pressed.controls.steer === -1 && pressed.controls.spray,
+    assert(Math.abs(pressed.controls.moveX + Math.SQRT1_2) < 0.001
+      && Math.abs(pressed.controls.moveY - Math.SQRT1_2) < 0.001
+      && pressed.controls.spray,
       `Keyboard command is wrong: ${JSON.stringify(pressed.controls)}`);
     assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'true',
       'Keyboard spray command did not update aria-pressed true.');
@@ -220,7 +222,7 @@ async function verifyDesktop(browser, errors, results) {
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
     await waitForFrames(page, 1);
     const blurred = await readGameState(page);
-    assert(blurred.controls.throttle === 0 && blurred.controls.steer === 0 && !blurred.controls.spray,
+    assert(blurred.controls.moveX === 0 && blurred.controls.moveY === 0 && !blurred.controls.spray,
       `Blur did not release all controls: ${JSON.stringify(blurred.controls)}`);
     await page.keyboard.up('KeyW');
     await page.keyboard.up('KeyA');
@@ -330,7 +332,7 @@ async function verifyTouch(browser, errors, results) {
     const hiddenThumb = await page.locator('.touch-joystick__thumb').boundingBox();
     assert(hiddenThumb, 'Visibility release lost the joystick thumb.');
     const hiddenThumbEdges = toEdges(hiddenThumb);
-    assert(hidden.controls.throttle === 0 && hidden.controls.steer === 0
+    assert(hidden.controls.moveX === 0 && hidden.controls.moveY === 0
       && await page.locator('.touch-joystick').getAttribute('data-active') === 'false'
       && Math.abs((hiddenThumbEdges.left + hiddenThumbEdges.right) / 2 - (joystickEdges.left + joystickEdges.right) / 2) <= 0.5
       && Math.abs((hiddenThumbEdges.top + hiddenThumbEdges.bottom) / 2 - (joystickEdges.top + joystickEdges.bottom) / 2) <= 0.5,
@@ -350,7 +352,7 @@ async function verifyTouch(browser, errors, results) {
     });
     await waitForFrames(page, 1);
     const afterVisibilityRestart = await readGameState(page);
-    assert(afterVisibilityRestart.controls.throttle > 0.45 && afterVisibilityRestart.controls.steer > 0.45,
+    assert(afterVisibilityRestart.controls.moveX > 0.45 && afterVisibilityRestart.controls.moveY > 0.45,
       `Joystick did not accept a new pointer after visibility release: ${JSON.stringify(afterVisibilityRestart.controls)}`);
     await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchCancel' });
 
@@ -365,8 +367,8 @@ async function verifyTouch(browser, errors, results) {
     });
     await waitForFrames(page, 1);
     const dragged = await readGameState(page);
-    assert(dragged.controls.throttle > 0.45 && dragged.controls.steer > 0.45,
-      `Actual touch drag did not move/steer: ${JSON.stringify(dragged.controls)}`);
+    assert(dragged.controls.moveX > 0.45 && dragged.controls.moveY > 0.45,
+      `Actual touch drag did not move toward screen upper-right: ${JSON.stringify(dragged.controls)}`);
     const heldStick = { x: center.x + joystick.width * 0.38, y: center.y - joystick.height * 0.38 };
 
     const sprayCenter = { x: spray.x + spray.width / 2, y: spray.y + spray.height / 2 };
@@ -376,7 +378,7 @@ async function verifyTouch(browser, errors, results) {
     });
     await waitForFrames(page, 1);
     const simultaneous = await readGameState(page);
-    assert(simultaneous.controls.throttle > 0.45 && simultaneous.controls.steer > 0.45 && simultaneous.controls.spray,
+    assert(simultaneous.controls.moveX > 0.45 && simultaneous.controls.moveY > 0.45 && simultaneous.controls.spray,
       `Spray start released the held joystick: ${JSON.stringify(simultaneous.controls)}`);
     assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'true',
       'Simultaneous spray did not set aria-pressed true.');
@@ -394,7 +396,7 @@ async function verifyTouch(browser, errors, results) {
     });
     await waitForFrames(page, 1);
     const stickAfterSprayRelease = await readGameState(page);
-    assert(stickAfterSprayRelease.controls.throttle > 0.45 && stickAfterSprayRelease.controls.steer > 0.45
+    assert(stickAfterSprayRelease.controls.moveX > 0.45 && stickAfterSprayRelease.controls.moveY > 0.45
       && !stickAfterSprayRelease.controls.spray,
     `Spray release did not preserve the held joystick: ${JSON.stringify(stickAfterSprayRelease.controls)}`);
 
@@ -406,12 +408,12 @@ async function verifyTouch(browser, errors, results) {
       pointerType: 'touch',
     });
     const joystickReleased = await readGameState(page);
-    assert(joystickReleased.controls.throttle === 0 && joystickReleased.controls.steer === 0,
+    assert(joystickReleased.controls.moveX === 0 && joystickReleased.controls.moveY === 0,
       `Joystick release did not center command: ${JSON.stringify(joystickReleased.controls)}`);
 
     await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchCancel' });
     const cancelled = await readGameState(page);
-    assert(cancelled.controls.throttle === 0 && cancelled.controls.steer === 0,
+    assert(cancelled.controls.moveX === 0 && cancelled.controls.moveY === 0,
       `Touch cancel did not center joystick: ${JSON.stringify(cancelled.controls)}`);
 
     await cdp.send('Input.dispatchTouchEvent', {
@@ -471,7 +473,7 @@ async function verifyTouch(browser, errors, results) {
       pointerType: 'touch',
     });
     const inverseActive = await readGameState(page);
-    assert(inverseActive.controls.throttle > 0.45 && inverseActive.controls.steer > 0.45 && inverseActive.controls.spray,
+    assert(inverseActive.controls.moveX > 0.45 && inverseActive.controls.moveY > 0.45 && inverseActive.controls.spray,
       `Spray-first input did not preserve both commands: ${JSON.stringify(inverseActive.controls)}`);
     await page.locator('.touch-joystick').dispatchEvent('pointercancel', {
       bubbles: true,
@@ -479,7 +481,7 @@ async function verifyTouch(browser, errors, results) {
       pointerType: 'touch',
     });
     const inverseJoystickCancelled = await readGameState(page);
-    assert(inverseJoystickCancelled.controls.throttle === 0 && inverseJoystickCancelled.controls.steer === 0
+    assert(inverseJoystickCancelled.controls.moveX === 0 && inverseJoystickCancelled.controls.moveY === 0
       && inverseJoystickCancelled.controls.spray,
     `Joystick cancel did not preserve the earlier spray: ${JSON.stringify(inverseJoystickCancelled.controls)}`);
     await page.locator('.spray-button').dispatchEvent('lostpointercapture', {

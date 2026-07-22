@@ -3,10 +3,19 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright';
+import * as THREE from 'three';
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
-const outputDirectory = 'output/voxel-game';
+const canonicalOutputDirectory = 'output/voxel-game';
+const supportedFocusModes = ['nonbreak', 'collision', 'break-red', 'break-yellow', 'break-blue', 'break-green'];
+const focusMode = process.env.VOXEL_GAME_FOCUS ?? null;
+if (focusMode !== null) {
+  assert(supportedFocusModes.includes(focusMode), `Unsupported VOXEL_GAME_FOCUS: ${focusMode}`);
+}
+const outputDirectory = focusMode === null
+  ? canonicalOutputDirectory
+  : `${canonicalOutputDirectory}/focus/${focusMode}`;
 const targets = [
   { hasTouch: false, height: 720, minimumFps: 60, name: 'desktop', width: 1_280 },
   { hasTouch: true, height: 768, minimumFps: 30, name: 'tablet-landscape', width: 1_024 },
@@ -22,6 +31,31 @@ const expectedScreenshots = [
   'mobile-landscape-driving.png',
   'mobile-landscape-water-fire.png',
 ];
+const timelineScreenshots = [
+  'desktop-water-start.png',
+  'desktop-water-flow.png',
+  'desktop-water-splash.png',
+  ...['red', 'yellow', 'blue', 'green'].flatMap((color) => [
+    `desktop-break-${color}-first-observed.png`,
+    `desktop-break-${color}-arc-250ms.png`,
+  ]),
+];
+const collisionScreenshots = [
+  'desktop-collision-tree-trunk-3.png',
+  'desktop-collision-fire-building-body.png',
+];
+const COLLISION_OBSTACLES = [
+  { id: 'tree-trunk-1', position: [-4, 1.25, -2], scale: [0.7, 2.2, 0.7] },
+  { id: 'tree-trunk-2', position: [-4.5, 1.25, 2], scale: [0.7, 2.2, 0.7] },
+  { id: 'tree-trunk-3', position: [4.4, 1.25, 2.1], scale: [0.7, 2.2, 0.7] },
+  { id: 'fire-building-body', position: [9.5, 1.8, -9.5], scale: [6, 3.4, 5] },
+];
+const VEHICLE_COLLIDER_HALF_EXTENTS = [1.45, 0.95, 1.7];
+// breakableVfx.tsの最大合成初速は5未満。観測遅延中の移動上限には保守的に5を用いる。
+const MAX_MAIN_FRAGMENT_LAUNCH_SPEED = 5;
+const BREAK_FRAGMENT_GRAVITY_MAGNITUDE = 18;
+const ACTIVATION_TRANSITION_DELAY_LIMIT_MS = 50;
+const FIRST_OBSERVED_POSITION_EPSILON = 0.03;
 
 /** WebGL renderer名を既知software、明示physical、unknownへ保守的に分類する。 */
 function classifyRenderer(rendererName) {
@@ -75,24 +109,24 @@ function resetOutputArtifacts(artifactDirectory) {
   fs.mkdirSync(artifactDirectory, { recursive: true });
 }
 
-/** 現在runの状態をmanifestへ同期保存する。 */
-function writeRunManifest(artifactDirectory, status, error = null) {
+/** 現在runの状態をmode/fullメタデータとともにmanifestへ同期保存する。 */
+function writeRunManifest(artifactDirectory, status, error = null, metadata = {}) {
   fs.writeFileSync(
     `${artifactDirectory}/run-manifest.json`,
-    `${JSON.stringify({ error, recordedAt: new Date().toISOString(), status }, null, 2)}\n`,
+    `${JSON.stringify({ error, ...metadata, recordedAt: new Date().toISOString(), status }, null, 2)}\n`,
   );
 }
 
 /** artifact初期化から成功/失敗manifestまでを必ず一続きで管理する。 */
-async function runWithManifest(artifactDirectory, verification) {
+async function runWithManifest(artifactDirectory, verification, metadata = {}) {
   resetOutputArtifacts(artifactDirectory);
-  writeRunManifest(artifactDirectory, 'running');
+  writeRunManifest(artifactDirectory, 'running', null, metadata);
   try {
     await verification();
-    writeRunManifest(artifactDirectory, 'completed');
+    writeRunManifest(artifactDirectory, 'completed', null, metadata);
   } catch (error) {
     const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    writeRunManifest(artifactDirectory, 'failed', errorMessage);
+    writeRunManifest(artifactDirectory, 'failed', errorMessage, metadata);
     throw error;
   }
 }
@@ -152,6 +186,212 @@ async function readGameState(page) {
   assert(state.renderer && state.vehicle && state.runtime && state.breakables,
     `Final telemetry is incomplete: ${rendered}`);
   return state;
+}
+
+/** 実camera telemetryを使ってworld座標を現在viewportのscreen座標へ投影する。 */
+function projectWorldPoint(cameraTelemetry, position) {
+  const { height, width } = cameraTelemetry.viewport;
+  const camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2);
+  camera.position.fromArray(cameraTelemetry.position);
+  camera.zoom = cameraTelemetry.zoom;
+  camera.lookAt(new THREE.Vector3(...cameraTelemetry.lookTarget));
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  const point = new THREE.Vector3(...position).project(camera);
+  return [(point.x + 1) * width / 2, (1 - point.y) * height / 2];
+}
+
+/** JSON artifactを改行付きで保存する。 */
+function writeJsonArtifact(name, payload) {
+  fs.writeFileSync(`${outputDirectory}/${name}`, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+/** 6主破片の平均world Yを返す。 */
+function averageFragmentY(fragments) {
+  assert.equal(fragments.length, 6, 'Average Y requires six fragments.');
+  return fragments.reduce((sum, fragment) => sum + fragment.position[1], 0) / fragments.length;
+}
+
+/** 観測sampleの6主破片が元block AABB内にあるか判定する。 */
+function fragmentsAreInsideBlock(fragments, blockPosition, tolerance = 0.03) {
+  return fragments.length === 6 && fragments.every((fragment) => (
+    Math.abs(fragment.position[0] - blockPosition[0]) + fragment.scale[0] / 2 <= 0.75 + tolerance
+    && Math.abs(fragment.position[1] - blockPosition[1]) + fragment.scale[1] / 2 <= 0.75 + tolerance
+    && Math.abs(fragment.position[2] - blockPosition[2]) + fragment.scale[2] / 2 <= 0.75 + tolerance
+  ));
+}
+
+/** 元block AABBから最も外へ出た破片面の距離を返す。内包時は0以下になり得る。 */
+function maximumFragmentAabbOverflow(fragments, blockPosition) {
+  assert.equal(fragments.length, 6, 'AABB overflow requires six fragments.');
+  return Math.max(...fragments.flatMap((fragment) => fragment.position.map((value, axis) => (
+    Math.abs(value - blockPosition[axis]) + fragment.scale[axis] / 2 - 0.75
+  ))));
+}
+
+/** 衝突観測から最初の6片観測までに物理的に移動し得る保守上限を返す。 */
+function firstObservedPositionAllowance(delayMilliseconds) {
+  assert(delayMilliseconds >= 0, `Activation transition delay is negative: ${delayMilliseconds}`);
+  const delaySeconds = delayMilliseconds / 1_000;
+  return MAX_MAIN_FRAGMENT_LAUNCH_SPEED * delaySeconds
+    + 0.5 * BREAK_FRAGMENT_GRAVITY_MAGNITUDE * delaySeconds ** 2
+    + FIRST_OBSERVED_POSITION_EPSILON;
+}
+
+/** first-activeから正常な6→0終了まで、全rAFで6片と同一ID集合が続くことを検証する。 */
+function readContinuousFragmentWindow(samples, firstActiveIndex, blockId) {
+  const firstActive = samples[firstActiveIndex];
+  const expectedIds = firstActive.activeFragments.map(({ id }) => id).sort();
+  const fragmentEndIndex = samples.findIndex((sample, index) => (
+    index > firstActiveIndex
+    && sample.sinceFirstActiveMs !== null
+    && sample.activeFragments.length === 0
+  ));
+  assert(fragmentEndIndex > firstActiveIndex, `${blockId}: rAF timeline has no 6-to-0 fragment end.`);
+  const activeSamples = samples.slice(firstActiveIndex, fragmentEndIndex);
+  for (const sample of activeSamples) {
+    assert.equal(sample.activeFragments.length, 6,
+      `${blockId}: fragment count changed before the normal 6-to-0 end at ${sample.sinceFirstActiveMs}ms.`);
+    assert.deepEqual(sample.activeFragments.map(({ id }) => id).sort(), expectedIds,
+      `${blockId}: fragment IDs changed before the normal 6-to-0 end at ${sample.sinceFirstActiveMs}ms.`);
+  }
+  return { activeSamples, ended: samples[fragmentEndIndex], expectedIds };
+}
+
+/** 指定時刻に最も近いsampleを許容誤差内から選ぶ。 */
+function sampleNearestElapsed(samples, elapsedMilliseconds, toleranceMilliseconds) {
+  const ranked = samples
+    .map((sample) => ({ delta: Math.abs(sample.sinceFirstActiveMs - elapsedMilliseconds), sample }))
+    .sort((first, second) => first.delta - second.delta);
+  return ranked[0]?.delta <= toleranceMilliseconds ? ranked[0].sample : null;
+}
+
+/** 衝突入力前から毎rAFの実telemetryを保存するpage内observerを開始する。 */
+async function startBreakFrameObserver(page, blockId, baselineImpactCount) {
+  await page.evaluate(({ baseline, targetId }) => {
+    const previous = window.__voxelBreakFrameObserver;
+    if (previous?.frameId) cancelAnimationFrame(previous.frameId);
+    const observer = {
+      baselineImpactCount: baseline,
+      firstActiveAtMs: null,
+      firstImpactAtMs: null,
+      frameId: 0,
+      running: true,
+      samples: [],
+      startedAtMs: performance.now(),
+      targetId,
+    };
+    window.__voxelBreakFrameObserver = observer;
+    const capture = (capturedAtMs) => {
+      if (!observer.running) return;
+      const rendered = window.render_game_to_text?.();
+      if (!rendered) {
+        observer.running = false;
+        observer.error = 'render_game_to_text unavailable during break observation';
+        return;
+      }
+      const state = JSON.parse(rendered);
+      const targetBlock = state.breakables.blocks.find(({ id }) => id === targetId) ?? null;
+      const runtimeBlock = state.runtime.blocks.find(({ id }) => id === targetId) ?? null;
+      const activeFragments = state.breakables.activeFragments
+        .filter(({ id }) => id.startsWith(`${targetId}:`))
+        .map(({ id, position, scale }) => ({ id, position: [...position], scale: [...scale] }));
+      const sample = {
+        activeChips: state.breakables.chips
+          .filter(({ active }) => active)
+          .map(({ position, scale, slot }) => ({ position: [...position], scale, slot })),
+        activeFragments,
+        block: targetBlock ? {
+          intactBodyEnabledCount: targetBlock.intactBodyEnabledCount,
+          intactColliderEnabledCount: targetBlock.intactColliderEnabledCount,
+          intactEnabledCountAtFragmentActivation: targetBlock.intactEnabledCountAtFragmentActivation,
+          intactVisible: targetBlock.intactVisible,
+          maxImpactSpeed: targetBlock.maxImpactSpeed,
+          vehicleImpactCount: targetBlock.vehicleImpactCount,
+        } : null,
+        capturedAtMs,
+        otherBlocks: state.breakables.blocks
+          .filter(({ id }) => id !== targetId)
+          .map(({ id, vehicleImpactCount }) => ({ id, vehicleImpactCount })),
+        runtimeBlock,
+        sinceFirstActiveMs: null,
+        sinceObserverStartMs: capturedAtMs - observer.startedAtMs,
+        vehicle: {
+          forward: [...state.vehicle.forward],
+          position: [...state.vehicle.position],
+          resetCount: state.vehicle.resetCount,
+          speed: state.vehicle.speed,
+        },
+      };
+      if (observer.firstImpactAtMs === null
+        && (targetBlock?.vehicleImpactCount ?? baseline) > baseline
+        && (targetBlock?.maxImpactSpeed ?? 0) >= 4) {
+        observer.firstImpactAtMs = capturedAtMs;
+      }
+      if (observer.firstActiveAtMs === null && activeFragments.length === 6) {
+        observer.firstActiveAtMs = capturedAtMs;
+      }
+      if (observer.firstActiveAtMs !== null) {
+        sample.sinceFirstActiveMs = capturedAtMs - observer.firstActiveAtMs;
+      }
+      observer.samples.push(sample);
+      if (observer.samples.length > 720) observer.samples.shift();
+      if (observer.firstActiveAtMs !== null) {
+        const activeAgeMs = capturedAtMs - observer.firstActiveAtMs;
+        if ((activeAgeMs >= 900 && activeFragments.length === 0) || activeAgeMs >= 1_500) {
+          observer.running = false;
+          observer.stoppedReason = activeFragments.length === 0 ? 'fragment-window-ended' : 'observer-timeout';
+          return;
+        }
+      }
+      observer.frameId = requestAnimationFrame(capture);
+    };
+    observer.frameId = requestAnimationFrame(capture);
+  }, { baseline: baselineImpactCount, targetId: blockId });
+}
+
+/** page内observerを停止し、関数を含まない時系列artifactを取得する。 */
+async function stopAndReadBreakFrameObserver(page) {
+  return page.evaluate(() => {
+    const observer = window.__voxelBreakFrameObserver;
+    if (!observer) throw new Error('Break frame observer is unavailable.');
+    observer.running = false;
+    if (observer.frameId) cancelAnimationFrame(observer.frameId);
+    return JSON.parse(JSON.stringify(observer));
+  });
+}
+
+/** cameraが車両へ追従しても変わらないworld-fixed offsetを返す。 */
+function getCameraOffset(state) {
+  return state.camera.position.map((value, index) => value - state.camera.lookTarget[index]);
+}
+
+/** 固定pool identityとslot数がTask 7契約を保つことを確認する。 */
+function readPoolIdentity(state, scenario) {
+  const breakables = state.breakables;
+  assert.equal(breakables.poolSlotCount, 24, `${scenario}: main fragment pool is not 24.`);
+  assert.equal(breakables.uniqueBodyHandleCount, 24, `${scenario}: main fragment body identity is not 24.`);
+  assert.equal(breakables.uniqueColliderHandleCount, 24, `${scenario}: main fragment collider identity is not 24.`);
+  assert.equal(breakables.uniqueMeshUuidCount, 24, `${scenario}: main fragment mesh identity is not 24.`);
+  assert.equal(breakables.chipPoolSlotCount, 32, `${scenario}: chip pool is not 32.`);
+  assert.equal(breakables.chips.length, 32, `${scenario}: chip telemetry is not 32 slots.`);
+  assert.equal(state.visuals.waterInstances.length, 32, `${scenario}: water pool is not 32 slots.`);
+  assert.equal(state.visuals.waterInstances.filter(({ kind }) => kind === 'stream').length, 24,
+    `${scenario}: water stream pool is not 24.`);
+  assert.equal(state.visuals.waterInstances.filter(({ kind }) => kind === 'splash').length, 8,
+    `${scenario}: water splash pool is not 8.`);
+  return {
+    bodyHandles: [...breakables.bodyHandles],
+    colliderHandles: [...breakables.colliderHandles],
+    meshUuids: [...breakables.meshUuids],
+    poolSlotIds: [...breakables.poolSlotIds],
+  };
+}
+
+/** 固定pool identityがscenario前後で増減・置換されていないことを確認する。 */
+function assertPoolIdentity(state, expected, scenario) {
+  const actual = readPoolIdentity(state, scenario);
+  assert.deepEqual(actual, expected, `${scenario}: fixed pool identity changed.`);
 }
 
 /** console/page/request failureを収集し、独立contextでscene/HUD/hookを開く。 */
@@ -298,67 +538,803 @@ async function brakeVehicle(page) {
   throw new Error('Vehicle did not stop within 150 frames.');
 }
 
-/** 左右入力だけで指定世界方向へ向ける。 */
-async function turnVehicleToward(page, targetX, targetZ) {
-  const length = Math.hypot(targetX, targetZ) || 1;
-  const normalizedX = targetX / length;
-  const normalizedZ = targetZ / length;
-  for (let attempt = 0; attempt < 220; attempt += 1) {
-    const state = await readGameState(page);
-    const [forwardX, , forwardZ] = state.vehicle.forward;
-    if (forwardX * normalizedX + forwardZ * normalizedZ >= 0.9995) return;
-    const current = Math.atan2(forwardX, forwardZ);
-    const target = Math.atan2(normalizedX, normalizedZ);
-    const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
-    const key = delta >= 0 ? 'KeyD' : 'KeyA';
-    await page.keyboard.down(key);
-    await waitForFrames(page, 1);
-    await page.keyboard.up(key);
-    await waitForFrames(page, 1);
+/** 押下中keyboard集合を次のscreen方向へ同期する。 */
+async function syncKeyboardKeys(page, heldKeys, nextKeys) {
+  const next = new Set(nextKeys);
+  for (const key of heldKeys) {
+    if (!next.has(key)) await page.keyboard.up(key);
   }
-  throw new Error(`Vehicle did not turn toward [${targetX}, ${targetZ}].`);
+  for (const key of next) {
+    if (!heldKeys.has(key)) await page.keyboard.down(key);
+  }
+  heldKeys.clear();
+  for (const key of next) heldKeys.add(key);
 }
 
-/** Wの公開keyboard経路で条件まで走って停止する。 */
-async function driveUntil(page, predicate, description, maxBursts = 180) {
-  const resetCount = (await readGameState(page)).vehicle.resetCount;
-  await page.keyboard.down('KeyW');
+/** keyboard集合を必ず全解除する。 */
+async function releaseKeyboardKeys(page, heldKeys) {
+  for (const key of heldKeys) await page.keyboard.up(key);
+  heldKeys.clear();
+}
+
+/** CDP実touchで任意screen方向のstickと放水を操作する。 */
+async function createTouchDriver(page) {
+  const cdp = await page.context().newCDPSession(page);
+  const joystick = await page.locator('.touch-joystick').boundingBox();
+  const spray = await page.locator('.spray-button').boundingBox();
+  assert(joystick && spray, 'Touch controls lack bounding boxes.');
+  const center = { x: joystick.x + joystick.width / 2, y: joystick.y + joystick.height / 2 };
+  const radius = Math.min(joystick.width, joystick.height) / 2;
+  const sprayCenter = { x: spray.x + spray.width / 2, y: spray.y + spray.height / 2 };
+  let sprayActive = false;
+  let stickActive = false;
+
+  return {
+    async close() {
+      await cdp.detach();
+    },
+    async pressSpray() {
+      assert(!stickActive, 'Spray touch must start after joystick release.');
+      if (sprayActive) return;
+      await cdp.send('Input.dispatchTouchEvent', {
+        touchPoints: [{ id: 72, ...sprayCenter }],
+        type: 'touchStart',
+      });
+      sprayActive = true;
+    },
+    async releaseSpray() {
+      if (!sprayActive) return;
+      await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+      sprayActive = false;
+    },
+    async releaseStick() {
+      if (!stickActive) return;
+      await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+      stickActive = false;
+    },
+    async setStick(x, y) {
+      const length = Math.hypot(x, y) || 1;
+      const normalizedX = x / length;
+      const normalizedY = y / length;
+      if (!stickActive) {
+        await cdp.send('Input.dispatchTouchEvent', {
+          touchPoints: [{ id: 71, ...center }],
+          type: 'touchStart',
+        });
+        stickActive = true;
+      }
+      await cdp.send('Input.dispatchTouchEvent', {
+        touchPoints: [{
+          id: 71,
+          x: center.x + normalizedX * radius * 0.82,
+          y: center.y + normalizedY * radius * 0.82,
+        }],
+        type: 'touchMove',
+      });
+    },
+  };
+}
+
+const WORLD_AXIS_INPUTS = {
+  negativeX: { keys: ['KeyA', 'KeyW'], stick: [-0.803, -0.595] },
+  negativeZ: { keys: ['KeyD', 'KeyW'], stick: [0.595, -0.803] },
+  positiveX: { keys: ['KeyD', 'KeyS'], stick: [0.803, 0.595] },
+  positiveZ: { keys: ['KeyA', 'KeyS'], stick: [-0.595, 0.803] },
+};
+
+/** 直接操作のscreen対角入力でworld cardinal方向へ走り、座標条件で停止する。 */
+async function driveAlongWorldAxis(page, axis, predicate, description, touchDriver, maxBursts = 360) {
+  const input = WORLD_AXIS_INPUTS[axis];
+  assert(input, `${description}: unknown world axis ${axis}.`);
+  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
+  const heldKeys = new Set();
+  let latestState = null;
+  let previousState = null;
   try {
+    if (touchDriver) await touchDriver.setStick(...input.stick);
+    else await syncKeyboardKeys(page, heldKeys, input.keys);
     for (let burst = 0; burst < maxBursts; burst += 1) {
-      await waitForFrames(page, 2);
       const state = await readGameState(page);
-      if (predicate(state)) return state;
-      assert.equal(state.vehicle.resetCount, resetCount, `${description}: vehicle reset unexpectedly.`);
+      latestState = state;
+      if (predicate(state)) {
+        await touchDriver?.releaseStick();
+        await releaseKeyboardKeys(page, heldKeys);
+        await brakeVehicle(page);
+        return readGameState(page);
+      }
+      assert.equal(state.vehicle.resetCount, initialResetCount,
+        `${description}: vehicle reset unexpectedly: ${JSON.stringify({
+          current: state.vehicle,
+          previous: previousState?.vehicle,
+        })}`);
+      previousState = state;
+      await waitForFrames(page, 2);
     }
-    throw new Error(`${description}: destination was not reached.`);
+    throw new Error(`${description}: axis destination was not reached: ${JSON.stringify({
+      controls: latestState?.controls,
+      position: latestState?.vehicle.position,
+    })}`);
   } finally {
-    await page.keyboard.up('KeyW');
-    await brakeVehicle(page);
+    await touchDriver?.releaseStick();
+    await releaseKeyboardKeys(page, heldKeys);
   }
 }
 
-/** 車庫から右回り道路を走り、火災現場の南へ到達する。 */
-async function driveRightRouteToFire(page) {
-  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'garage exit');
-  await turnVehicleToward(page, 1, 0);
-  await driveUntil(page, (state) => state.vehicle.position[0] >= 12, 'east road');
-  await turnVehicleToward(page, 0, -1);
-  await driveUntil(page, (state) => state.vehicle.position[2] <= -2, 'north road');
-  await driveUntil(page, (state) => state.mission.distance <= 7.5, 'spray coarse approach', 120);
-  for (let pulse = 0; pulse < 40; pulse += 1) {
-    const state = await readGameState(page);
-    if (state.mission.distance <= 5.7) return state;
-    await page.keyboard.down('KeyW');
-    await waitForFrames(page, 3);
-    await page.keyboard.up('KeyW');
-    await brakeVehicle(page);
+/** world cardinal方向へ短く入力し、停止後のheadingを同方向へ揃える。 */
+async function pulseAlongWorldAxis(page, axis, frameCount, touchDriver) {
+  const input = WORLD_AXIS_INPUTS[axis];
+  const heldKeys = new Set();
+  try {
+    if (touchDriver) await touchDriver.setStick(...input.stick);
+    else await syncKeyboardKeys(page, heldKeys, input.keys);
+    await waitForFrames(page, frameCount);
+  } finally {
+    await touchDriver?.releaseStick();
+    await releaseKeyboardKeys(page, heldKeys);
   }
-  throw new Error('Tablet spray approach did not reach 5.7 units.');
+  await brakeVehicle(page);
+}
+
+/** 短いcardinal pulseを反復し、world X/Zを安全なwaypointへ揃える。 */
+async function alignWorldCoordinate(
+  page,
+  coordinateIndex,
+  targetValue,
+  description,
+  tolerance = 0.32,
+  touchDriver = null,
+) {
+  assert(coordinateIndex === 0 || coordinateIndex === 2, `${description}: only X/Z can be aligned.`);
+  const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
+  const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
+  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
+  let latest = null;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    latest = await readGameState(page);
+    const delta = targetValue - latest.vehicle.position[coordinateIndex];
+    if (Math.abs(delta) <= tolerance) return latest;
+    assert.equal(latest.vehicle.resetCount, initialResetCount, `${description}: vehicle reset unexpectedly.`);
+    const frameCount = Math.max(1, Math.min(7, Math.ceil(Math.abs(delta) * 1.5)));
+    await pulseAlongWorldAxis(page, delta > 0 ? positiveAxis : negativeAxis, frameCount, touchDriver);
+  }
+  throw new Error(`${description}: coordinate did not align: ${JSON.stringify({
+    actual: latest?.vehicle.position[coordinateIndex],
+    targetValue,
+  })}`);
+}
+
+/** 車庫から外周東側道路を通って火の照準距離へ進む。 */
+async function driveMissionToFire(page, touchDriver) {
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 15.3,
+    'fire route garage exit', touchDriver);
+  await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 11.5,
+    'fire route east road', touchDriver);
+  await alignWorldCoordinate(page, 0, 15.5, 'fire route safe east X', 0.5, touchDriver);
+  await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -7,
+    'fire route north road', touchDriver);
+  await driveAlongWorldAxis(page, 'negativeX', (state) => state.mission.targeted,
+    'fire route east-wall targeting', touchDriver);
+  const state = await readGameState(page);
+  assert(state.mission.distance <= 6 && state.mission.targeted,
+    `Fire route did not end targeted: ${JSON.stringify(state.mission)}`);
+  return state;
+}
+
+/** 火災現場から外周東側道路を戻り、車庫でassigned再開まで走る。 */
+async function driveMissionBackToGarage(page, touchDriver) {
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 10.5,
+    'garage route south road', touchDriver);
+  await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= 4,
+    'garage route west road', touchDriver);
+  let latestState = await readGameState(page);
+  for (let correction = 0; correction < 4; correction += 1) {
+    if (latestState.runtime.missionPhase === 'assigned') return latestState;
+    await alignWorldCoordinate(page, 0, 0, 'garage final X', 0.7, touchDriver);
+    await alignWorldCoordinate(page, 2, 14, 'garage final Z', 0.7, touchDriver);
+    latestState = await readGameState(page);
+    const garageDistance = Math.hypot(
+      latestState.vehicle.position[0],
+      latestState.vehicle.position[2] - 14,
+    );
+    assert(garageDistance <= 3.1,
+      `Garage final alignment exceeds restart radius: ${garageDistance}.`);
+    for (let frame = 0; frame < 20; frame += 1) {
+      const state = await readGameState(page);
+      latestState = state;
+      if (state.runtime.missionPhase === 'assigned') return state;
+      await waitForFrames(page, 1);
+    }
+  }
+  for (let frame = 0; frame < 20; frame += 1) {
+    const state = await readGameState(page);
+    latestState = state;
+    if (state.runtime.missionPhase === 'assigned') return state;
+    await waitForFrames(page, 1);
+  }
+  throw new Error(`Garage return did not restart the assigned mission: ${JSON.stringify({
+    mission: latestState?.runtime,
+    vehicle: latestState?.vehicle,
+  })}`);
+}
+
+/** A/D/W/S単独でscreen四方向へ並進し、camera方向が固定されることを確認する。 */
+async function verifyDirectMovement(browser, errors) {
+  const cases = [
+    ['KeyA', -1, 0], ['KeyD', 1, 0], ['KeyW', 0, -1], ['KeyS', 0, 1],
+  ];
+  const results = {};
+  for (const [key, expectedX, expectedY] of cases) {
+    const target = { hasTouch: false, height: 720, name: `direct-${key}`, width: 1_280 };
+    const { context, page } = await openViewportPage(browser, target, errors);
+    try {
+      await page.evaluate(() => window.reset_voxel_game_vehicle?.());
+      await waitForFrames(page, 30);
+      const before = await readGameState(page);
+      await page.keyboard.down(key);
+      await page.waitForTimeout(350);
+      await page.keyboard.up(key);
+      const after = await readGameState(page);
+      const start = projectWorldPoint(before.camera, before.vehicle.position);
+      const end = projectWorldPoint(after.camera, after.vehicle.position);
+      const screenDelta = [end[0] - start[0], end[1] - start[1]];
+      const worldDistance = Math.hypot(
+        after.vehicle.position[0] - before.vehicle.position[0],
+        after.vehicle.position[2] - before.vehicle.position[2],
+      );
+      assert(screenDelta[0] * expectedX > 8 || screenDelta[1] * expectedY > 8,
+        `${key} did not move in its screen direction: ${JSON.stringify(screenDelta)}`);
+      assert(worldDistance > 0.3, `${key} only rotated without translating: ${worldDistance}`);
+      const beforeOffset = getCameraOffset(before);
+      const afterOffset = getCameraOffset(after);
+      assert(Math.max(...beforeOffset.map((value, index) => Math.abs(value - afterOffset[index]))) < 0.001,
+        `${key} changed the world-fixed camera direction.`);
+      results[key] = { screenDelta, worldDistance };
+    } finally {
+      await page.keyboard.up(key).catch(() => undefined);
+      await context.close();
+    }
+  }
+  return results;
+}
+
+/** keyboardまたは実touchで消火、freeRoam、実走帰庫、仕事再開まで完走する。 */
+async function verifyCompleteMission(browser, errors, name, hasTouch) {
+  const target = { hasTouch, height: hasTouch ? 390 : 720, name, width: hasTouch ? 844 : 1_280 };
+  const { context, page } = await openViewportPage(browser, target, errors);
+  const touch = hasTouch ? await createTouchDriver(page) : null;
+  try {
+    const initial = await readGameState(page);
+    readPoolIdentity(initial, `${name} initial`);
+    const targeted = await driveMissionToFire(page, touch);
+    if (touch) await touch.pressSpray();
+    else await page.keyboard.down('Space');
+    await waitForFrames(page, 4);
+    const spraying = await readGameState(page);
+    assert(spraying.controls.spray && spraying.mission.sprayOnFire,
+      `${name}: targeted spray did not start.`);
+    if (hasTouch) await page.screenshot({ path: `${outputDirectory}/mobile-landscape-water-fire.png` });
+    await page.evaluate(() => window.advanceTime?.(2_500));
+    await waitForFrames(page, 2);
+    if (touch) await touch.releaseSpray();
+    else await page.keyboard.up('Space');
+    const celebration = await readGameState(page);
+    assert.equal(celebration.runtime.fireIntensity, 0, `${name}: fire remains after 2500ms.`);
+    assert.equal(celebration.runtime.missionPhase, 'celebrating', `${name}: celebration did not start.`);
+    assert.equal(celebration.visuals.starCubeCount, 30, `${name}: celebration stars are incomplete.`);
+    if (!hasTouch) await page.screenshot({ path: `${outputDirectory}/desktop-complete.png` });
+    await page.evaluate(() => window.advanceTime?.(1_800));
+    await waitForFrames(page, 2);
+    const freeRoam = await readGameState(page);
+    assert.equal(freeRoam.runtime.missionPhase, 'freeRoam', `${name}: freeRoam did not start.`);
+    const restarted = await driveMissionBackToGarage(page, touch);
+    assert.equal(restarted.runtime.fireIntensity, 1, `${name}: fire was not restored at garage.`);
+    assert(restarted.runtime.routeVisible, `${name}: route was not restored at garage.`);
+    return {
+      celebration: celebration.runtime,
+      freeRoam: freeRoam.runtime,
+      input: hasTouch ? 'touch' : 'keyboard',
+      restarted: restarted.runtime,
+      targetedDistance: targeted.mission.distance,
+    };
+  } finally {
+    await page.keyboard.up('Space').catch(() => undefined);
+    await touch?.releaseSpray().catch(() => undefined);
+    await touch?.releaseStick().catch(() => undefined);
+    await touch?.close().catch(() => undefined);
+    await context.close();
+  }
+}
+
+/** 水流開始、60ms後の流動、target着弾飛沫を固定32slotと画像で検証する。 */
+async function verifyWaterTimeline(browser, errors) {
+  const target = { hasTouch: false, height: 720, name: 'water-timeline', width: 1_280 };
+  const { context, page } = await openViewportPage(browser, target, errors);
+  try {
+    const initial = await readGameState(page);
+    const identity = readPoolIdentity(initial, 'water initial');
+    await page.keyboard.down('Space');
+    await page.waitForTimeout(90);
+    const untargeted = await readGameState(page);
+    assert.equal(untargeted.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length, 0,
+      'Untargeted spray displayed a splash.');
+    await page.keyboard.up('Space');
+    await waitForFrames(page, 2);
+
+    await driveMissionToFire(page);
+    const steadyCalls = (await readGameState(page)).renderer.rendererCalls;
+    await page.keyboard.down('Space');
+    let start = null;
+    for (let frame = 0; frame < 16; frame += 1) {
+      await waitForFrames(page, 1);
+      const state = await readGameState(page);
+      const activeStreams = state.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'stream');
+      const activeSplashes = state.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash');
+      if (activeStreams.length >= 4 && activeSplashes.length >= 1) {
+        start = state;
+        break;
+      }
+    }
+    assert(start, 'Targeted water start frame was not observed.');
+    writeJsonArtifact('desktop-water-start.json', {
+      mission: start.mission,
+      renderer: start.renderer,
+      waterInstances: start.visuals.waterInstances,
+    });
+    await page.screenshot({ path: `${outputDirectory}/desktop-water-start.png` });
+
+    await page.waitForTimeout(60);
+    const flow = await readGameState(page);
+    const directionLength = Math.hypot(...start.mission.direction) || 1;
+    const direction = start.mission.direction.map((value) => value / directionLength);
+    const startBySlot = new Map(start.visuals.waterInstances
+      .filter(({ active, kind }) => active && kind === 'stream')
+      .map((instance) => [instance.slot, instance]));
+    const advancingSlots = flow.visuals.waterInstances
+      .filter(({ active, kind, slot }) => active && kind === 'stream' && startBySlot.has(slot))
+      .filter((instance) => {
+        const previous = startBySlot.get(instance.slot);
+        return instance.position.reduce(
+          (sum, value, axis) => sum + (value - previous.position[axis]) * direction[axis],
+          0,
+        ) > 0.01;
+      })
+      .map(({ slot }) => slot);
+    assert(advancingSlots.length >= 4,
+      `Fewer than four stream slots advanced over 60ms: ${JSON.stringify(advancingSlots)}`);
+    writeJsonArtifact('desktop-water-flow.json', {
+      advancingSlots,
+      mission: flow.mission,
+      renderer: flow.renderer,
+      waterInstances: flow.visuals.waterInstances,
+    });
+    await page.screenshot({ path: `${outputDirectory}/desktop-water-flow.png` });
+
+    await page.waitForTimeout(60);
+    const splash = await readGameState(page);
+    const splashCount = splash.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length;
+    assert(splashCount >= 1, 'Targeted spray displayed no splash.');
+    assert(splash.renderer.rendererCalls - steadyCalls <= 2,
+      `Water VFX added more than two draw calls: ${splash.renderer.rendererCalls - steadyCalls}`);
+    assertPoolIdentity(splash, identity, 'water timeline');
+    writeJsonArtifact('desktop-water-splash.json', {
+      mission: splash.mission,
+      renderer: splash.renderer,
+      splashCount,
+      waterInstances: splash.visuals.waterInstances,
+    });
+    await page.screenshot({ path: `${outputDirectory}/desktop-water-splash.png` });
+    return {
+      advancingSlots,
+      drawCallDelta: splash.renderer.rendererCalls - steadyCalls,
+      fixedColorBatchCount: 2,
+      pool: { splash: 8, stream: 24, total: 32 },
+      splashCount,
+      untargetedSplashCount: 0,
+    };
+  } finally {
+    await page.keyboard.up('Space').catch(() => undefined);
+    await context.close();
+  }
+}
+
+/** 新しい木/建物colliderを横断しない道路waypointから指定blockの正面へ揃える。 */
+async function driveToBlockApproach(page, block) {
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 15.3,
+    `${block.id} garage exit`);
+  if (block.id === 'plaza-blue') {
+    const westOuterX = -17.2;
+    const approachZ = -1;
+    await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= westOuterX + 2.5,
+      `${block.id} west outer road`);
+    await alignWorldCoordinate(page, 0, westOuterX, `${block.id} west outer X`);
+    await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= 10,
+      `${block.id} west upper corridor`);
+    await alignWorldCoordinate(page, 0, westOuterX, `${block.id} west upper correction X`);
+    const staged = await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= 1.5,
+      `${block.id} west lower corridor`);
+    assert(staged.vehicle.position[0] <= -14.8,
+      `${block.id}: west corridor drifted into the red-block support envelope: ${JSON.stringify(staged.vehicle.position)}.`);
+    await alignWorldCoordinate(page, 0, westOuterX, `${block.id} west lower correction X`);
+    await alignWorldCoordinate(page, 2, approachZ, `${block.id} west approach Z`);
+    return { axis: 'positiveX', approach: 'west-corrected-corridor' };
+  }
+  if (block.id === 'plaza-red') {
+    await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= block.position[0] + 2.5,
+      `${block.id} north-road longitude`);
+    await alignWorldCoordinate(page, 0, block.position[0], `${block.id} north approach X`);
+    return { axis: 'negativeZ', approach: 'north-road' };
+  }
+  if (block.id === 'plaza-yellow' || block.id === 'plaza-green') {
+    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 12,
+      `${block.id} east outer road`);
+    await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -12.8,
+      `${block.id} south outer road`);
+    await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= block.position[0] + 2.5,
+      `${block.id} south-road longitude`);
+    await alignWorldCoordinate(page, 0, block.position[0], `${block.id} south approach X`);
+    return { axis: 'positiveZ', approach: 'south-outer-road' };
+  }
+  throw new Error(`${block.id}: no collider-safe block approach is defined.`);
+}
+
+/** rAF時系列からactivation遷移、物理許容、上昇→下降arc、連続移動、lifetimeを検証する。 */
+function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId) {
+  assert.equal(observer.error, undefined, `${blockId}: page observer failed: ${observer.error}`);
+  const firstActiveIndex = observer.samples.findIndex(({ activeFragments }) => activeFragments.length === 6);
+  assert(firstActiveIndex >= 0, `${blockId}: page observer did not capture six active fragments.`);
+  const firstActive = observer.samples[firstActiveIndex];
+  const previousFrame = observer.samples[firstActiveIndex - 1] ?? null;
+  const firstInsideAabb = fragmentsAreInsideBlock(firstActive.activeFragments, block.position);
+  const activationTransitionCaptured = Boolean(
+    previousFrame
+    && previousFrame.activeFragments.length === 0
+    && observer.firstImpactAtMs !== null
+    && (firstActive.block?.vehicleImpactCount ?? beforeImpactCounts[blockId]) > beforeImpactCounts[blockId],
+  );
+  assert(activationTransitionCaptured,
+    `${blockId}: observer did not capture a pre-impact 0-to-6 activation transition.`);
+  const captureDelayFromImpactMs = firstActive.capturedAtMs - observer.firstImpactAtMs;
+  assert(captureDelayFromImpactMs >= 0
+    && captureDelayFromImpactMs <= ACTIVATION_TRANSITION_DELAY_LIMIT_MS,
+    `${blockId}: first 6-fragment observation was ${captureDelayFromImpactMs}ms after impact; limit is ${ACTIVATION_TRANSITION_DELAY_LIMIT_MS}ms.`);
+  const allowedFirstObservedOverflow = firstObservedPositionAllowance(captureDelayFromImpactMs);
+  const maximumFirstObservedOverflow = maximumFragmentAabbOverflow(firstActive.activeFragments, block.position);
+  assert(maximumFirstObservedOverflow <= allowedFirstObservedOverflow,
+    `${blockId}: first-observed fragments exceed the delay-based AABB allowance (${maximumFirstObservedOverflow} > ${allowedFirstObservedOverflow}).`);
+
+  const { activeSamples, ended, expectedIds } = readContinuousFragmentWindow(
+    observer.samples,
+    firstActiveIndex,
+    blockId,
+  );
+  assert(activeSamples.length >= 8, `${blockId}: too few consecutive active rAF samples (${activeSamples.length}).`);
+  const sample250 = sampleNearestElapsed(activeSamples, 250, 70);
+  assert(sample250, `${blockId}: no rAF sample near 250ms after first active observation.`);
+  const firstAverageY = averageFragmentY(firstActive.activeFragments);
+  const arcSamples = activeSamples
+    .filter(({ sinceFirstActiveMs }) => sinceFirstActiveMs >= 20 && sinceFirstActiveMs <= 260)
+    .map((sample) => ({ averageY: averageFragmentY(sample.activeFragments), sample }));
+  assert(arcSamples.length >= 3, `${blockId}: early arc lacks rAF samples.`);
+  const peak = arcSamples.reduce((highest, candidate) => (
+    candidate.averageY > highest.averageY ? candidate : highest
+  ));
+  const descendingSamples = activeSamples
+    .filter(({ sinceFirstActiveMs }) => sinceFirstActiveMs >= peak.sample.sinceFirstActiveMs + 80)
+    .map((sample) => ({ averageY: averageFragmentY(sample.activeFragments), sample }));
+  assert(descendingSamples.length >= 2, `${blockId}: post-apex arc lacks rAF samples.`);
+  const descent = descendingSamples.at(-1);
+  assert(peak.averageY > firstAverageY + 0.04,
+    `${blockId}: average Y did not rise in the early arc (${firstAverageY} -> ${peak.averageY}).`);
+  assert(descent.averageY < peak.averageY - 0.04,
+    `${blockId}: average Y did not descend after the apex (${peak.averageY} -> ${descent.averageY}).`);
+
+  const firstPositions = new Map(firstActive.activeFragments.map(({ id, position }) => [id, position]));
+  const movedFragmentIds = sample250.activeFragments.filter(({ id, position }) => {
+    const origin = firstPositions.get(id);
+    return origin && Math.hypot(...position.map((value, axis) => value - origin[axis])) >= 0.25;
+  }).map(({ id }) => id);
+  assert(movedFragmentIds.length >= 4,
+    `${blockId}: fewer than four fragments moved 0.25 unit by the observed 250ms sample.`);
+  const continuity = expectedIds.map((id) => {
+    const positions = activeSamples
+      .filter(({ sinceFirstActiveMs }) => sinceFirstActiveMs <= 350)
+      .map((sample) => sample.activeFragments.find((fragment) => fragment.id === id).position);
+    const stepDistances = positions.slice(1).map((position, index) => (
+      Math.hypot(...position.map((value, axis) => value - positions[index][axis]))
+    ));
+    return {
+      id,
+      movingStepCount: stepDistances.filter((distance) => distance > 0.002).length,
+      stepCount: stepDistances.length,
+      totalObservedDistance: Math.hypot(...positions.at(-1).map((value, axis) => value - positions[0][axis])),
+    };
+  });
+  assert(continuity.every(({ movingStepCount }) => movingStepCount >= 3),
+    `${blockId}: a fragment lacks continuous movement: ${JSON.stringify(continuity)}`);
+
+  const maximumActiveChipCount = Math.max(...observer.samples.map(({ activeChips }) => activeChips.length));
+  assert.equal(maximumActiveChipCount, 8, `${blockId}: observed chip maximum is not eight.`);
+  for (const sample of observer.samples) {
+    for (const other of sample.otherBlocks) {
+      assert.equal(other.vehicleImpactCount, beforeImpactCounts[other.id],
+        `${blockId}: collision changed ${other.id} vehicleImpactCount.`);
+    }
+  }
+  assert((firstActive.block?.maxImpactSpeed ?? 0) >= 4,
+    `${blockId}: real vehicle impact speed is below four.`);
+  assert.equal(firstActive.block?.intactEnabledCountAtFragmentActivation, 0,
+    `${blockId}: intact body/collider remained enabled at fragment activation.`);
+  assert(ended.sinceFirstActiveMs >= 1_000 && ended.sinceFirstActiveMs <= 1_450,
+    `${blockId}: fragment lifetime from first observation is outside tolerance (${ended.sinceFirstActiveMs}ms).`);
+
+  return {
+    activationTransitionCaptured,
+    allowedFirstObservedOverflow,
+    captureDelayFromImpactMs,
+    continuity,
+    firstAverageY,
+    firstInsideAabb,
+    firstObservedAtMs: observer.firstActiveAtMs,
+    fragmentEndedAtMs: ended.sinceFirstActiveMs,
+    maximumFirstObservedOverflow,
+    maximumActiveChipCount,
+    movedFragmentIds,
+    peak: { averageY: peak.averageY, elapsedMs: peak.sample.sinceFirstActiveMs },
+    postApex: { averageY: descent.averageY, elapsedMs: descent.sample.sinceFirstActiveMs },
+    sample250: {
+      activeFragments: sample250.activeFragments,
+      averageY: averageFragmentY(sample250.activeFragments),
+      elapsedMs: sample250.sinceFirstActiveMs,
+    },
+  };
+}
+
+/** 実車衝突のrAF時系列、chip/主破片終了、安全復元まで1色分を検証する。 */
+async function verifyBreakTimeline(browser, errors, contractFailures, blockId, colorName) {
+  const target = { hasTouch: false, height: 720, name: `break-${colorName}`, width: 1_280 };
+  const { context, page } = await openViewportPage(browser, target, errors);
+  const heldKeys = new Set();
+  try {
+    const initial = await readGameState(page);
+    const identity = readPoolIdentity(initial, `${blockId} initial`);
+    const block = initial.landmarks.breakableBlocks.find(({ id }) => id === blockId);
+    assert(block, `${blockId}: landmark is unavailable.`);
+    const beforeImpactCounts = Object.fromEntries(initial.breakables.blocks.map(
+      ({ id, vehicleImpactCount }) => [id, vehicleImpactCount],
+    ));
+    const approach = await driveToBlockApproach(page, block);
+    const approachState = await readGameState(page);
+    for (const telemetry of approachState.breakables.blocks) {
+      assert.equal(telemetry.vehicleImpactCount, beforeImpactCounts[telemetry.id],
+        `${blockId}: approach touched ${telemetry.id} before observation.`);
+    }
+    assert.equal(approachState.runtime.blocks.find(({ id }) => id === blockId)?.phase, 'intact',
+      `${blockId}: target was not intact when observation started.`);
+    const conservativeVehicleRadius = Math.hypot(
+      VEHICLE_COLLIDER_HALF_EXTENTS[0],
+      VEHICLE_COLLIDER_HALF_EXTENTS[2],
+    );
+    const conservativeBlockRadius = Math.hypot(0.75, 0.75);
+    const approachDistance = Math.hypot(
+      approachState.vehicle.position[0] - block.position[0],
+      approachState.vehicle.position[2] - block.position[2],
+    );
+    assert(approachDistance >= conservativeVehicleRadius + conservativeBlockRadius + 0.1,
+      `${blockId}: observer started without collider-support clearance: ${approachDistance}.`);
+    await startBreakFrameObserver(page, blockId, beforeImpactCounts[blockId]);
+    await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS[approach.axis].keys);
+    let activationObserved = true;
+    try {
+      await page.waitForFunction(
+        () => window.__voxelBreakFrameObserver?.firstActiveAtMs !== null,
+        undefined,
+        { timeout: 8_000 },
+      );
+    } catch {
+      activationObserved = false;
+    }
+    await releaseKeyboardKeys(page, heldKeys);
+    if (!activationObserved) {
+      const observer = await stopAndReadBreakFrameObserver(page);
+      const latestCandidate = await readGameState(page);
+      const failure = `${blockId}: effective real-vehicle impact did not expose six active fragments.`;
+      contractFailures.push(failure);
+      writeJsonArtifact(`desktop-break-${colorName}-timeline.json`, {
+        approach,
+        failure,
+        observer,
+        state: latestCandidate,
+      });
+      await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-first-observed.png` });
+      await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png` });
+      return {
+        activationObserved: false,
+        approach,
+        impactSpeed: latestCandidate?.breakables.blocks.find(({ id }) => id === blockId)?.maxImpactSpeed,
+      };
+    }
+    await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-first-observed.png` });
+    await page.waitForFunction(
+      () => window.__voxelBreakFrameObserver?.samples.some(
+        ({ sinceFirstActiveMs }) => sinceFirstActiveMs !== null && sinceFirstActiveMs >= 250,
+      ),
+      undefined,
+      { timeout: 2_000 },
+    );
+    await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png` });
+    await page.waitForFunction(() => window.__voxelBreakFrameObserver?.running === false, undefined, { timeout: 2_500 });
+    const observer = await stopAndReadBreakFrameObserver(page);
+    const analysis = analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId);
+    writeJsonArtifact(`desktop-break-${colorName}-timeline.json`, { analysis, approach, observer });
+
+    await page.evaluate(() => window.reset_voxel_game_vehicle?.());
+    await waitForFrames(page, 2);
+    const fragmentExpired = await readGameState(page);
+    assert.equal(fragmentExpired.breakables.activeFragments.length, 0,
+      `${blockId}: main fragments remain after the observed 1.2 second window.`);
+    assert.equal(fragmentExpired.breakables.chips.filter(({ active }) => active).length, 0,
+      `${blockId}: chips remain active after 350ms.`);
+    const restoringBlock = fragmentExpired.runtime.blocks.find(({ id }) => id === blockId);
+    await page.evaluate((milliseconds) => window.advanceTime?.(milliseconds),
+      Math.max(1, restoringBlock?.respawnRemainingMs ?? 0));
+    await waitForFrames(page, 2);
+    const restored = await readGameState(page);
+    assert.equal(restored.runtime.blocks.find(({ id }) => id === blockId)?.phase, 'intact',
+      `${blockId}: block did not restore after five seconds while vehicle was outside radius three.`);
+    assertPoolIdentity(restored, identity, `${blockId} restored`);
+    return {
+      activationObserved: true,
+      analysis,
+      approach,
+      chipPoolSlotCount: restored.breakables.chipPoolSlotCount,
+      impactSpeed: restored.breakables.blocks.find(({ id }) => id === blockId)?.maxImpactSpeed,
+      poolSlotCount: restored.breakables.poolSlotCount,
+      restored: restored.runtime.blocks.find(({ id }) => id === blockId),
+    };
+  } finally {
+    await stopAndReadBreakFrameObserver(page).catch(() => undefined);
+    await releaseKeyboardKeys(page, heldKeys).catch(() => undefined);
+    await context.close();
+  }
+}
+
+/** 車両yawを考慮したcolliderのworld X/Z support半径を返す。 */
+function vehicleColliderSupport(vehicle) {
+  const [forwardX, , forwardZ] = vehicle.forward;
+  return {
+    x: Math.abs(forwardZ) * VEHICLE_COLLIDER_HALF_EXTENTS[0]
+      + Math.abs(forwardX) * VEHICLE_COLLIDER_HALF_EXTENTS[2],
+    z: Math.abs(forwardX) * VEHICLE_COLLIDER_HALF_EXTENTS[0]
+      + Math.abs(forwardZ) * VEHICLE_COLLIDER_HALF_EXTENTS[2],
+  };
+}
+
+/** 実camera basisからworld X/Z方向をDOM touch stick座標へ逆投影する。 */
+function worldDirectionToTouchStick(camera, worldX, worldZ) {
+  const forwardX = camera.lookTarget[0] - camera.position[0];
+  const forwardZ = camera.lookTarget[2] - camera.position[2];
+  const forwardLength = Math.hypot(forwardX, forwardZ) || 1;
+  const normalizedForward = [forwardX / forwardLength, forwardZ / forwardLength];
+  const screenRight = [-normalizedForward[1], normalizedForward[0]];
+  const worldLength = Math.hypot(worldX, worldZ) || 1;
+  const normalizedWorld = [worldX / worldLength, worldZ / worldLength];
+  const moveX = normalizedWorld[0] * screenRight[0] + normalizedWorld[1] * screenRight[1];
+  const moveY = normalizedWorld[0] * normalizedForward[0] + normalizedWorld[1] * normalizedForward[1];
+  return [moveX, -moveY];
+}
+
+/** 南側からsolidへ押し込み、visual AABB非貫通・resetなし・離脱操作を数値検証する。 */
+async function verifyWorldCollisionScenario(browser, errors, obstacle) {
+  const target = { hasTouch: true, height: 720, name: `collision-${obstacle.id}`, width: 1_280 };
+  const { context, page } = await openViewportPage(browser, target, errors);
+  const touch = await createTouchDriver(page);
+  try {
+    const initial = await readGameState(page);
+    const initialResetCount = initial.vehicle.resetCount;
+    await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 15.3,
+      `${obstacle.id} collision garage exit`);
+    const currentX = (await readGameState(page)).vehicle.position[0];
+    if (obstacle.position[0] > currentX) {
+      await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= obstacle.position[0] - 2.5,
+        `${obstacle.id} collision east alignment`);
+    } else {
+      await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= obstacle.position[0] + 2.5,
+        `${obstacle.id} collision west alignment`);
+    }
+    await alignWorldCoordinate(page, 0, obstacle.position[0], `${obstacle.id} collision X`);
+    const aligned = await readGameState(page);
+    assert.equal(aligned.vehicle.resetCount, initialResetCount, `${obstacle.id}: reset during approach.`);
+
+    const obstacleMaxZ = obstacle.position[2] + obstacle.scale[2] / 2;
+    let contactSample = null;
+    let minimumClearance = Number.POSITIVE_INFINITY;
+    let maximumApproachSpeed = 0;
+    const contactPositions = [];
+    await touch.setStick(...worldDirectionToTouchStick(aligned.camera, 0, -1));
+    for (let frame = 0; frame < 600; frame += 1) {
+      await waitForFrames(page, 1);
+      const state = await readGameState(page);
+      assert.equal(state.vehicle.resetCount, initialResetCount, `${obstacle.id}: reset while pressing solid.`);
+      maximumApproachSpeed = Math.max(maximumApproachSpeed, state.vehicle.speed);
+      const support = vehicleColliderSupport(state.vehicle);
+      const clearance = state.vehicle.position[2] - support.z - obstacleMaxZ;
+      minimumClearance = Math.min(minimumClearance, clearance);
+      const xOverlap = Math.abs(state.vehicle.position[0] - obstacle.position[0])
+        <= support.x + obstacle.scale[0] / 2 + 0.05;
+      if (xOverlap && clearance <= 0.12) {
+        contactSample ??= { clearance, state, support };
+        contactPositions.push(state.vehicle.position[2]);
+        if (contactPositions.length >= 45) break;
+      }
+    }
+    assert(contactSample, `${obstacle.id}: actual collider contact was not reached.`);
+    assert(maximumApproachSpeed >= 4, `${obstacle.id}: approach never reached collision speed.`);
+    assert(contactPositions.length >= 45, `${obstacle.id}: contact was not held for 45 frames.`);
+    assert(minimumClearance >= -0.09,
+      `${obstacle.id}: vehicle collider penetrated visual AABB by ${-minimumClearance}.`);
+    const contactTravel = Math.max(...contactPositions) - Math.min(...contactPositions);
+    assert(contactTravel <= 0.18, `${obstacle.id}: vehicle traversed solid while held (${contactTravel}).`);
+    const heldState = await readGameState(page);
+    assert(heldState.vehicle.position[2] > obstacleMaxZ,
+      `${obstacle.id}: vehicle center crossed the obstacle visual AABB.`);
+    assert(heldState.vehicle.position[0] >= heldState.worldBounds.minX
+      && heldState.vehicle.position[0] <= heldState.worldBounds.maxX
+      && heldState.vehicle.position[2] >= heldState.worldBounds.minZ
+      && heldState.vehicle.position[2] <= heldState.worldBounds.maxZ,
+    `${obstacle.id}: collision left the vehicle outside world bounds.`);
+    await page.screenshot({ path: `${outputDirectory}/desktop-collision-${obstacle.id}.png` });
+
+    await touch.releaseStick();
+    await brakeVehicle(page);
+    const beforeRecovery = await readGameState(page);
+    await touch.setStick(...worldDirectionToTouchStick(beforeRecovery.camera, 0, 1));
+    await waitForFrames(page, 28);
+    await touch.releaseStick();
+    await brakeVehicle(page);
+    const recovered = await readGameState(page);
+    assert(recovered.vehicle.position[2] - beforeRecovery.vehicle.position[2] >= 0.5,
+      `${obstacle.id}: vehicle did not respond after collision.`);
+    assert.equal(recovered.vehicle.resetCount, initialResetCount, `${obstacle.id}: recovery triggered reset.`);
+    return {
+      contactClearance: contactSample.clearance,
+      contactPosition: contactSample.state.vehicle.position,
+      contactTravel,
+      maximumApproachSpeed,
+      minimumClearance,
+      obstacle,
+      recoveredDistance: recovered.vehicle.position[2] - beforeRecovery.vehicle.position[2],
+      resetCount: recovered.vehicle.resetCount,
+    };
+  } finally {
+    await touch.releaseStick().catch(() => undefined);
+    await touch.close().catch(() => undefined);
+    await context.close();
+  }
+}
+
+/** COLL-001代表として木1本と火災建物本体を実車検証する。 */
+async function verifyWorldCollisions(browser, errors) {
+  const testedIds = ['tree-trunk-3', 'fire-building-body'];
+  const scenarios = {};
+  for (const id of testedIds) {
+    const obstacle = COLLISION_OBSTACLES.find((candidate) => candidate.id === id);
+    assert(obstacle, `${id}: collision obstacle definition is unavailable.`);
+    scenarios[id] = await verifyWorldCollisionScenario(browser, errors, obstacle);
+  }
+  return {
+    scenarios,
+    sharedDefinitionOnly: COLLISION_OBSTACLES
+      .filter(({ id }) => !testedIds.includes(id))
+      .map(({ id }) => id),
+    testedIds,
+    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all four visuals and colliders share one definition',
+  };
 }
 
 /** 代表viewportでperformance/layoutと実運転画像を取得する。 */
 async function verifyViewport(browser, target, errors) {
   const { context, page } = await openViewportPage(browser, target, errors);
+  let touch = null;
   try {
     const initial = await readGameState(page);
     const layout = await measureLayout(page, target);
@@ -371,32 +1347,17 @@ async function verifyViewport(browser, target, errors) {
     }
 
     if (target.hasTouch) {
-      const joystick = await page.locator('.touch-joystick').boundingBox();
-      assert(joystick, `${target.name}: joystick has no box.`);
-      const cdp = await context.newCDPSession(page);
-      const center = { x: joystick.x + joystick.width / 2, y: joystick.y + joystick.height / 2 };
-      const held = { x: center.x + joystick.width * 0.24, y: center.y - joystick.height * 0.38 };
-      try {
-        await cdp.send('Input.dispatchTouchEvent', {
-          touchPoints: [{ id: 17, x: center.x, y: center.y }],
-          type: 'touchStart',
-        });
-        await cdp.send('Input.dispatchTouchEvent', {
-          touchPoints: [{ id: 17, x: held.x, y: held.y }],
-          type: 'touchMove',
-        });
-        await waitForFrames(page, 30);
-        const driven = await readGameState(page);
-        assert(driven.controls.throttle > 0.5 && driven.controls.steer > 0.2,
-          `${target.name}: touch did not drive/steer.`);
-        await page.screenshot({ path: `${outputDirectory}/${target.name}-driving.png` });
-        await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchCancel' });
-        const cancelled = await readGameState(page);
-        assert(cancelled.controls.throttle === 0 && cancelled.controls.steer === 0,
-          `${target.name}: pointercancel did not release drive.`);
-      } finally {
-        await cdp.detach();
-      }
+      touch = await createTouchDriver(page);
+      await touch.setStick(0.55, -0.82);
+      await waitForFrames(page, 30);
+      const driven = await readGameState(page);
+      assert(driven.controls.moveX > 0.45 && driven.controls.moveY > 0.45,
+        `${target.name}: touch did not move toward screen upper-right.`);
+      await page.screenshot({ path: `${outputDirectory}/${target.name}-driving.png` });
+      await touch.releaseStick();
+      const cancelled = await readGameState(page);
+      assert(cancelled.controls.moveX === 0 && cancelled.controls.moveY === 0,
+        `${target.name}: touch release did not center movement.`);
     } else {
       await page.keyboard.down('KeyW');
       await page.keyboard.down('KeyA');
@@ -410,11 +1371,8 @@ async function verifyViewport(browser, target, errors) {
       await waitForFrames(page, 18);
       await page.keyboard.up('KeyA');
       const afterTurn = await readGameState(page);
-      const cameraOffset = (state) => state.camera.position.map(
-        (value, index) => value - state.camera.lookTarget[index],
-      );
-      const beforeOffset = cameraOffset(beforeTurn);
-      const afterOffset = cameraOffset(afterTurn);
+      const beforeOffset = getCameraOffset(beforeTurn);
+      const afterOffset = getCameraOffset(afterTurn);
       assert(Math.max(...beforeOffset.map((value, index) => Math.abs(value - afterOffset[index]))) < 0.001,
         'Desktop camera world direction changed with vehicle yaw.');
     }
@@ -422,33 +1380,36 @@ async function verifyViewport(browser, target, errors) {
     if (target.name === 'tablet-landscape') {
       await page.evaluate(() => window.reset_voxel_game_vehicle?.());
       await waitForFrames(page, 2);
-      const targeted = await driveRightRouteToFire(page);
+      const targeted = await driveMissionToFire(page, touch);
       assert(targeted.mission.targeted, `Tablet fire is not targeted: ${JSON.stringify(targeted.mission)}`);
-      await page.keyboard.down('Space');
-      await waitForFrames(page, 2);
+      await touch.pressSpray();
+      await waitForFrames(page, 4);
       await page.evaluate(() => window.advanceTime?.(1_000));
-      await waitForFrames(page, 2);
+      await page.waitForTimeout(180);
       const water = await readGameState(page);
-      assert(water.visuals.waterCubeCount === 18 && water.visuals.fireLayerCount === 2,
+      assert(water.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'stream').length >= 4
+        && water.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length >= 1
+        && water.visuals.fireLayerCount === 2,
         `Tablet water/fire visuals are wrong: ${JSON.stringify(water.visuals)}`);
       await page.screenshot({ path: `${outputDirectory}/tablet-landscape-water-fire.png` });
-      await page.keyboard.up('Space');
+      await touch.releaseSpray();
     }
 
     const resourceUrls = await page.evaluate(() => performance.getEntriesByType('resource').map((entry) => entry.name));
     return { initial: initial.runtime, layout, performance, policy, rendererInfo, resourceCount: resourceUrls.length };
   } finally {
+    await touch?.releaseSpray().catch(() => undefined);
+    await touch?.releaseStick().catch(() => undefined);
+    await touch?.close().catch(() => undefined);
     await context.close();
   }
 }
 
-/** 子E2E成果物を最終8画像名へ固定する。 */
+/** 時系列成果物を従来の代表8画像名へ対応付け、全必須画像の存在を確認する。 */
 function assembleRepresentativeScreenshots() {
   const copies = [
-    ['fire-medium-water.png', 'desktop-water-fire.png'],
-    ['block-broken.png', 'desktop-block-broken.png'],
-    ['mission-complete.png', 'desktop-complete.png'],
-    ['fire-medium-water-mobile.png', 'mobile-landscape-water-fire.png'],
+    ['desktop-water-splash.png', 'desktop-water-fire.png'],
+    ['desktop-break-red-arc-250ms.png', 'desktop-block-broken.png'],
   ];
   for (const [source, target] of copies) {
     assert(fs.existsSync(`${outputDirectory}/${source}`), `Missing source screenshot: ${source}`);
@@ -457,28 +1418,97 @@ function assembleRepresentativeScreenshots() {
   for (const screenshot of expectedScreenshots) {
     assert(fs.existsSync(`${outputDirectory}/${screenshot}`), `Missing representative screenshot: ${screenshot}`);
   }
+  for (const screenshot of timelineScreenshots) {
+    assert(fs.existsSync(`${outputDirectory}/${screenshot}`), `Missing timeline screenshot: ${screenshot}`);
+  }
+  for (const screenshot of collisionScreenshots) {
+    assert(fs.existsSync(`${outputDirectory}/${screenshot}`), `Missing collision screenshot: ${screenshot}`);
+  }
 }
 
-/** 全既存chain、3 viewport、性能policy、8画像を1回のrelease runとして検証する。 */
+/** 新操作・完全mission・時系列VFX・3 viewportを1回のrelease runとして検証する。 */
 async function verifyVoxelGame() {
   verifyPerformancePolicySelfCheck();
   await waitForServer();
-  const regressions = [];
-  for (const scriptPath of [
-    'scripts/verify-voxel-game-task5.mjs',
-    'scripts/verify-voxel-game-task6.mjs',
-    'scripts/verify-voxel-game-task7.mjs',
-  ]) {
-    regressions.push(await runRegressionScript(scriptPath));
+  if (focusMode === 'nonbreak') {
+    const browser = await chromium.launch({ headless: true });
+    const errors = [];
+    const viewports = {};
+    try {
+      const directMovement = await verifyDirectMovement(browser, errors);
+      const missions = {
+        desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
+        touch: await verifyCompleteMission(browser, errors, 'touch-mission', true),
+      };
+      const waterTimeline = await verifyWaterTimeline(browser, errors);
+      for (const target of targets) viewports[target.name] = await verifyViewport(browser, target, errors);
+      assert.equal(errors.length, 0, `Focused non-break browser/request errors: ${errors.join(' | ')}`);
+      fs.copyFileSync(`${outputDirectory}/desktop-water-splash.png`, `${outputDirectory}/desktop-water-fire.png`);
+      writeJsonArtifact('focused-nonbreak.json', { directMovement, errors, missions, viewports, waterTimeline });
+      console.log(JSON.stringify({ directMovement, missions, viewports, waterTimeline }));
+      return;
+    } finally {
+      await browser.close();
+    }
   }
-  const task5 = JSON.parse(fs.readFileSync(`${outputDirectory}/task5-results.json`, 'utf8'));
-  const task6 = JSON.parse(fs.readFileSync(`${outputDirectory}/task6-results.json`, 'utf8'));
+  if (focusMode === 'collision') {
+    const browser = await chromium.launch({ headless: true });
+    const errors = [];
+    try {
+      const collisions = await verifyWorldCollisions(browser, errors);
+      writeJsonArtifact('focused-collision.json', { collisions, errors });
+      assert.equal(errors.length, 0, `Focused collision browser/request errors: ${errors.join(' | ')}`);
+      console.log(JSON.stringify({ collisions }));
+      return;
+    } finally {
+      await browser.close();
+    }
+  }
+  const focusedBreak = focusMode?.match(/^break-(red|yellow|blue|green)$/)?.[1];
+  if (focusedBreak) {
+    const blockId = `plaza-${focusedBreak}`;
+    const browser = await chromium.launch({ headless: true });
+    const errors = [];
+    const contractFailures = [];
+    try {
+      const result = await verifyBreakTimeline(browser, errors, contractFailures, blockId, focusedBreak);
+      writeJsonArtifact(`focused-break-${focusedBreak}.json`, { contractFailures, errors, result });
+      assert.equal(errors.length, 0, `Focused browser/request errors: ${errors.join(' | ')}`);
+      assert.equal(contractFailures.length, 0, `Focused break contract failures: ${contractFailures.join(' | ')}`);
+      console.log(JSON.stringify({ blockId, contractFailures, result }));
+      return;
+    } finally {
+      await browser.close();
+    }
+  }
+  const regressions = [await runRegressionScript('scripts/verify-voxel-game-task7.mjs')];
   const task7 = JSON.parse(fs.readFileSync(`${outputDirectory}/task7/results.json`, 'utf8'));
 
   const browser = await chromium.launch({ headless: true });
   const errors = [];
+  const contractFailures = [];
   const viewports = {};
+  const breakTimelines = {};
+  let collisions;
+  let directMovement;
+  let missions;
+  let waterTimeline;
   try {
+    directMovement = await verifyDirectMovement(browser, errors);
+    missions = {
+      desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
+      touch: await verifyCompleteMission(browser, errors, 'touch-mission', true),
+    };
+    waterTimeline = await verifyWaterTimeline(browser, errors);
+    collisions = await verifyWorldCollisions(browser, errors);
+    for (const [blockId, colorName] of [
+      ['plaza-red', 'red'],
+      ['plaza-yellow', 'yellow'],
+      ['plaza-blue', 'blue'],
+      ['plaza-green', 'green'],
+    ]) {
+      breakTimelines[blockId] = await verifyBreakTimeline(browser, errors, contractFailures, blockId, colorName);
+    }
     for (const target of targets) {
       viewports[target.name] = await verifyViewport(browser, target, errors);
     }
@@ -487,6 +1517,11 @@ async function verifyVoxelGame() {
   }
   assert.equal(errors.length, 0, `Voxel Game browser/request errors: ${errors.join(' | ')}`);
   assembleRepresentativeScreenshots();
+  const errorCounts = {
+    console: errors.filter((error) => error.includes(': console:')).length,
+    page: errors.filter((error) => error.includes(': pageerror:')).length,
+    request: errors.filter((error) => error.includes(': requestfailed:')).length,
+  };
 
   const environmentConcerns = Object.entries(viewports)
     .filter(([, result]) => !result.policy.certified)
@@ -494,24 +1529,32 @@ async function verifyVoxelGame() {
       `${name}: ${result.policy.rendererClass} renderer; thresholdMet=${result.policy.thresholdMet}; physical-GPU revalidation required`
     ));
   const report = {
-    artifacts: expectedScreenshots,
+    artifacts: [...expectedScreenshots, ...timelineScreenshots, ...collisionScreenshots],
+    breakTimelines,
+    collisions,
+    contractFailures,
+    directMovement,
     environmentConcerns,
+    errorCounts,
+    missions,
     performancePolicy: {
       certification: 'certified only when rendererClass is physical and measured fps meets the viewport target',
       rendererClasses: ['software', 'physical', 'unknown'],
       targets: Object.fromEntries(targets.map(({ minimumFps, name }) => [name, minimumFps])),
     },
     regressions,
-    task5,
-    task6,
     task7,
     viewports,
+    waterTimeline,
   };
   fs.writeFileSync(`${outputDirectory}/results.json`, `${JSON.stringify(report, null, 2)}\n`);
   if (environmentConcerns.length > 0) {
     console.warn(`Voxel Game physical-GPU revalidation required: ${environmentConcerns.join(' | ')}`);
   }
-  console.log(JSON.stringify({ artifacts: expectedScreenshots, environmentConcerns, viewports }));
+  if (contractFailures.length > 0) {
+    throw new Error(`Voxel Game release contract failures: ${contractFailures.join(' | ')}`);
+  }
+  console.log(JSON.stringify({ artifacts: report.artifacts, environmentConcerns, errorCounts, viewports }));
 }
 
 /** 意図的失敗でstale artifact消去とfailed manifest更新を自己検証する。 */
@@ -545,5 +1588,8 @@ if (process.argv.includes('--self-check')) {
   await verifyManifestFailureSelfCheck();
   console.log('Voxel Game failed-manifest self-check passed.');
 } else {
-  await runWithManifest(outputDirectory, verifyVoxelGame);
+  await runWithManifest(outputDirectory, verifyVoxelGame, {
+    full: focusMode === null,
+    mode: focusMode ?? 'full',
+  });
 }
