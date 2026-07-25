@@ -1,9 +1,12 @@
+import { Children, isValidElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { VoxelGameRuntime } from '../voxel-game/domain/VoxelGameRuntime';
 import {
   CELEBRATION_STAR_CENTERS,
   FIRE_HAZARD_BOX,
   FIRE_LAYER_POSITIONS,
+  FireHazardCollider,
   ROUTE_BOXES,
   advanceWaterVfxClock,
   getFireLayerCount,
@@ -13,6 +16,49 @@ import {
   resolveWaterAndFireFrame,
   syncColliderEnabled,
 } from '../voxel-game/scene/WaterAndFire';
+
+const fireHazardLifecycle = vi.hoisted(() => ({
+  layoutEffects: [] as (() => void)[],
+}));
+
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react')>();
+  return {
+    ...actual,
+    useLayoutEffect: (effect: () => void): void => {
+      fireHazardLifecycle.layoutEffects.push(effect);
+    },
+    useRef: <Value,>(initialValue: Value): { current: Value } => ({ current: initialValue }),
+  };
+});
+
+interface FireHazardColliderElementProps {
+  readonly ref?: ((collider: TestCollider | null) => void) | { current: TestCollider | null };
+}
+
+interface TestCollider {
+  isEnabled(): boolean;
+  setEnabled(enabled: boolean): void;
+}
+
+/** 親layout effect後に実体がattachされるRapier ref順序をcomponent出力上で再現する。 */
+function attachFireHazardCollider(enabled: boolean, collider: TestCollider): void {
+  fireHazardLifecycle.layoutEffects.length = 0;
+  const rigidBody = FireHazardCollider({ enabled }) as ReactElement<{ readonly children?: ReactNode }>;
+  const child = Children.only(rigidBody.props.children);
+  expect(isValidElement<FireHazardColliderElementProps>(child)).toBe(true);
+  const colliderElement = child as ReactElement<FireHazardColliderElementProps>;
+
+  for (const effect of fireHazardLifecycle.layoutEffects.splice(0)) effect();
+
+  const ref = colliderElement.props.ref;
+  expect(ref).toBeDefined();
+  if (typeof ref === 'function') {
+    ref(collider);
+  } else if (ref) {
+    ref.current = collider;
+  }
+}
 
 describe('WaterAndFire', () => {
   it('12個の道しるべを高さ0.14以下の非障害タイルとして定義する', () => {
@@ -46,6 +92,27 @@ describe('WaterAndFire', () => {
     setEnabled.mockClear();
     syncColliderEnabled({ isEnabled: () => true, setEnabled }, true);
     expect(setEnabled).not.toHaveBeenCalled();
+  });
+
+  it('遅延ref attachで初期falseを反映し、その後もfalse→true→falseを同期する', () => {
+    const enabledHistory: boolean[] = [];
+    let colliderEnabled = true;
+    const collider = {
+      isEnabled: () => colliderEnabled,
+      setEnabled: (enabled: boolean) => {
+        colliderEnabled = enabled;
+        enabledHistory.push(enabled);
+      },
+    };
+
+    attachFireHazardCollider(false, collider);
+    expect(enabledHistory).toEqual([false]);
+    expect(colliderEnabled).toBe(false);
+
+    attachFireHazardCollider(true, collider);
+    attachFireHazardCollider(false, collider);
+    expect(enabledHistory).toEqual([false, true, false]);
+    expect(colliderEnabled).toBe(false);
   });
 
   it('炎hazardを表示下2層より大きくしない', () => {

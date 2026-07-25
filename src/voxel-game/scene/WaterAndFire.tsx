@@ -37,6 +37,7 @@ interface WaterAndFireProps {
   readonly telemetryRef: VehicleTelemetryRef;
 }
 
+/** 低頻度な火勢状態を常設Rapier colliderへ渡すcomponent入力。 */
 interface FireHazardColliderProps {
   readonly enabled: boolean;
 }
@@ -58,6 +59,7 @@ export interface MissionTelemetry {
 
 export type MissionTelemetryRef = React.MutableRefObject<MissionTelemetry>;
 
+/** runtime購読からReactへ反映する低頻度な表示・hazard状態。 */
 interface MissionVisualState {
   readonly celebrating: boolean;
   readonly fireHazardEnabled: boolean;
@@ -142,6 +144,7 @@ export function isFireHazardEnabled(fireIntensity: number): boolean {
   return Number.isFinite(fireIntensity) && fireIntensity > 0;
 }
 
+/** enabled差分同期に必要な実Rapier collider境界の最小契約。 */
 interface ColliderEnabledPort {
   isEnabled(): boolean;
   setEnabled(enabled: boolean): void;
@@ -157,19 +160,14 @@ export function syncColliderEnabled(
 
 /** 1個のfixed colliderを再利用し、低頻度な火勢変化だけをRapierへ同期する。 */
 export function FireHazardCollider({ enabled }: FireHazardColliderProps): ReactElement {
-  const colliderRef = useRef<RapierCollider>(null);
-
-  useLayoutEffect(() => {
-    const collider = colliderRef.current;
-    if (collider) syncColliderEnabled(collider, enabled);
-  }, [enabled]);
-
   return (
     <RigidBody colliders={false} type="fixed">
       <CuboidCollider
         args={scaleToHalfExtents(FIRE_HAZARD_BOX.scale)}
         position={FIRE_HAZARD_BOX.position}
-        ref={colliderRef}
+        ref={(collider: RapierCollider | null) => {
+          if (collider) syncColliderEnabled(collider, enabled);
+        }}
       />
     </RigidBody>
   );
