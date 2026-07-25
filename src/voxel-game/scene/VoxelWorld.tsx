@@ -5,13 +5,18 @@ import * as THREE from 'three';
 import { BLOCK_PLAZA, PARK_CENTER } from './worldLayout';
 import {
   FIRE_BUILDING_BODY,
+  GARAGE_WALLS,
+  PLAYGROUND_PLANK,
+  PLAYGROUND_SUPPORT,
   TREE_TRUNKS,
   WORLD_SOLID_BOXES,
   scaleToHalfExtents,
 } from './worldCollisionLayout';
 
+/** InstancedMeshへ渡す共有直方体の変換情報。 */
 interface BoxInstance {
   readonly position: readonly [number, number, number];
+  readonly rotation?: readonly [number, number, number];
   readonly scale: readonly [number, number, number];
 }
 
@@ -53,9 +58,13 @@ function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
     const position = new THREE.Vector3();
     const scale = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
+    const euler = new THREE.Euler();
     boxes.forEach((box, index) => {
       position.fromArray(box.position);
       scale.fromArray(box.scale);
+      const [rotationX, rotationY, rotationZ] = box.rotation ?? [0, 0, 0];
+      euler.set(rotationX, rotationY, rotationZ, 'XYZ');
+      quaternion.setFromEuler(euler);
       matrix.compose(position, quaternion, scale);
       mesh.setMatrixAt(index, matrix);
     });
@@ -85,12 +94,12 @@ function VoxelPark(): ReactElement {
       </mesh>
       <InstancedBoxes boxes={TREE_TRUNKS} color="#86552f" />
       <InstancedBoxes boxes={TREE_CROWNS} color="#3f7f3a" />
-      <mesh position={[2.9, 0.75, 2.4]} rotation={[0, 0, -0.2]}>
-        <boxGeometry args={[3.4, 0.28, 0.7]} />
+      <mesh position={PLAYGROUND_PLANK.position} rotation={PLAYGROUND_PLANK.rotation}>
+        <boxGeometry args={PLAYGROUND_PLANK.scale} />
         <meshLambertMaterial color="#e24b3f" />
       </mesh>
-      <mesh position={[2.9, 0.45, 2.4]}>
-        <boxGeometry args={[0.36, 0.8, 0.36]} />
+      <mesh position={PLAYGROUND_SUPPORT.position}>
+        <boxGeometry args={PLAYGROUND_SUPPORT.scale} />
         <meshLambertMaterial color="#f2c94c" />
       </mesh>
     </group>
@@ -101,24 +110,13 @@ function VoxelPark(): ReactElement {
 function VoxelGarage(): ReactElement {
   return (
     <group>
-      <mesh position={[0, 1.8, 12.5]}>
-        <boxGeometry args={[8, 3.4, 1]} />
-        <meshLambertMaterial color="#f1efe6" />
-      </mesh>
-      <mesh position={[-3.5, 1.8, 14.8]}>
-        <boxGeometry args={[1, 3.4, 5]} />
-        <meshLambertMaterial color="#f1efe6" />
-      </mesh>
-      <mesh position={[3.5, 1.8, 14.8]}>
-        <boxGeometry args={[1, 3.4, 5]} />
-        <meshLambertMaterial color="#f1efe6" />
-      </mesh>
-      <mesh position={[0, 3.65, 12.7]}>
-        <boxGeometry args={[8, 0.5, 1.4]} />
+      <InstancedBoxes boxes={GARAGE_WALLS} color="#f1efe6" />
+      <mesh position={[0, 3.65, 11.8]}>
+        <boxGeometry args={[8.8, 0.5, 1.2]} />
         <meshLambertMaterial color="#c83e34" />
       </mesh>
-      <mesh position={[0, 3, 16.8]}>
-        <boxGeometry args={[7, 0.45, 0.35]} />
+      <mesh position={[0, 3.35, 14.35]}>
+        <boxGeometry args={[8.8, 0.45, 0.35]} />
         <meshLambertMaterial color="#c83e34" />
       </mesh>
     </group>
@@ -149,12 +147,17 @@ function VoxelFireBuilding(): ReactElement {
   );
 }
 
-/** 共有visual定義から木の幹3本と火災建物本体の固定衝突を構成する。 */
+/** 共有visual定義から9個の静的solidを単一fixed bodyに構成する。 */
 export function WorldSolidColliders(): ReactElement {
   return (
     <RigidBody colliders={false} type="fixed">
-      {WORLD_SOLID_BOXES.map(({ id, position, scale }) => (
-        <CuboidCollider args={scaleToHalfExtents(scale)} key={id} position={position} />
+      {WORLD_SOLID_BOXES.map(({ id, position, rotation, scale }) => (
+        <CuboidCollider
+          args={scaleToHalfExtents(scale)}
+          key={id}
+          position={position}
+          rotation={rotation}
+        />
       ))}
     </RigidBody>
   );

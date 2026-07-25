@@ -24,6 +24,7 @@ interface InspectedElementProps {
   readonly children?: ReactNode;
   readonly colliders?: boolean;
   readonly position?: readonly [number, number, number];
+  readonly rotation?: readonly [number, number, number];
   readonly type?: string;
 }
 
@@ -173,9 +174,11 @@ describe('worldCollisionLayout', () => {
     expect(colliders.map(({ props }) => ({
       args: props.args,
       position: props.position,
-    }))).toEqual(WORLD_SOLID_BOXES.map(({ position, scale }) => ({
+      rotation: props.rotation,
+    }))).toEqual(WORLD_SOLID_BOXES.map(({ position, rotation, scale }) => ({
       args: scaleToHalfExtents(scale),
       position,
+      rotation,
     })));
   });
 
@@ -185,12 +188,14 @@ describe('worldCollisionLayout', () => {
     expect(rapierRenderRecords.rigidBodies).toHaveLength(1);
     expect(rapierRenderRecords.rigidBodies[0]).toMatchObject({ colliders: false, type: 'fixed' });
     expect(rapierRenderRecords.cuboidColliders).toHaveLength(9);
-    expect(rapierRenderRecords.cuboidColliders.map(({ args, position }) => ({
+    expect(rapierRenderRecords.cuboidColliders.map(({ args, position, rotation }) => ({
       args,
       position,
-    }))).toEqual(WORLD_SOLID_BOXES.map(({ position, scale }) => ({
+      rotation,
+    }))).toEqual(WORLD_SOLID_BOXES.map(({ position, rotation, scale }) => ({
       args: scaleToHalfExtents(scale),
       position,
+      rotation,
     })));
   });
 });
