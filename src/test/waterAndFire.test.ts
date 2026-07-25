@@ -1,16 +1,60 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { VoxelGameRuntime } from '../voxel-game/domain/VoxelGameRuntime';
 import {
   CELEBRATION_STAR_CENTERS,
+  FIRE_HAZARD_BOX,
   FIRE_LAYER_POSITIONS,
+  ROUTE_BOXES,
   advanceWaterVfxClock,
   getFireLayerCount,
   getWaterVisibleDistance,
+  isFireHazardEnabled,
   isWaterVfxResetEvent,
   resolveWaterAndFireFrame,
+  syncColliderEnabled,
 } from '../voxel-game/scene/WaterAndFire';
 
 describe('WaterAndFire', () => {
+  it('12個の道しるべを高さ0.14以下の非障害タイルとして定義する', () => {
+    expect(ROUTE_BOXES).toHaveLength(12);
+    expect(ROUTE_BOXES.every(({ position, scale }) => (
+      position[1] <= 0.28
+      && scale[0] === 0.62
+      && scale[1] >= 0.1
+      && scale[1] <= 0.14
+      && scale[2] === 0.62
+    ))).toBe(true);
+  });
+
+  it.each([
+    [1, true],
+    [0.01, true],
+    [0, false],
+    [Number.NaN, false],
+  ])('fireIntensity %sからhazard enabled=%sを決める', (intensity, expected) => {
+    expect(isFireHazardEnabled(intensity)).toBe(expected);
+  });
+
+  it('Rapier colliderのenabled差分だけを同期する', () => {
+    const setEnabled = vi.fn();
+    const collider = { isEnabled: () => false, setEnabled };
+
+    syncColliderEnabled(collider, true);
+    expect(setEnabled).toHaveBeenCalledOnce();
+    expect(setEnabled).toHaveBeenCalledWith(true);
+
+    setEnabled.mockClear();
+    syncColliderEnabled({ isEnabled: () => true, setEnabled }, true);
+    expect(setEnabled).not.toHaveBeenCalled();
+  });
+
+  it('炎hazardを表示下2層より大きくしない', () => {
+    expect(FIRE_HAZARD_BOX).toEqual({
+      position: [12.9, 0.9, -9.1],
+      scale: [1.2, 1.8, 1.2],
+    });
+  });
+
   it('火cubeを建物のcamera側外壁面へ置き、3層すべてを遮蔽させない', () => {
     expect(FIRE_LAYER_POSITIONS).toHaveLength(3);
     expect(FIRE_LAYER_POSITIONS.every(([x]) => x >= 12.75)).toBe(true);

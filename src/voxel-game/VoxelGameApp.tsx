@@ -22,9 +22,12 @@ import type {
 } from './scene/VehicleController';
 import {
   CELEBRATION_STAR_GROUPS,
+  FIRE_HAZARD_BOX,
   FIRE_LAYER_BOXES,
+  ROUTE_BOXES,
   getFireLayerCount,
   getWaterVisibleDistance,
+  isFireHazardEnabled,
   type MissionTelemetry,
 } from './scene/WaterAndFire';
 import { createWaterFlowFrame } from './scene/waterFlow';
@@ -204,13 +207,16 @@ export function VoxelGameApp(): ReactElement {
           position: [...vehicle.position],
         },
         visualLayout: {
+          fireHazard: FIRE_HAZARD_BOX,
           fireLayers: FIRE_LAYER_BOXES,
+          routeMarkers: ROUTE_BOXES,
           starGroups: CELEBRATION_STAR_GROUPS,
           vehicleBounds: VEHICLE_VISUAL_BOUNDS,
         },
         visuals: {
+          fireHazardEnabled: isFireHazardEnabled(runtime.fireIntensity),
           fireLayerCount: getFireLayerCount(runtime.fireIntensity),
-          routeCubeCount: runtime.routeVisible ? 12 : 0,
+          routeCubeCount: runtime.routeVisible ? ROUTE_BOXES.length : 0,
           starCubeCount: runtime.missionPhase === 'celebrating' ? 30 : 0,
           waterCubeCount: waterFrame.instances.filter(({ active }) => active).length,
           waterInstances: waterFrame.instances.map(({ active, kind, position, scale, slot }) => ({

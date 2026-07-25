@@ -1,6 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
+import {
+  CuboidCollider,
+  RigidBody,
+  type RapierCollider,
+} from '@react-three/rapier';
 import * as THREE from 'three';
 import type { VoxelGameRuntime, VoxelGameSnapshot } from '../domain/VoxelGameRuntime';
 import { resolveSprayTarget } from '../domain/sprayTargeting';
@@ -11,6 +16,7 @@ import {
   WATER_INSTANCE_COUNT,
   type WaterInstanceTransform,
 } from './waterFlow';
+import { scaleToHalfExtents } from './worldCollisionLayout';
 import { FIRE_POSITION } from './worldLayout';
 
 export interface VoxelBox {
@@ -29,6 +35,10 @@ interface WaterAndFireProps {
   readonly missionTelemetryRef: MissionTelemetryRef;
   readonly runtime: VoxelGameRuntime;
   readonly telemetryRef: VehicleTelemetryRef;
+}
+
+interface FireHazardColliderProps {
+  readonly enabled: boolean;
 }
 
 /**
@@ -50,6 +60,7 @@ export type MissionTelemetryRef = React.MutableRefObject<MissionTelemetry>;
 
 interface MissionVisualState {
   readonly celebrating: boolean;
+  readonly fireHazardEnabled: boolean;
   readonly fireLayerCount: number;
   readonly routeVisible: boolean;
 }
@@ -78,15 +89,20 @@ const WATER_BLUE_INSTANCE_COUNT = 22;
 const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
 
 const ROUTE_POSITIONS: readonly (readonly [number, number, number])[] = [
-  [3, 0.52, 15], [6, 0.52, 15], [9, 0.52, 15], [12, 0.52, 15],
-  [15, 0.52, 13], [15, 0.52, 10], [15, 0.52, 7], [15, 0.52, 4],
-  [15, 0.52, 1], [15, 0.52, -2], [15, 0.52, -6], [14, 0.52, -10],
+  [0, 0.26, 16.2], [3, 0.26, 16.2], [6, 0.26, 15], [9, 0.26, 15],
+  [12, 0.26, 15], [15, 0.26, 13], [15, 0.26, 10], [15, 0.26, 7],
+  [15, 0.26, 4], [15, 0.26, 1], [15, 0.26, -3], [14, 0.26, -8],
 ] as const;
 
-const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map((position) => ({
-  position,
-  scale: [0.62, 0.62, 0.62],
+export const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map(([x, , z]) => ({
+  position: [x, 0.26, z],
+  scale: [0.62, 0.12, 0.62],
 }));
+
+export const FIRE_HAZARD_BOX: VoxelBox = {
+  position: [12.9, 0.9, -9.1],
+  scale: [1.2, 1.8, 1.2],
+};
 
 export const FIRE_LAYER_POSITIONS: readonly (readonly [number, number, number])[] = [
   [12.9, 0.75, -9.1],
@@ -120,6 +136,44 @@ export const CELEBRATION_STAR_GROUPS: readonly (readonly VoxelBox[])[] = CELEBRA
   .map((center) => createStarBoxes([center]));
 const YELLOW_STAR_BOXES = CELEBRATION_STAR_GROUPS.filter((_, index) => index % 2 === 0).flat();
 const WHITE_STAR_BOXES = CELEBRATION_STAR_GROUPS.filter((_, index) => index % 2 === 1).flat();
+
+/** 有限な正の火勢だけを進入防止対象とする。 */
+export function isFireHazardEnabled(fireIntensity: number): boolean {
+  return Number.isFinite(fireIntensity) && fireIntensity > 0;
+}
+
+interface ColliderEnabledPort {
+  isEnabled(): boolean;
+  setEnabled(enabled: boolean): void;
+}
+
+/** 実Rapier colliderへenabled差分だけを反映する。 */
+export function syncColliderEnabled(
+  collider: ColliderEnabledPort,
+  enabled: boolean,
+): void {
+  if (collider.isEnabled() !== enabled) collider.setEnabled(enabled);
+}
+
+/** 1個のfixed colliderを再利用し、低頻度な火勢変化だけをRapierへ同期する。 */
+export function FireHazardCollider({ enabled }: FireHazardColliderProps): ReactElement {
+  const colliderRef = useRef<RapierCollider>(null);
+
+  useLayoutEffect(() => {
+    const collider = colliderRef.current;
+    if (collider) syncColliderEnabled(collider, enabled);
+  }, [enabled]);
+
+  return (
+    <RigidBody colliders={false} type="fixed">
+      <CuboidCollider
+        args={scaleToHalfExtents(FIRE_HAZARD_BOX.scale)}
+        position={FIRE_HAZARD_BOX.position}
+        ref={colliderRef}
+      />
+    </RigidBody>
+  );
+}
 
 /** 同色の静的cubeを1つのInstancedMeshへまとめる。 */
 function StaticVoxelBatch({ boxes, color, emissive }: StaticVoxelBatchProps): ReactElement {
@@ -213,10 +267,11 @@ export function advanceWaterVfxClock(input: WaterVfxClockInput): WaterVfxClock {
   };
 }
 
-/** runtime snapshotからReactで切り替える3種類の低頻度表示状態だけを取り出す。 */
+/** runtime snapshotからReactで切り替える低頻度な表示・衝突状態だけを取り出す。 */
 function selectMissionVisualState(snapshot: VoxelGameSnapshot): MissionVisualState {
   return {
     celebrating: snapshot.missionPhase === 'celebrating',
+    fireHazardEnabled: isFireHazardEnabled(snapshot.fireIntensity),
     fireLayerCount: getFireLayerCount(snapshot.fireIntensity),
     routeVisible: snapshot.routeVisible,
   };
@@ -272,6 +327,7 @@ export function WaterAndFire({
     const next = selectMissionVisualState(snapshot);
     setVisualState((current) => (
       current.celebrating === next.celebrating
+      && current.fireHazardEnabled === next.fireHazardEnabled
       && current.fireLayerCount === next.fireLayerCount
       && current.routeVisible === next.routeVisible
         ? current
@@ -323,6 +379,7 @@ export function WaterAndFire({
 
   return (
     <group>
+      <FireHazardCollider enabled={visualState.fireHazardEnabled} />
       {visualState.fireLayerCount >= 1 ? (
         <mesh position={FIRE_LAYER_BOXES[0].position}>
           <boxGeometry args={FIRE_LAYER_BOXES[0].scale} />

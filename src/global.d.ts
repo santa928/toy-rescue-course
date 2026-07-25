@@ -30,7 +30,9 @@ declare global {
     readonly runtime: import('./voxel-game/domain/VoxelGameRuntime').VoxelGameSnapshot;
     readonly vehicle: import('./voxel-game/scene/VehicleController').VehicleTelemetry;
     readonly visualLayout: {
+      readonly fireHazard: import('./voxel-game/scene/WaterAndFire').VoxelBox;
       readonly fireLayers: readonly unknown[];
+      readonly routeMarkers: readonly import('./voxel-game/scene/WaterAndFire').VoxelBox[];
       readonly starGroups: readonly unknown[];
       readonly vehicleBounds: {
         readonly offset: readonly [number, number, number];
@@ -38,6 +40,7 @@ declare global {
       };
     };
     readonly visuals: {
+      readonly fireHazardEnabled: boolean;
       readonly fireLayerCount: number;
       readonly fragmentCollisionEnabledCount: number;
       readonly fragmentPoolSlotCount: number;
