@@ -6,10 +6,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VoxelWorld, WorldSolidColliders } from '../voxel-game/scene/VoxelWorld';
 import {
   FIRE_BUILDING_BODY,
+  GARAGE_WALLS,
+  PLAYGROUND_PLANK,
+  PLAYGROUND_SOLIDS,
+  PLAYGROUND_SUPPORT,
   TREE_TRUNKS,
+  VEHICLE_COLLIDER_HALF_EXTENTS,
   WORLD_SOLID_BOXES,
+  getAxisAlignedSeparation,
+  isValidBoxDefinition,
   scaleToHalfExtents,
 } from '../voxel-game/scene/worldCollisionLayout';
+import { GARAGE_POSITION } from '../voxel-game/scene/worldLayout';
 
 interface InspectedElementProps {
   readonly args?: readonly [number, number, number];
@@ -64,15 +72,58 @@ describe('worldCollisionLayout', () => {
     rapierRenderRecords.rigidBodies.length = 0;
   });
 
-  it('木の幹3本と火災建物本体だけをsolidとして公開する', () => {
+  it('木・建物・車庫3壁・遊具2部品を9個のstatic solidとして公開する', () => {
     expect(WORLD_SOLID_BOXES.map(({ id }) => id)).toEqual([
       'tree-trunk-1',
       'tree-trunk-2',
       'tree-trunk-3',
       'fire-building-body',
+      'garage-back-wall',
+      'garage-left-wall',
+      'garage-right-wall',
+      'playground-plank',
+      'playground-support',
     ]);
-    expect(WORLD_SOLID_BOXES.slice(0, 3)).toEqual(TREE_TRUNKS);
-    expect(WORLD_SOLID_BOXES[3]).toBe(FIRE_BUILDING_BODY);
+    expect(WORLD_SOLID_BOXES).toEqual([
+      ...TREE_TRUNKS,
+      FIRE_BUILDING_BODY,
+      ...GARAGE_WALLS,
+      ...PLAYGROUND_SOLIDS,
+    ]);
+    expect(PLAYGROUND_SOLIDS).toEqual([PLAYGROUND_PLANK, PLAYGROUND_SUPPORT]);
+  });
+
+  it('車庫初期位置と3壁が重ならず、正面へ出た位置で左右壁を抜ける', () => {
+    expect(VEHICLE_COLLIDER_HALF_EXTENTS).toEqual([1.45, 0.95, 1.7]);
+    const initialSeparations = GARAGE_WALLS.map((wall) => (
+      getAxisAlignedSeparation(wall, GARAGE_POSITION, VEHICLE_COLLIDER_HALF_EXTENTS)
+    ));
+    expect(initialSeparations.every(([x, , z]) => x >= 0 || z >= 0)).toBe(true);
+
+    const exitCenter = [0, GARAGE_POSITION[1], 16.3] as const;
+    for (const sideWall of GARAGE_WALLS.slice(1)) {
+      const [, , z] = getAxisAlignedSeparation(
+        sideWall,
+        exitCenter,
+        VEHICLE_COLLIDER_HALF_EXTENTS,
+      );
+      expect(z).toBeGreaterThan(0);
+    }
+  });
+
+  it('全static定義を有限な座標・正scale・有限rotationへ制限する', () => {
+    expect(WORLD_SOLID_BOXES.every(isValidBoxDefinition)).toBe(true);
+    expect(isValidBoxDefinition({
+      id: 'invalid-scale',
+      position: [0, 0, 0],
+      scale: [1, 0, 1],
+    })).toBe(false);
+    expect(isValidBoxDefinition({
+      id: 'invalid-rotation',
+      position: [0, 0, 0],
+      rotation: [0, Number.NaN, 0],
+      scale: [1, 1, 1],
+    })).toBe(false);
   });
 
   it('既存visualと同じworld座標とfull scaleを維持する', () => {
@@ -111,13 +162,13 @@ describe('worldCollisionLayout', () => {
     )).toBe(false);
   });
 
-  it('単一fixed bodyに共有定義由来の4 colliderだけを構成する', () => {
+  it('単一fixed bodyに共有定義由来の9 colliderだけを構成する', () => {
     const rigidBody = inspectElement(WorldSolidColliders());
     const colliders = Children.toArray(rigidBody.props.children).map(inspectElement);
 
     expect(rigidBody.type).toBe(RigidBody);
     expect(rigidBody.props).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(colliders).toHaveLength(4);
+    expect(colliders).toHaveLength(9);
     expect(colliders.every((collider) => collider.type === CuboidCollider)).toBe(true);
     expect(colliders.map(({ props }) => ({
       args: props.args,
@@ -133,7 +184,7 @@ describe('worldCollisionLayout', () => {
 
     expect(rapierRenderRecords.rigidBodies).toHaveLength(1);
     expect(rapierRenderRecords.rigidBodies[0]).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(rapierRenderRecords.cuboidColliders).toHaveLength(4);
+    expect(rapierRenderRecords.cuboidColliders).toHaveLength(9);
     expect(rapierRenderRecords.cuboidColliders.map(({ args, position }) => ({
       args,
       position,

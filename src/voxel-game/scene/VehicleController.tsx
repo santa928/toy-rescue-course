@@ -5,6 +5,7 @@ import { CuboidCollider, RigidBody, type RapierRigidBody } from '@react-three/ra
 import * as THREE from 'three';
 import { VoxelFireTruck } from '../../vehicle-lab/scene/VoxelFireTruck';
 import type { DriveCommand } from '../input/controlState';
+import { VEHICLE_COLLIDER_HALF_EXTENTS } from './worldCollisionLayout';
 import { GARAGE_POSITION, WORLD_BOUNDS } from './worldLayout';
 import { resolveScreenRelativeMovement, shortestAngleDelta } from './screenRelativeMovement';
 
@@ -130,7 +131,11 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
         position={GARAGE_POSITION}
         ref={bodyRef}
       >
-        <CuboidCollider args={[1.45, 0.95, 1.7]} mass={1.4} position={[0, 0.95, 0]} />
+        <CuboidCollider
+          args={[...VEHICLE_COLLIDER_HALF_EXTENTS]}
+          mass={1.4}
+          position={[0, 0.95, 0]}
+        />
         <group rotation={[0, Math.PI, 0]}>
           <VoxelFireTruck />
         </group>
