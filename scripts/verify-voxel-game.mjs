@@ -9,6 +9,9 @@ import {
   readHudPixelProof,
   waitForHudCaptureReadiness,
 } from './voxel-game-screenshot-proof.mjs';
+import {
+  evaluateFirstObservedPositionContract,
+} from './voxel-game-break-physics-contract.mjs';
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
@@ -77,11 +80,7 @@ const FIRE_HAZARD_BOX = {
   scale: [1.2, 1.8, 1.2],
 };
 const VEHICLE_COLLIDER_HALF_EXTENTS = [1.45, 0.95, 1.7];
-// breakableVfx.tsの最大合成初速は5未満。観測遅延中の移動上限には保守的に5を用いる。
-const MAX_MAIN_FRAGMENT_LAUNCH_SPEED = 5;
-const BREAK_FRAGMENT_GRAVITY_MAGNITUDE = 18;
 const ACTIVATION_TRANSITION_DELAY_LIMIT_MS = 50;
-const FIRST_OBSERVED_POSITION_EPSILON = 0.03;
 
 /** WebGL renderer名を既知software、明示physical、unknownへ保守的に分類する。 */
 function classifyRenderer(rendererName) {
@@ -287,15 +286,6 @@ function maximumFragmentAabbOverflow(fragments, blockPosition) {
   return Math.max(...fragments.flatMap((fragment) => fragment.position.map((value, axis) => (
     Math.abs(value - blockPosition[axis]) + fragment.scale[axis] / 2 - 0.75
   ))));
-}
-
-/** 衝突観測から最初の6片観測までに物理的に移動し得る保守上限を返す。 */
-function firstObservedPositionAllowance(delayMilliseconds) {
-  assert(delayMilliseconds >= 0, `Activation transition delay is negative: ${delayMilliseconds}`);
-  const delaySeconds = delayMilliseconds / 1_000;
-  return MAX_MAIN_FRAGMENT_LAUNCH_SPEED * delaySeconds
-    + 0.5 * BREAK_FRAGMENT_GRAVITY_MAGNITUDE * delaySeconds ** 2
-    + FIRST_OBSERVED_POSITION_EPSILON;
 }
 
 /** first-activeから正常な6→0終了まで、全rAFで6片と同一ID集合が続くことを検証する。 */
@@ -1084,10 +1074,16 @@ function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId)
   assert(captureDelayFromImpactMs >= 0
     && captureDelayFromImpactMs <= ACTIVATION_TRANSITION_DELAY_LIMIT_MS,
     `${blockId}: first 6-fragment observation was ${captureDelayFromImpactMs}ms after impact; limit is ${ACTIVATION_TRANSITION_DELAY_LIMIT_MS}ms.`);
-  const allowedFirstObservedOverflow = firstObservedPositionAllowance(captureDelayFromImpactMs);
   const maximumFirstObservedOverflow = maximumFragmentAabbOverflow(firstActive.activeFragments, block.position);
-  assert(maximumFirstObservedOverflow <= allowedFirstObservedOverflow,
-    `${blockId}: first-observed fragments exceed the delay-based AABB allowance (${maximumFirstObservedOverflow} > ${allowedFirstObservedOverflow}).`);
+  const {
+    accepted: firstObservedPositionAccepted,
+    allowedOverflow: allowedFirstObservedOverflow,
+  } = evaluateFirstObservedPositionContract({
+    delayMilliseconds: captureDelayFromImpactMs,
+    maximumOverflow: maximumFirstObservedOverflow,
+  });
+  assert(firstObservedPositionAccepted,
+    `${blockId}: first-observed fragments exceed the scheduler-bounded AABB allowance (${maximumFirstObservedOverflow} > ${allowedFirstObservedOverflow}).`);
 
   const { activeSamples, ended, expectedIds } = readContinuousFragmentWindow(
     observer.samples,
