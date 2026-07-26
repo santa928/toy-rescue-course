@@ -43,13 +43,33 @@ const timelineScreenshots = [
 const collisionScreenshots = [
   'desktop-collision-tree-trunk-3.png',
   'desktop-collision-fire-building-body.png',
+  'desktop-collision-garage-back-wall.png',
+  'desktop-collision-garage-right-wall.png',
+  'desktop-collision-playground-plank.png',
+  'desktop-fire-hazard-before.png',
+  'desktop-fire-hazard-after.png',
+  'desktop-route-marker-pass-through.png',
 ];
 const COLLISION_OBSTACLES = [
   { id: 'tree-trunk-1', position: [-4, 1.25, -2], scale: [0.7, 2.2, 0.7] },
   { id: 'tree-trunk-2', position: [-4.5, 1.25, 2], scale: [0.7, 2.2, 0.7] },
   { id: 'tree-trunk-3', position: [4.4, 1.25, 2.1], scale: [0.7, 2.2, 0.7] },
   { id: 'fire-building-body', position: [9.5, 1.8, -9.5], scale: [6, 3.4, 5] },
+  { id: 'garage-back-wall', position: [0, 1.8, 11.6], scale: [8.8, 3.4, 0.8] },
+  { id: 'garage-left-wall', position: [-4, 1.8, 13], scale: [0.8, 3.4, 3] },
+  { id: 'garage-right-wall', position: [4, 1.8, 13], scale: [0.8, 3.4, 3] },
+  {
+    id: 'playground-plank',
+    position: [2.9, 0.75, 2.4],
+    rotation: [0, 0, -0.2],
+    scale: [3.4, 0.28, 0.7],
+  },
+  { id: 'playground-support', position: [2.9, 0.45, 2.4], scale: [0.36, 0.8, 0.36] },
 ];
+const FIRE_HAZARD_BOX = {
+  position: [12.9, 0.9, -9.1],
+  scale: [1.2, 1.8, 1.2],
+};
 const VEHICLE_COLLIDER_HALF_EXTENTS = [1.45, 0.95, 1.7];
 // breakableVfx.tsの最大合成初速は5未満。観測遅延中の移動上限には保守的に5を用いる。
 const MAX_MAIN_FRAGMENT_LAUNCH_SPEED = 5;
@@ -186,6 +206,16 @@ async function readGameState(page) {
   assert(state.renderer && state.vehicle && state.runtime && state.breakables,
     `Final telemetry is incomplete: ${rendered}`);
   return state;
+}
+
+/** 初期sceneがfire hazardと非障害物route markerの公開契約を満たすことを確認する。 */
+function assertInitialWorldPhysicsContract(initial) {
+  assert.equal(initial.visuals.fireHazardEnabled, true, 'Initial fire hazard is disabled.');
+  assert.deepEqual(initial.visualLayout.fireHazard, FIRE_HAZARD_BOX,
+    'Fire hazard telemetry differs from the E2E clearance contract.');
+  assert.equal(initial.visualLayout.routeMarkers.length, 12, 'Route marker layout is incomplete.');
+  assert(initial.visualLayout.routeMarkers.every(({ scale }) => scale[1] <= 0.14),
+    'Route marker is still obstacle-height.');
 }
 
 /** 実camera telemetryを使ってworld座標を現在viewportのscreen座標へ投影する。 */
@@ -705,10 +735,10 @@ async function alignWorldCoordinate(
 
 /** 車庫から外周東側道路を通って火の照準距離へ進む。 */
 async function driveMissionToFire(page, touchDriver) {
-  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 15.3,
-    'fire route garage exit', touchDriver);
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+    'fire route garage opening', touchDriver);
   await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 11.5,
-    'fire route east road', touchDriver);
+    'fire route south road', touchDriver);
   await alignWorldCoordinate(page, 0, 15.5, 'fire route safe east X', 0.5, touchDriver);
   await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -7,
     'fire route north road', touchDriver);
@@ -722,10 +752,12 @@ async function driveMissionToFire(page, touchDriver) {
 
 /** 火災現場から外周東側道路を戻り、車庫でassigned再開まで走る。 */
 async function driveMissionBackToGarage(page, touchDriver) {
-  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 10.5,
-    'garage route south road', touchDriver);
-  await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= 4,
-    'garage route west road', touchDriver);
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+    'garage route south opening', touchDriver);
+  await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= 2.5,
+    'garage outside west road', touchDriver);
+  await alignWorldCoordinate(page, 0, 0, 'garage outside X', 0.7, touchDriver);
+  await alignWorldCoordinate(page, 2, 14, 'garage inside Z', 0.7, touchDriver);
   let latestState = await readGameState(page);
   for (let correction = 0; correction < 4; correction += 1) {
     if (latestState.runtime.missionPhase === 'assigned') return latestState;
@@ -804,6 +836,8 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
   const touch = hasTouch ? await createTouchDriver(page) : null;
   try {
     const initial = await readGameState(page);
+    assertInitialWorldPhysicsContract(initial);
+    const initialResetCount = initial.vehicle.resetCount;
     readPoolIdentity(initial, `${name} initial`);
     const targeted = await driveMissionToFire(page, touch);
     if (touch) await touch.pressSpray();
@@ -827,7 +861,11 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
     const freeRoam = await readGameState(page);
     assert.equal(freeRoam.runtime.missionPhase, 'freeRoam', `${name}: freeRoam did not start.`);
     const restarted = await driveMissionBackToGarage(page, touch);
+    assert.equal(restarted.runtime.missionPhase, 'assigned', `${name}: mission did not restart at garage.`);
+    assert.equal(restarted.runtime.signals.atGarage, true, `${name}: garage signal is not active.`);
     assert.equal(restarted.runtime.fireIntensity, 1, `${name}: fire was not restored at garage.`);
+    assert.equal(restarted.visuals.fireHazardEnabled, true, `${name}: fire hazard was not restored at garage.`);
+    assert.equal(restarted.vehicle.resetCount, initialResetCount, `${name}: mission route used a vehicle reset.`);
     assert(restarted.runtime.routeVisible, `${name}: route was not restored at garage.`);
     return {
       celebration: celebration.runtime,
@@ -939,7 +977,7 @@ async function verifyWaterTimeline(browser, errors) {
 
 /** 新しい木/建物colliderを横断しない道路waypointから指定blockの正面へ揃える。 */
 async function driveToBlockApproach(page, block) {
-  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 15.3,
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
     `${block.id} garage exit`);
   if (block.id === 'plaza-blue') {
     const westOuterX = -17.2;
@@ -1209,6 +1247,20 @@ function vehicleColliderSupport(vehicle) {
   };
 }
 
+const AXIS_INDEX = { x: 0, z: 2 };
+
+/** 指定軸・障害物側から見た車両colliderとvisual AABBの分離距離を返す。 */
+function collisionClearance(vehicle, obstacle, axis, direction) {
+  const support = vehicleColliderSupport(vehicle);
+  const index = AXIS_INDEX[axis];
+  const vehicleSupport = support[axis];
+  const obstacleHalf = obstacle.scale[index] / 2;
+  const signedCenterDistance = direction * (
+    vehicle.position[index] - obstacle.position[index]
+  );
+  return signedCenterDistance - vehicleSupport - obstacleHalf;
+}
+
 /** 実camera basisからworld X/Z方向をDOM touch stick座標へ逆投影する。 */
 function worldDirectionToTouchStick(camera, worldX, worldZ) {
   const forwardX = camera.lookTarget[0] - camera.position[0];
@@ -1223,86 +1275,143 @@ function worldDirectionToTouchStick(camera, worldX, worldZ) {
   return [moveX, -moveY];
 }
 
-/** 南側からsolidへ押し込み、visual AABB非貫通・resetなし・離脱操作を数値検証する。 */
-async function verifyWorldCollisionScenario(browser, errors, obstacle) {
+/** 車庫外の東側安全路から指定solidの+Z側へ車両を配置する。 */
+async function prepareWorldObstacleCollision(page, touch, obstacle, targetX = obstacle.position[0]) {
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+    `${obstacle.id} collision garage opening`, touch);
+  await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 13,
+    `${obstacle.id} collision east road`, touch);
+  await alignWorldCoordinate(page, 0, 15.5, `${obstacle.id} collision east safe X`, 0.5, touch);
+  const approachZ = obstacle.position[2] + obstacle.scale[2] / 2
+    + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 1;
+  const turnZ = approachZ + 2.5;
+  await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= turnZ,
+    `${obstacle.id} collision north staging`, touch);
+  await alignWorldCoordinate(page, 0, targetX, `${obstacle.id} collision X`, 0.35, touch);
+  await alignWorldCoordinate(page, 2, approachZ, `${obstacle.id} collision staging Z`, 0.35, touch);
+}
+
+/** 任意world軸からsolidへ押し込み、非貫通・resetなし・離脱操作を数値検証する。 */
+async function verifyWorldCollisionScenario(browser, errors, {
+  approachAxis,
+  approachDirection,
+  obstacle,
+  prepare,
+  recoveryDirection,
+}) {
   const target = { hasTouch: true, height: 720, name: `collision-${obstacle.id}`, width: 1_280 };
   const { context, page } = await openViewportPage(browser, target, errors);
   const touch = await createTouchDriver(page);
   try {
     const initial = await readGameState(page);
+    assertInitialWorldPhysicsContract(initial);
     const initialResetCount = initial.vehicle.resetCount;
-    await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 15.3,
-      `${obstacle.id} collision garage exit`);
-    const currentX = (await readGameState(page)).vehicle.position[0];
-    if (obstacle.position[0] > currentX) {
-      await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= obstacle.position[0] - 2.5,
-        `${obstacle.id} collision east alignment`);
-    } else {
-      await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= obstacle.position[0] + 2.5,
-        `${obstacle.id} collision west alignment`);
-    }
-    await alignWorldCoordinate(page, 0, obstacle.position[0], `${obstacle.id} collision X`);
+    await prepare(page, touch);
     const aligned = await readGameState(page);
     assert.equal(aligned.vehicle.resetCount, initialResetCount, `${obstacle.id}: reset during approach.`);
 
-    const obstacleMaxZ = obstacle.position[2] + obstacle.scale[2] / 2;
+    const axisIndex = AXIS_INDEX[approachAxis];
+    const perpendicularAxis = approachAxis === 'x' ? 'z' : 'x';
+    const perpendicularIndex = AXIS_INDEX[perpendicularAxis];
+    const approachVector = approachAxis === 'x'
+      ? [approachDirection, 0]
+      : [0, approachDirection];
     let contactSample = null;
+    let latestState = aligned;
     let minimumClearance = Number.POSITIVE_INFINITY;
+    let minimumPerpendicularSeparation = Number.POSITIVE_INFINITY;
     let maximumApproachSpeed = 0;
     const contactPositions = [];
-    await touch.setStick(...worldDirectionToTouchStick(aligned.camera, 0, -1));
+    await touch.setStick(...worldDirectionToTouchStick(aligned.camera, ...approachVector));
     for (let frame = 0; frame < 600; frame += 1) {
       await waitForFrames(page, 1);
       const state = await readGameState(page);
+      latestState = state;
       assert.equal(state.vehicle.resetCount, initialResetCount, `${obstacle.id}: reset while pressing solid.`);
       maximumApproachSpeed = Math.max(maximumApproachSpeed, state.vehicle.speed);
       const support = vehicleColliderSupport(state.vehicle);
-      const clearance = state.vehicle.position[2] - support.z - obstacleMaxZ;
-      minimumClearance = Math.min(minimumClearance, clearance);
-      const xOverlap = Math.abs(state.vehicle.position[0] - obstacle.position[0])
-        <= support.x + obstacle.scale[0] / 2 + 0.05;
-      if (xOverlap && clearance <= 0.12) {
+      const headingAlongApproach = state.vehicle.forward[axisIndex] * approachDirection;
+      const clearance = collisionClearance(
+        state.vehicle,
+        obstacle,
+        approachAxis,
+        -approachDirection,
+      );
+      const perpendicularOverlap = Math.abs(
+        state.vehicle.position[perpendicularIndex] - obstacle.position[perpendicularIndex],
+      ) <= support[perpendicularAxis] + obstacle.scale[perpendicularIndex] / 2 + 0.05;
+      minimumPerpendicularSeparation = Math.min(
+        minimumPerpendicularSeparation,
+        Math.abs(state.vehicle.position[perpendicularIndex] - obstacle.position[perpendicularIndex])
+          - support[perpendicularAxis] - obstacle.scale[perpendicularIndex] / 2,
+      );
+      if (headingAlongApproach >= 0.999) {
+        minimumClearance = Math.min(minimumClearance, clearance);
+      }
+      if (headingAlongApproach >= 0.999 && perpendicularOverlap && clearance <= 0.12) {
         contactSample ??= { clearance, state, support };
-        contactPositions.push(state.vehicle.position[2]);
+        contactPositions.push(state.vehicle.position[axisIndex]);
         if (contactPositions.length >= 45) break;
       }
     }
-    assert(contactSample, `${obstacle.id}: actual collider contact was not reached.`);
-    assert(maximumApproachSpeed >= 4, `${obstacle.id}: approach never reached collision speed.`);
+    assert(contactSample, `${obstacle.id}: actual collider contact was not reached: ${JSON.stringify({
+      aligned: aligned.vehicle,
+      latest: latestState.vehicle,
+      minimumClearance,
+      minimumPerpendicularSeparation,
+    })}`);
     assert(contactPositions.length >= 45, `${obstacle.id}: contact was not held for 45 frames.`);
-    assert(minimumClearance >= -0.09,
-      `${obstacle.id}: vehicle collider penetrated visual AABB by ${-minimumClearance}.`);
     const contactTravel = Math.max(...contactPositions) - Math.min(...contactPositions);
+    assert(minimumClearance >= -0.09,
+      `${obstacle.id}: vehicle collider penetrated visual AABB: ${JSON.stringify({
+        contactPosition: contactSample.state.vehicle.position,
+        contactSupport: contactSample.support,
+        contactTravel,
+        latest: latestState.vehicle,
+        minimumClearance,
+      })}`);
     assert(contactTravel <= 0.18, `${obstacle.id}: vehicle traversed solid while held (${contactTravel}).`);
     const heldState = await readGameState(page);
-    assert(heldState.vehicle.position[2] > obstacleMaxZ,
+    assert((-approachDirection) * (
+      heldState.vehicle.position[axisIndex] - obstacle.position[axisIndex]
+    ) > obstacle.scale[axisIndex] / 2,
       `${obstacle.id}: vehicle center crossed the obstacle visual AABB.`);
     assert(heldState.vehicle.position[0] >= heldState.worldBounds.minX
       && heldState.vehicle.position[0] <= heldState.worldBounds.maxX
       && heldState.vehicle.position[2] >= heldState.worldBounds.minZ
       && heldState.vehicle.position[2] <= heldState.worldBounds.maxZ,
     `${obstacle.id}: collision left the vehicle outside world bounds.`);
+    await waitForFrames(page, 2);
     await page.screenshot({ path: `${outputDirectory}/desktop-collision-${obstacle.id}.png` });
 
     await touch.releaseStick();
     await brakeVehicle(page);
     const beforeRecovery = await readGameState(page);
-    await touch.setStick(...worldDirectionToTouchStick(beforeRecovery.camera, 0, 1));
+    const recoveryVector = approachAxis === 'x'
+      ? [recoveryDirection, 0]
+      : [0, recoveryDirection];
+    await touch.setStick(...worldDirectionToTouchStick(beforeRecovery.camera, ...recoveryVector));
     await waitForFrames(page, 28);
     await touch.releaseStick();
     await brakeVehicle(page);
     const recovered = await readGameState(page);
-    assert(recovered.vehicle.position[2] - beforeRecovery.vehicle.position[2] >= 0.5,
+    const recoveredDistance = recoveryDirection * (
+      recovered.vehicle.position[axisIndex] - beforeRecovery.vehicle.position[axisIndex]
+    );
+    assert(recoveredDistance >= 0.5,
       `${obstacle.id}: vehicle did not respond after collision.`);
     assert.equal(recovered.vehicle.resetCount, initialResetCount, `${obstacle.id}: recovery triggered reset.`);
     return {
+      approachAxis,
+      approachDirection,
       contactClearance: contactSample.clearance,
       contactPosition: contactSample.state.vehicle.position,
       contactTravel,
       maximumApproachSpeed,
       minimumClearance,
       obstacle,
-      recoveredDistance: recovered.vehicle.position[2] - beforeRecovery.vehicle.position[2],
+      recoveredDistance,
+      recoveryDirection,
       resetCount: recovered.vehicle.resetCount,
     };
   } finally {
@@ -1312,22 +1421,302 @@ async function verifyWorldCollisionScenario(browser, errors, obstacle) {
   }
 }
 
-/** COLL-001代表として木1本と火災建物本体を実車検証する。 */
+/** 同一contextで有効な火が車両を止め、消火後は同じ空間を通過できることを検証する。 */
+async function verifyFireHazardLifecycle(browser, errors) {
+  const { context, page } = await openViewportPage(
+    browser,
+    { hasTouch: true, height: 720, name: 'fire-hazard', width: 1_280 },
+    errors,
+  );
+  const touch = await createTouchDriver(page);
+  try {
+    const initial = await readGameState(page);
+    assertInitialWorldPhysicsContract(initial);
+    await driveMissionToFire(page, touch);
+    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 17.2,
+      'fire hazard east heading staging', touch);
+    await alignWorldCoordinate(page, 2, -10.1, 'fire hazard targeting lane Z', 0.15, touch);
+    await driveAlongWorldAxis(page, 'negativeX', (state) => -state.vehicle.forward[0] >= 0.999,
+      'fire hazard negative-X heading', touch);
+    await alignWorldCoordinate(page, 0, 15.7, 'fire hazard head-on X', 0.15, touch);
+    const before = await readGameState(page);
+    assert.equal(before.visuals.fireHazardEnabled, true);
+
+    await touch.setStick(...worldDirectionToTouchStick(before.camera, -1, 0));
+    let minimumClearance = Number.POSITIVE_INFINITY;
+    const contactPositions = [];
+    for (let frame = 0; frame < 360; frame += 1) {
+      await waitForFrames(page, 1);
+      const state = await readGameState(page);
+      assert.equal(state.vehicle.resetCount, before.vehicle.resetCount);
+      const clearance = collisionClearance(state.vehicle, FIRE_HAZARD_BOX, 'x', 1);
+      const headingAlongApproach = -state.vehicle.forward[0];
+      if (headingAlongApproach >= 0.999) {
+        minimumClearance = Math.min(minimumClearance, clearance);
+      }
+      if (headingAlongApproach >= 0.999 && clearance <= 0.12) {
+        contactPositions.push(state.vehicle.position[0]);
+        if (contactPositions.length >= 45) break;
+      }
+    }
+    await touch.releaseStick();
+    await brakeVehicle(page);
+    const blocked = await readGameState(page);
+    assert(contactPositions.length >= 45, 'Vehicle did not reach and hold the fire hazard.');
+    const contactTravel = Math.max(...contactPositions) - Math.min(...contactPositions);
+    assert(minimumClearance >= -0.09, `Vehicle penetrated the enabled fire hazard: ${JSON.stringify({
+      before: before.vehicle,
+      blocked: blocked.vehicle,
+      contactTravel,
+      minimumClearance,
+    })}`);
+    assert(contactTravel <= 0.18, 'Vehicle traversed the enabled fire hazard while input was held.');
+    assert.equal(blocked.vehicle.resetCount, before.vehicle.resetCount);
+    await waitForFrames(page, 2);
+    await page.screenshot({ path: `${outputDirectory}/desktop-fire-hazard-before.png` });
+
+    await touch.pressSpray();
+    let spraying = null;
+    for (let frame = 0; frame < 60; frame += 1) {
+      await waitForFrames(page, 1);
+      spraying = await readGameState(page);
+      if (spraying.controls.spray && spraying.mission.sprayOnFire && spraying.mission.targeted) break;
+    }
+    assert(spraying?.controls.spray && spraying.mission.sprayOnFire && spraying.mission.targeted,
+      `Fire-hazard lifecycle spray did not target the fire: ${JSON.stringify({
+        camera: spraying?.camera,
+        controls: spraying?.controls,
+        mission: spraying?.mission,
+        vehicle: spraying?.vehicle,
+      })}`);
+    await page.evaluate(() => window.advanceTime?.(2_500));
+    await waitForFrames(page, 2);
+    await touch.releaseSpray();
+    const extinguished = await readGameState(page);
+    assert.equal(extinguished.runtime.fireIntensity, 0);
+    assert.equal(extinguished.visuals.fireHazardEnabled, false);
+    await page.locator('.mission-pill[data-phase="celebrating"]').waitFor({ state: 'visible' });
+    await waitForFrames(page, 2);
+
+    await touch.setStick(...worldDirectionToTouchStick(extinguished.camera, -1, 0));
+    await waitForFrames(page, 1);
+    const passInput = await readGameState(page);
+    assert(Math.hypot(passInput.controls.moveX, passInput.controls.moveY) >= 0.8,
+      `Former fire-hazard pass input was not applied: ${JSON.stringify(passInput.controls)}`);
+    await waitForFrames(page, 19);
+    await touch.releaseStick();
+    await brakeVehicle(page);
+    const passed = await readGameState(page);
+    const passedDistance = blocked.vehicle.position[0] - passed.vehicle.position[0];
+    assert(passedDistance >= 0.5, `Vehicle did not enter the former fire-hazard space: ${JSON.stringify({
+      blocked: blocked.vehicle,
+      controls: passed.controls,
+      passed: passed.vehicle,
+      passedDistance,
+      renderedFrameDelta: passed.renderer.renderedFrames - passInput.renderer.renderedFrames,
+    })}`);
+    assert.equal(passed.vehicle.resetCount, before.vehicle.resetCount);
+    await waitForFrames(page, 2);
+    await page.screenshot({ path: `${outputDirectory}/desktop-fire-hazard-after.png` });
+
+    await page.evaluate(() => window.advanceTime?.(1_800));
+    await waitForFrames(page, 2);
+    const freeRoam = await readGameState(page);
+    assert.equal(freeRoam.runtime.missionPhase, 'freeRoam',
+      'Fire-hazard lifecycle did not enter freeRoam before garage return.');
+    const restarted = await driveMissionBackToGarage(page, touch);
+    assert.equal(restarted.runtime.missionPhase, 'assigned',
+      'Fire-hazard lifecycle mission did not restart at garage.');
+    assert.equal(restarted.runtime.signals.atGarage, true,
+      'Fire-hazard lifecycle garage signal is not active.');
+    assert.equal(restarted.visuals.fireHazardEnabled, true,
+      'Fire hazard was not restored after returning to the garage.');
+    assert.equal(restarted.vehicle.resetCount, before.vehicle.resetCount,
+      'Fire-hazard lifecycle garage return used a vehicle reset.');
+
+    return {
+      before: {
+        enabled: before.visuals.fireHazardEnabled,
+        fireIntensity: before.runtime.fireIntensity,
+        position: before.vehicle.position,
+        resetCount: before.vehicle.resetCount,
+      },
+      blocked: {
+        contactTravel,
+        minimumClearance,
+        position: blocked.vehicle.position,
+        resetCount: blocked.vehicle.resetCount,
+      },
+      extinguished: {
+        enabled: extinguished.visuals.fireHazardEnabled,
+        fireIntensity: extinguished.runtime.fireIntensity,
+        position: extinguished.vehicle.position,
+        resetCount: extinguished.vehicle.resetCount,
+      },
+      passed: {
+        passedDistance,
+        position: passed.vehicle.position,
+        resetCount: passed.vehicle.resetCount,
+      },
+      restarted: {
+        atGarage: restarted.runtime.signals.atGarage,
+        enabled: restarted.visuals.fireHazardEnabled,
+        fireIntensity: restarted.runtime.fireIntensity,
+        missionPhase: restarted.runtime.missionPhase,
+        position: restarted.vehicle.position,
+        resetCount: restarted.vehicle.resetCount,
+      },
+    };
+  } finally {
+    await touch.releaseSpray().catch(() => undefined);
+    await touch.releaseStick().catch(() => undefined);
+    await touch.close().catch(() => undefined);
+    await context.close();
+  }
+}
+
+/** desktop実入力で先頭2枚のroute markerを停止・impactなしに横断する。 */
+async function verifyRouteMarkerPassThrough(browser, errors) {
+  const { context, page } = await openViewportPage(
+    browser,
+    { hasTouch: false, height: 720, name: 'route-marker', width: 1_280 },
+    errors,
+  );
+  try {
+    const initial = await readGameState(page);
+    assertInitialWorldPhysicsContract(initial);
+    await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+      'route marker garage opening');
+    await alignWorldCoordinate(page, 0, -2.5, 'route marker run-up X', 0.35);
+    await alignWorldCoordinate(page, 2, 16.2, 'route marker lane Z', 0.35);
+    const before = await readGameState(page);
+    const impactCountsBefore = before.breakables.blocks.map(({ impactCount }) => impactCount);
+    const heldKeys = new Set();
+    const markerSpeeds = new Map([[0, []], [3, []]]);
+    try {
+      await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS.positiveX.keys);
+      for (let frame = 0; frame < 360; frame += 1) {
+        const state = await readGameState(page);
+        assert.equal(state.vehicle.resetCount, initial.vehicle.resetCount);
+        for (const markerX of markerSpeeds.keys()) {
+          if (Math.abs(state.vehicle.position[0] - markerX) <= 0.45) {
+            markerSpeeds.get(markerX).push(state.vehicle.speed);
+          }
+        }
+        if (state.vehicle.position[0] >= 4) break;
+        await waitForFrames(page, 1);
+      }
+    } finally {
+      await releaseKeyboardKeys(page, heldKeys);
+    }
+    await brakeVehicle(page);
+    const after = await readGameState(page);
+    assert.equal(after.vehicle.resetCount, initial.vehicle.resetCount);
+    const travel = after.vehicle.position[0] - before.vehicle.position[0];
+    assert(travel >= 6, `Route-marker run was too short: ${travel}.`);
+    for (const [markerX, speeds] of markerSpeeds) {
+      assert(speeds.length > 0, `Route marker ${markerX} was not crossed.`);
+      assert(Math.max(...speeds) >= 2.5, `Route marker ${markerX} caused a sustained stop.`);
+    }
+    assert.deepEqual(
+      after.breakables.blocks.map(({ impactCount }) => impactCount),
+      impactCountsBefore,
+      'Route-marker crossing emitted a breakable impact event.',
+    );
+    assert.equal(after.visuals.routeCubeCount, 12);
+    await waitForFrames(page, 2);
+    await page.screenshot({ path: `${outputDirectory}/desktop-route-marker-pass-through.png` });
+    return {
+      resetCount: after.vehicle.resetCount,
+      routeMarkerCount: after.visuals.routeCubeCount,
+      sampledSpeeds: Object.fromEntries(markerSpeeds),
+      travel,
+    };
+  } finally {
+    await context.close();
+  }
+}
+
+/** 5代表solid、動的fire hazard、非solid route markerを実車検証する。 */
 async function verifyWorldCollisions(browser, errors) {
-  const testedIds = ['tree-trunk-3', 'fire-building-body'];
+  const testedScenarios = [
+    {
+      approachAxis: 'z',
+      approachDirection: 1,
+      id: 'tree-trunk-3',
+      prepare: async (page, touch) => {
+        const obstacle = COLLISION_OBSTACLES.find(({ id }) => id === 'tree-trunk-3');
+        assert(obstacle, 'tree-trunk-3 collision obstacle definition is unavailable.');
+        await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+          'tree-trunk-3 collision garage opening', touch);
+        await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 13,
+          'tree-trunk-3 collision east road', touch);
+        await alignWorldCoordinate(page, 0, 15.5, 'tree-trunk-3 collision east safe X', 0.5, touch);
+        await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -3.5,
+          'tree-trunk-3 collision north staging', touch);
+        await alignWorldCoordinate(page, 0, obstacle.position[0], 'tree-trunk-3 collision X', 0.15, touch);
+        await alignWorldCoordinate(page, 2, -1, 'tree-trunk-3 collision staging Z', 0.35, touch);
+      },
+      recoveryDirection: -1,
+    },
+    {
+      approachAxis: 'z',
+      approachDirection: -1,
+      id: 'fire-building-body',
+      recoveryDirection: 1,
+    },
+    {
+      approachAxis: 'z',
+      approachDirection: -1,
+      id: 'garage-back-wall',
+      prepare: async (page, touch) => {
+        await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+          'garage back-wall opening', touch);
+        await alignWorldCoordinate(page, 0, 0, 'garage back-wall X', 0.35, touch);
+      },
+      recoveryDirection: 1,
+    },
+    {
+      approachAxis: 'x',
+      approachDirection: 1,
+      id: 'garage-right-wall',
+      prepare: async (page, touch) => {
+        await alignWorldCoordinate(page, 2, 14, 'garage right-wall Z', 0.35, touch);
+      },
+      recoveryDirection: -1,
+    },
+    {
+      approachAxis: 'z',
+      approachDirection: -1,
+      id: 'playground-plank',
+      recoveryDirection: 1,
+    },
+  ];
+  const fireHazard = await verifyFireHazardLifecycle(browser, errors);
+  const routeMarkers = await verifyRouteMarkerPassThrough(browser, errors);
   const scenarios = {};
-  for (const id of testedIds) {
+  for (const scenario of testedScenarios) {
+    const { id } = scenario;
     const obstacle = COLLISION_OBSTACLES.find((candidate) => candidate.id === id);
     assert(obstacle, `${id}: collision obstacle definition is unavailable.`);
-    scenarios[id] = await verifyWorldCollisionScenario(browser, errors, obstacle);
+    scenarios[id] = await verifyWorldCollisionScenario(browser, errors, {
+      ...scenario,
+      obstacle,
+      prepare: scenario.prepare ?? (
+        async (page, touch) => prepareWorldObstacleCollision(page, touch, obstacle)
+      ),
+    });
   }
+  const testedIds = testedScenarios.map(({ id }) => id);
   return {
+    fireHazard,
+    routeMarkers,
     scenarios,
     sharedDefinitionOnly: COLLISION_OBSTACLES
       .filter(({ id }) => !testedIds.includes(id))
       .map(({ id }) => id),
     testedIds,
-    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all four visuals and colliders share one definition',
+    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all nine visuals and colliders share one definition',
   };
 }
 
@@ -1456,9 +1845,17 @@ async function verifyVoxelGame() {
     const errors = [];
     try {
       const collisions = await verifyWorldCollisions(browser, errors);
-      writeJsonArtifact('focused-collision.json', { collisions, errors });
+      for (const screenshot of collisionScreenshots) {
+        assert(fs.existsSync(`${outputDirectory}/${screenshot}`),
+          `Missing focused collision screenshot: ${screenshot}`);
+      }
+      writeJsonArtifact('focused-collision.json', {
+        artifacts: collisionScreenshots,
+        collisions,
+        errors,
+      });
       assert.equal(errors.length, 0, `Focused collision browser/request errors: ${errors.join(' | ')}`);
-      console.log(JSON.stringify({ collisions }));
+      console.log(JSON.stringify({ artifacts: collisionScreenshots, collisions, errors }));
       return;
     } finally {
       await browser.close();
