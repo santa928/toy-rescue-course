@@ -26,6 +26,14 @@ docker compose up --build web
 
 放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。中央公園の木の幹と火災建物本体には消防車で進入できません。
 
+### 箱庭の物理対象
+
+- 車庫は正面開口から出入りし、背面壁・左右壁を通り抜けません。
+- 中央公園の赤い遊具と黄色い支柱はsolidです。
+- 炎は燃えている間だけ進入できず、消火後は同じ場所を走れます。
+- 黄色い道しるべは道路へ埋め込まれた案内灯なので通過できます。
+- 樹冠、窓、屋根装飾、道路線、水、星は非solidです。
+
 最終E2E、3 viewportの代表画像、renderer分類と性能実測はDocker内で生成します。
 
 ```bash
@@ -53,4 +61,4 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、8枚の代表画像は `output/voxel-game/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む27枚の代表画像は `output/voxel-game/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。

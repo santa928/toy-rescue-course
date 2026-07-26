@@ -3,9 +3,10 @@
 ## 状態
 
 - 会話設計: 2026-07-23 承認済み
+- Written spec: 2026-07-23 承認済み
+- Implementation: Tasks 1〜4完了後に検証結果を記録
 - 対象entry: `voxel-game.html`
 - 基準設計: `docs/design/2026-07-20-direct-drive-and-voxel-vfx-design.md`
-- 次工程: 本設計のwritten spec承認後、実装計画を作成する
 
 ## 目的
 
@@ -151,6 +152,19 @@
 6. 既存の木・建物衝突、画面方向操作、水流、4色破壊、復元を回帰確認する。
 7. Desktop 1280×720、tablet landscape 1024×768、mobile landscape 844×390を原寸目視する。
 8. 旧Vehicle Labと旧`/`entryを含む3-entry buildを維持する。
+
+## 実装・検証状態
+
+- Tasks 1〜4: 2026-07-26 実装・レビュー完了。
+- Unit: Docker内で19 files / 123 testsがPASS、失敗0件。
+- Build: Docker内のproduction buildがPASSし、`index.html`、`vehicle-lab.html`、`voxel-game.html`を生成。既知の500kB超chunk警告のみ。
+- Voxel Game E2E: fresh full runが`full: true`、`mode: "full"`、`status: "completed"`、`contractFailures: []`、console/page/request errorが0/0/0で完了。
+- Mission: PC/touchとも消火・自由走行・帰庫を完走し、`assigned`かつ`atGarage: true`で再開。
+- Physics: 木、建物、車庫背面・右壁、遊具板の実接触、燃焼中の炎停止・消火後の同領域通過、12個の道しるべ通過を確認。
+- Regression: 水pool 24 stream + 8 splash、draw-call delta 2、4色それぞれ6主破片、約1.2秒終了、5秒復元を維持。
+- Vehicle Lab E2E: `status: "completed"`、`verificationFailures: []`、3 viewportともbrowser error 0件。
+- Visual: Desktop 1280×720、tablet landscape 1024×768、mobile landscape 844×390の代表画像を原寸目視し、HUDの安全余白、車庫開口、車両、道しるべ、放水、blank/clippingなしを確認。
+- Performance: DockerはSwiftShaderのため機能・レイアウト証跡のみ。物理GPUでの性能認証は未実施。
 
 ## 受け入れ条件
 
