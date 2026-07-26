@@ -169,7 +169,12 @@
 - Fix round 2 regression: break-blue focused 5/5連続PASS。delayは`16.6〜33.3ms`、overflowは`0.059137〜0.059139`、allowedは`0.206293〜0.302303`。red/yellow/green focusedも各1回PASS。fresh canonical fullは4色すべてPASSし、`contractFailures: []`、console/page/request errorは0/0/0。
 - Vehicle Lab E2E: `status: "completed"`、`verificationFailures: []`、3 viewportともbrowser error 0件。
 - Visual: 27 PNGすべてでcapture直前のfont ready・2連続rAF安定を待ち、mission/fullscreen/joystick/sprayのlabel自身についてcomputed `display` / `visibility` / `opacity` / `color` / `backgroundColor` / bbox、viewport・親control内包、contrast 4.5以上を検証した。保存bufferでは親背景・上下左右4辺に加え、label bbox内の期待前景または背景差文字画素を検証・記録した。`screenshotProofs`は27/27件、最小contrast`6.5282`、最小背景差文字画素率`0.1441`、最小背景一致率`0.3409`、最小辺一致率`0.375`。3 viewport contact sheetと108個の原寸label crop目視でもblank/clipping/label消失なし。大画像previewのタイル合成表示は実PNG判定の根拠にしない。
-- Performance: DockerはSwiftShaderのため機能・レイアウト証跡のみ。物理GPUでの性能認証は未実施。
+- Performance: DockerのSwiftShader結果とは分離し、2026-07-26にホストの
+  `ANGLE Metal Renderer: Apple M4` で再検証した。Desktop 1280×720・端末DPR 2
+  （Canvas DPR上限1.5）は、安定後の1秒窓5回で平均`60.0134fps`
+  （`59.9862〜60.0276fps`）、22 draw callsだった。Tablet 1024×768は
+  平均`59.9980fps`、Mobile landscape 844×390は平均`60.0026fps`で、
+  Desktop 60fps・Tablet/Mobile 30fpsの既存目標を満たした。
 
 ## 受け入れ条件
 
