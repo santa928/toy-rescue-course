@@ -114,3 +114,24 @@ React + React Three Fiber + Rapierで再構築した純ボクセル消防車ゲ�
   Tablet/Mobile landscapeは30fps以上。
 - draw call、動的body、破片pool、水poolを増やさない。
 - root昇格はHTML entryの切替だけとし、描画runtimeへ追加処理を入れない。
+
+## 実装結果（2026-07-26）
+
+- `0db1c08`で`/`を新Voxel Gameへ昇格し、Desktop 1280×720とMobile
+  landscape 844×390のroot smokeをcanonical E2Eへ追加した。
+- `9fcf136`で合意済み12ファイル、`__toyRescueTelemetry`、
+  `lucide-react`を削除した。新Voxel GameとVehicle Labのruntimeは変更していない。
+- `f322fa4`で、固定camera角と45度keyboard対角入力の差により北上中に
+  world境界へ寄っていたE2E経路を内側へ移した。ゲームの操作・物理には変更がない。
+- Docker unitは17 files / 120 testsが成功した。production buildは
+  `index.html`、`voxel-game.html`、`vehicle-lab.html`の3 entryを生成した。
+- `/`のDesktop/Mobileはいずれも`mode: "drive-ready"`、
+  `missionPhase: "assigned"`、消防車初期位置`[0, 約0, 14]`を確認した。
+  Canvas/HUDと全操作UIは各viewport境界内に収まった。
+- Voxel Game canonical full E2Eはmanifest `completed/full`、
+  `contractFailures: []`、browser error 0/0/0、27 PNG = 27 screenshot proofで完走した。
+- Vehicle Lab E2Eはmanifest `completed`、3 viewport、15 PNG、
+  `verificationFailures: []`で完走した。
+- Docker ChromiumはSwiftShaderのためfpsを性能認証に使わない。
+  物理GPU目標は移行前にApple M4実機でDesktop平均`60.0134fps`、
+  Tablet平均`59.9980fps`、Mobile landscape平均`60.0026fps`を確認済み。

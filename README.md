@@ -1,6 +1,6 @@
-# おもちゃレスキューコース
+# 純ボクセル消防車
 
-React Three FiberとThree.jsで作る、働く車のおもちゃ箱ゲームです。現在は既存ゲームに加え、本開発前のデザイン確認用として純ボクセル消防車のVehicle Labを提供します。
+React、React Three Fiber、Three.js、Rapierで作る、働く車のボクセル箱庭ゲームです。消防車で自由に走り回り、放水で火を消す仕事と、積み木を壊す遊びを楽しめます。消防車を単体で確認できるVehicle Labも残しています。
 
 ## 起動
 
@@ -10,12 +10,12 @@ React Three FiberとThree.jsで作る、働く車のおもちゃ箱ゲームで�
 docker compose up --build web
 ```
 
-- 既存ゲーム: <http://localhost:5180/>
-- 純ボクセル消防車: <http://localhost:5180/vehicle-lab.html>
+- 標準ゲーム: <http://localhost:5180/>
+- 互換URL: <http://localhost:5180/voxel-game.html>
+- 消防車デザイン確認用Vehicle Lab: <http://localhost:5180/vehicle-lab.html>
 
-## 純ボクセル消防車ゲーム
+## ゲームの操作
 
-- URL: <http://localhost:5180/voxel-game.html>
 - `W` / `↑`: 画面上へ移動
 - `S` / `↓`: 画面下へ移動
 - `A` / `←`: 画面左へ移動
@@ -50,7 +50,7 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ## 検証
 
-テスト、複数HTMLのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。移行後のunit testは17 files / 120 testsです。
 
 ```bash
 docker compose run --rm web npm test
