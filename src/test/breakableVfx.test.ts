@@ -40,7 +40,13 @@ describe('breakableVfx', () => {
 
     expect(new Set(velocities.map((velocity) => velocity.join(','))).size).toBe(6);
     expect(velocities.every(([x, y]) => x > 0 && y > 0)).toBe(true);
-    expect(velocities.every(([x, y, z]) => Math.hypot(x, y, z) < 5.5)).toBe(true);
+  });
+
+  it('全6主破片の3次元合成初速を5以下に保つ', () => {
+    const velocities = createMainFragmentDefinitions()
+      .map((definition) => resolveMainFragmentVelocity(definition, [1, 0, 0]));
+
+    expect(velocities.every(([x, y, z]) => Math.hypot(x, y, z) <= 5)).toBe(true);
   });
 
   it('補助片を固定32slotに保ち、1burstだけ8slotを350ms未満表示する', () => {

@@ -10,7 +10,7 @@ import {
   waitForHudCaptureReadiness,
 } from './voxel-game-screenshot-proof.mjs';
 import {
-  evaluateFirstObservedPositionContract,
+  evaluateConservativeFirstObservedAxisOverflow,
 } from './voxel-game-break-physics-contract.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -1076,14 +1076,14 @@ function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId)
     `${blockId}: first 6-fragment observation was ${captureDelayFromImpactMs}ms after impact; limit is ${ACTIVATION_TRANSITION_DELAY_LIMIT_MS}ms.`);
   const maximumFirstObservedOverflow = maximumFragmentAabbOverflow(firstActive.activeFragments, block.position);
   const {
-    accepted: firstObservedPositionAccepted,
+    accepted: firstObservedAxisOverflowAccepted,
     allowedOverflow: allowedFirstObservedOverflow,
-  } = evaluateFirstObservedPositionContract({
+  } = evaluateConservativeFirstObservedAxisOverflow({
     delayMilliseconds: captureDelayFromImpactMs,
     maximumOverflow: maximumFirstObservedOverflow,
   });
-  assert(firstObservedPositionAccepted,
-    `${blockId}: first-observed fragments exceed the scheduler-bounded AABB allowance (${maximumFirstObservedOverflow} > ${allowedFirstObservedOverflow}).`);
+  assert(firstObservedAxisOverflowAccepted,
+    `${blockId}: first-observed fragments exceed the conservative scheduler-bounded AABB axis-overflow envelope (${maximumFirstObservedOverflow} > ${allowedFirstObservedOverflow}).`);
 
   const { activeSamples, ended, expectedIds } = readContinuousFragmentWindow(
     observer.samples,

@@ -38,7 +38,7 @@
 | VIS-001 | 追加 | 黄色い道しるべを道路へ埋め込んだ薄い発光タイルへ変更し、非solidを維持する | 現行cubeが柵や障害物に見える誤解をなくす。案内UIとして通過可能であることを形で伝える。 |
 | REG-003 | 追加 | PC/touchの車庫出発・消火・自由走行・帰庫再開を、新しい車庫開口とcolliderで完走する | 物理追加による経路詰まりをrelease blockerとして扱う。 |
 | REG-004 | 追加 | 炎は消火前に車両を止め、消火後に同じ領域を通過可能にする | dynamic colliderの有効/無効がruntime状態と一致することを保証する。 |
-| REG-005 | 追加 | 破壊直後のfirst-observed AABB契約は、observer遅延にrAF/Rapier間で未観測になり得る1 fixed stepだけを加えた物理移動上限で判定する | `@react-three/rapier 2.2.0`の既定1/60秒stepとobserverの別rAF sample間の位相差を正しく扱い、正常な2-step観測を誤拒否せず、3-step相当または速度上限逸脱は拒否する。 |
+| REG-005 | 追加 | 破壊直後のfirst-observed最大AABB軸overflowは、observed delayにrAF/Rapier間で未観測になり得る1 fixed stepだけを加えた保守envelopeで判定する | `@react-three/rapier 2.2.0`の既定1/60秒stepとobserverの別rAF sample間の位相差を正しく扱い、既知の正常overflowを誤拒否せず、算出envelopeを超える位置だけを拒否する。fixed-step数そのものや3次元合成速度はこの位置契約から判定しない。 |
 | MIG-001 | 維持 | 旧ゲームと`/`は本変更で削除・切替しない | 移行は参照一覧と明示許可を伴う別タスクで行う。 |
 
 ### 要件差分
@@ -153,7 +153,7 @@
 6. 既存の木・建物衝突、画面方向操作、水流、4色破壊、復元を回帰確認する。
 7. Desktop 1280×720、tablet landscape 1024×768、mobile landscape 844×390を原寸目視する。
 8. 旧Vehicle Labと旧`/`entryを含む3-entry buildを維持する。
-9. 破壊直後のfirst-observed overflowは、観測delayが約1 frameでもRapierが2 fixed steps進み得るscheduler位相差を1 stepだけ許容し、3-step相当または最大初速5を越える移動を拒否する。
+9. 破壊直後のfirst-observed最大AABB軸overflowは、observed delayと未観測になり得る1 fixed stepから算出した保守envelope以内であることを確認する。これは位置外れの契約であり、実際のfixed-step数や3次元合成速度の一般検出には使わない。
 
 ## 実装・検証状態
 
@@ -164,7 +164,8 @@
 - Mission: PC/touchとも消火・自由走行・帰庫を完走し、`assigned`かつ`atGarage: true`で再開。
 - Physics: 木、建物、車庫背面・右壁、遊具板の実接触、燃焼中の炎停止・消火後の同領域通過・帰庫再開後の同一context再停止、12個の道しるべ通過を確認。fresh fullの再停止は45 frame、接触中移動`0.0567`、最小clearance`-0.0475`、車両中心余白`1.6850`、reset 0件。
 - Regression: 水pool 24 stream + 8 splash、fresh runのdraw-call delta 1（上限2）、4色それぞれ6主破片、約1.2秒終了、5秒復元を維持。
-- Break observer scheduler contract: `<Physics>`は`timeStep`未指定で、lock済み`@react-three/rapier 2.2.0`の既定値は1/60秒。impact telemetryと6片表示を別rAFで読むため、first-observed移動時間を`observed delay + bounded unobserved 1 fixed step`として判定する。速度上限5、重力18、epsilon 0.03、activation delay上限50msは変更しない。
+- Break observer position contract: `<Physics>`は`timeStep`未指定で、lock済み`@react-three/rapier 2.2.0`の既定値は1/60秒。impact telemetryと6片表示を別rAFで読むため、first-observed最大AABB軸overflowを`observed delay + bounded unobserved 1 fixed step`、scalar speed envelope 5、重力18、epsilon 0.03から算出した保守上限で判定する。この位置契約からfixed-step数や3次元合成速度は判定しない。
+- Break producer speed contract: `createMainFragmentDefinitions()`が生成する全6定義を`resolveMainFragmentVelocity()`へ通し、全3次元合成初速が`Math.hypot(...) <= 5`であることをVitestで直接固定する。
 - Fix round 2 regression: break-blue focused 5/5連続PASS。delayは`16.6〜33.3ms`、overflowは`0.059137〜0.059139`、allowedは`0.206293〜0.302303`。red/yellow/green focusedも各1回PASS。fresh canonical fullは4色すべてPASSし、`contractFailures: []`、console/page/request errorは0/0/0。
 - Vehicle Lab E2E: `status: "completed"`、`verificationFailures: []`、3 viewportともbrowser error 0件。
 - Visual: 27 PNGすべてでcapture直前のfont ready・2連続rAF安定を待ち、mission/fullscreen/joystick/sprayのlabel自身についてcomputed `display` / `visibility` / `opacity` / `color` / `backgroundColor` / bbox、viewport・親control内包、contrast 4.5以上を検証した。保存bufferでは親背景・上下左右4辺に加え、label bbox内の期待前景または背景差文字画素を検証・記録した。`screenshotProofs`は27/27件、最小contrast`6.5282`、最小背景差文字画素率`0.1441`、最小背景一致率`0.3409`、最小辺一致率`0.375`。3 viewport contact sheetと108個の原寸label crop目視でもblank/clipping/label消失なし。大画像previewのタイル合成表示は実PNG判定の根拠にしない。
@@ -180,7 +181,8 @@
 - 衝突後に車両が転倒、境界外reset、入力不能にならない。
 - 描画とcolliderのposition、scale、rotationが共有定義から生成される。
 - 画面方向操作、水流、飛沫、4色破壊、5秒復元を壊さない。
-- first-observed破片位置は、observer遅延と未観測1 fixed stepの物理上限内に収まり、2 stepを越えるscheduler差または速度上限逸脱を受理しない。
+- first-observed破片の最大AABB軸overflowは、observed delayと未観測1 fixed stepから算出した保守envelope内に収まる。
+- 全6主破片のproducer定義は、3次元合成初速`<= 5`を満たす。
 - Docker内unit、build、fresh full E2Eが成功し、console/page/request errorが0件である。
 
 ## 非対象
@@ -212,7 +214,7 @@
 | 消火後も見えない壁が残る | fire intensityとcollider enabledを同じ低頻度stateから同期し、消火前後の横断E2Eを作る。 |
 | 道しるべが薄くなって見失う | emissive色と水平寸法を維持し、3 viewportで道路とのコントラストを目視する。 |
 | collider増加で長時間runが不安定になる | staticは単一fixed bodyへ集約し、full E2Eのreset数・console error・FPS情報を保存する。 |
-| rAF observerとRapier fixed stepの位相で正常な破片移動を誤拒否する | delayだけでなく未観測になり得る1/60秒の1 stepだけを移動時間へ加えるpure contractを使い、2-step受理と3-step/速度逸脱拒否をNode testで固定する。 |
+| rAF observerとRapier fixed stepの位相で正常な破片移動を誤拒否する | observed delayへ未観測になり得る1/60秒の1 stepだけを加えた保守AABB軸overflow envelopeをpure Node testで固定する。fixed-step数や合成速度は推定せず、producerの全3次元合成初速`<= 5`を別Vitestで直接固定する。 |
 
 ## 後続フェーズ
 
