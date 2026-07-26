@@ -788,7 +788,9 @@ async function driveMissionToFire(page, touchDriver) {
     'fire route garage opening', touchDriver);
   await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 11.5,
     'fire route south road', touchDriver);
-  await alignWorldCoordinate(page, 0, 15.5, 'fire route safe east X', 0.5, touchDriver);
+  // Keyboardの対角入力は北上中に+Xへ寄るため、world境界へ達しない内側から開始する。
+  const safeEastX = touchDriver ? 15.5 : 11.5;
+  await alignWorldCoordinate(page, 0, safeEastX, 'fire route safe east X', 0.5, touchDriver);
   await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -7,
     'fire route north road', touchDriver);
   await driveAlongWorldAxis(page, 'negativeX', (state) => state.mission.targeted,
