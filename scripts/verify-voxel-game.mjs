@@ -750,10 +750,29 @@ async function driveMissionToFire(page, touchDriver) {
   return state;
 }
 
+/** 照準済み放水が実際に開始するまで有界待機し、失敗時は入力・照準境界を診断する。 */
+async function waitForTargetedSpray(page, description, maximumFrames = 60) {
+  let spraying = null;
+  for (let frame = 0; frame < maximumFrames; frame += 1) {
+    await waitForFrames(page, 1);
+    spraying = await readGameState(page);
+    if (spraying.controls.spray && spraying.mission.sprayOnFire && spraying.mission.targeted) {
+      return spraying;
+    }
+  }
+  throw new Error(`${description}: targeted spray did not start within ${maximumFrames} frames: ${JSON.stringify({
+    camera: spraying?.camera,
+    controls: spraying?.controls,
+    mission: spraying?.mission,
+    vehicle: spraying?.vehicle,
+  })}`);
+}
+
 /** 火災現場から外周東側道路を戻り、車庫でassigned再開まで走る。 */
 async function driveMissionBackToGarage(page, touchDriver) {
   await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
     'garage route south opening', touchDriver);
+  await alignWorldCoordinate(page, 2, 17.8, 'garage outside south safe Z', 0.15, touchDriver);
   await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= 2.5,
     'garage outside west road', touchDriver);
   await alignWorldCoordinate(page, 0, 0, 'garage outside X', 0.7, touchDriver);
@@ -842,10 +861,7 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
     const targeted = await driveMissionToFire(page, touch);
     if (touch) await touch.pressSpray();
     else await page.keyboard.down('Space');
-    await waitForFrames(page, 4);
-    const spraying = await readGameState(page);
-    assert(spraying.controls.spray && spraying.mission.sprayOnFire,
-      `${name}: targeted spray did not start.`);
+    await waitForTargetedSpray(page, `${name}: targeted spray`);
     if (hasTouch) await page.screenshot({ path: `${outputDirectory}/mobile-landscape-water-fire.png` });
     await page.evaluate(() => window.advanceTime?.(2_500));
     await waitForFrames(page, 2);
@@ -901,6 +917,7 @@ async function verifyWaterTimeline(browser, errors) {
     await driveMissionToFire(page);
     const steadyCalls = (await readGameState(page)).renderer.rendererCalls;
     await page.keyboard.down('Space');
+    await waitForTargetedSpray(page, 'water timeline targeted spray');
     let start = null;
     for (let frame = 0; frame < 16; frame += 1) {
       await waitForFrames(page, 1);
@@ -1283,7 +1300,7 @@ async function prepareWorldObstacleCollision(page, touch, obstacle, targetX = ob
     `${obstacle.id} collision east road`, touch);
   await alignWorldCoordinate(page, 0, 15.5, `${obstacle.id} collision east safe X`, 0.5, touch);
   const approachZ = obstacle.position[2] + obstacle.scale[2] / 2
-    + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 1;
+    + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 2.5;
   const turnZ = approachZ + 2.5;
   await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= turnZ,
     `${obstacle.id} collision north staging`, touch);
@@ -1360,6 +1377,8 @@ async function verifyWorldCollisionScenario(browser, errors, {
       minimumClearance,
       minimumPerpendicularSeparation,
     })}`);
+    assert(maximumApproachSpeed >= 4,
+      `${obstacle.id}: approach never reached collision speed: ${maximumApproachSpeed}.`);
     assert(contactPositions.length >= 45, `${obstacle.id}: contact was not held for 45 frames.`);
     const contactTravel = Math.max(...contactPositions) - Math.min(...contactPositions);
     assert(minimumClearance >= -0.09,
@@ -1476,19 +1495,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
     await page.screenshot({ path: `${outputDirectory}/desktop-fire-hazard-before.png` });
 
     await touch.pressSpray();
-    let spraying = null;
-    for (let frame = 0; frame < 60; frame += 1) {
-      await waitForFrames(page, 1);
-      spraying = await readGameState(page);
-      if (spraying.controls.spray && spraying.mission.sprayOnFire && spraying.mission.targeted) break;
-    }
-    assert(spraying?.controls.spray && spraying.mission.sprayOnFire && spraying.mission.targeted,
-      `Fire-hazard lifecycle spray did not target the fire: ${JSON.stringify({
-        camera: spraying?.camera,
-        controls: spraying?.controls,
-        mission: spraying?.mission,
-        vehicle: spraying?.vehicle,
-      })}`);
+    await waitForTargetedSpray(page, 'Fire-hazard lifecycle spray');
     await page.evaluate(() => window.advanceTime?.(2_500));
     await waitForFrames(page, 2);
     await touch.releaseSpray();
@@ -1529,6 +1536,8 @@ async function verifyFireHazardLifecycle(browser, errors) {
       'Fire-hazard lifecycle mission did not restart at garage.');
     assert.equal(restarted.runtime.signals.atGarage, true,
       'Fire-hazard lifecycle garage signal is not active.');
+    assert.equal(restarted.runtime.fireIntensity, 1,
+      'Fire intensity was not fully restored after returning to the garage.');
     assert.equal(restarted.visuals.fireHazardEnabled, true,
       'Fire hazard was not restored after returning to the garage.');
     assert.equal(restarted.vehicle.resetCount, before.vehicle.resetCount,
@@ -1593,11 +1602,35 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
     const impactCountsBefore = before.breakables.blocks.map(({ impactCount }) => impactCount);
     const heldKeys = new Set();
     const markerSpeeds = new Map([[0, []], [3, []]]);
+    const routeCorridorSamples = [];
+    let maximumConsecutiveStalledFrames = 0;
+    let consecutiveStalledFrames = 0;
+    let previousCorridorX = null;
     try {
       await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS.positiveX.keys);
       for (let frame = 0; frame < 360; frame += 1) {
         const state = await readGameState(page);
         assert.equal(state.vehicle.resetCount, initial.vehicle.resetCount);
+        if (state.vehicle.position[0] >= -0.6 && state.vehicle.position[0] <= 3.6) {
+          const progress = previousCorridorX === null
+            ? null
+            : state.vehicle.position[0] - previousCorridorX;
+          routeCorridorSamples.push({
+            positionX: state.vehicle.position[0],
+            progress,
+            speed: state.vehicle.speed,
+          });
+          if (progress !== null && progress <= 0.003) {
+            consecutiveStalledFrames += 1;
+            maximumConsecutiveStalledFrames = Math.max(
+              maximumConsecutiveStalledFrames,
+              consecutiveStalledFrames,
+            );
+          } else {
+            consecutiveStalledFrames = 0;
+          }
+          previousCorridorX = state.vehicle.position[0];
+        }
         for (const markerX of markerSpeeds.keys()) {
           if (Math.abs(state.vehicle.position[0] - markerX) <= 0.45) {
             markerSpeeds.get(markerX).push(state.vehicle.speed);
@@ -1614,6 +1647,12 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
     assert.equal(after.vehicle.resetCount, initial.vehicle.resetCount);
     const travel = after.vehicle.position[0] - before.vehicle.position[0];
     assert(travel >= 6, `Route-marker run was too short: ${travel}.`);
+    assert(routeCorridorSamples.length >= 2,
+      `Route-marker corridor was not sampled: ${JSON.stringify(routeCorridorSamples)}.`);
+    assert(maximumConsecutiveStalledFrames <= 3,
+      `Route-marker corridor stopped forward progress for ${maximumConsecutiveStalledFrames} frames: ${
+        JSON.stringify(routeCorridorSamples)
+      }.`);
     for (const [markerX, speeds] of markerSpeeds) {
       assert(speeds.length > 0, `Route marker ${markerX} was not crossed.`);
       assert(Math.max(...speeds) >= 2.5, `Route marker ${markerX} caused a sustained stop.`);
@@ -1629,6 +1668,8 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
     return {
       resetCount: after.vehicle.resetCount,
       routeMarkerCount: after.visuals.routeCubeCount,
+      maximumConsecutiveStalledFrames,
+      minimumCorridorSpeed: Math.min(...routeCorridorSamples.map(({ speed }) => speed)),
       sampledSpeeds: Object.fromEntries(markerSpeeds),
       travel,
     };
@@ -1655,7 +1696,7 @@ async function verifyWorldCollisions(browser, errors) {
         await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -3.5,
           'tree-trunk-3 collision north staging', touch);
         await alignWorldCoordinate(page, 0, obstacle.position[0], 'tree-trunk-3 collision X', 0.15, touch);
-        await alignWorldCoordinate(page, 2, -1, 'tree-trunk-3 collision staging Z', 0.35, touch);
+        await alignWorldCoordinate(page, 2, -2.5, 'tree-trunk-3 collision run-up Z', 0.35, touch);
       },
       recoveryDirection: -1,
     },
@@ -1772,7 +1813,7 @@ async function verifyViewport(browser, target, errors) {
       const targeted = await driveMissionToFire(page, touch);
       assert(targeted.mission.targeted, `Tablet fire is not targeted: ${JSON.stringify(targeted.mission)}`);
       await touch.pressSpray();
-      await waitForFrames(page, 4);
+      await waitForTargetedSpray(page, 'Tablet targeted spray');
       await page.evaluate(() => window.advanceTime?.(1_000));
       await page.waitForTimeout(180);
       const water = await readGameState(page);
