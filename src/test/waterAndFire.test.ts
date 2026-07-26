@@ -18,22 +18,34 @@ import {
 } from '../voxel-game/scene/WaterAndFire';
 
 const fireHazardLifecycle = vi.hoisted(() => ({
+  effects: [] as (() => void)[],
   layoutEffects: [] as (() => void)[],
+  refCursor: 0,
+  refs: [] as { current: unknown }[],
 }));
 
 vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react')>();
   return {
     ...actual,
+    useEffect: (effect: () => void): void => {
+      fireHazardLifecycle.effects.push(effect);
+    },
     useLayoutEffect: (effect: () => void): void => {
       fireHazardLifecycle.layoutEffects.push(effect);
     },
-    useRef: <Value,>(initialValue: Value): { current: Value } => ({ current: initialValue }),
+    useRef: <Value,>(initialValue: Value): { current: Value } => {
+      const index = fireHazardLifecycle.refCursor;
+      fireHazardLifecycle.refCursor += 1;
+      const ref = fireHazardLifecycle.refs[index] ?? { current: initialValue };
+      fireHazardLifecycle.refs[index] = ref;
+      return ref as { current: Value };
+    },
   };
 });
 
 interface FireHazardColliderElementProps {
-  readonly ref?: ((collider: TestCollider | null) => void) | { current: TestCollider | null };
+  readonly ref?: FireHazardTestRef;
 }
 
 interface TestCollider {
@@ -41,21 +53,33 @@ interface TestCollider {
   setEnabled(enabled: boolean): void;
 }
 
-/** 親layout effect後に実体がattachされるRapier ref順序をcomponent出力上で再現する。 */
-function attachFireHazardCollider(enabled: boolean, collider: TestCollider): void {
+type FireHazardTestRef = ((collider: TestCollider | null) => void) | {
+  current: TestCollider | null;
+};
+
+/** componentを再renderし、ref再attachなしで低頻度effectだけを進める。 */
+function renderFireHazardCollider(enabled: boolean): FireHazardTestRef {
+  fireHazardLifecycle.effects.length = 0;
   fireHazardLifecycle.layoutEffects.length = 0;
+  fireHazardLifecycle.refCursor = 0;
   const rigidBody = FireHazardCollider({ enabled }) as ReactElement<{ readonly children?: ReactNode }>;
   const child = Children.only(rigidBody.props.children);
   expect(isValidElement<FireHazardColliderElementProps>(child)).toBe(true);
   const colliderElement = child as ReactElement<FireHazardColliderElementProps>;
 
   for (const effect of fireHazardLifecycle.layoutEffects.splice(0)) effect();
+  for (const effect of fireHazardLifecycle.effects.splice(0)) effect();
 
   const ref = colliderElement.props.ref;
   expect(ref).toBeDefined();
+  return ref as FireHazardTestRef;
+}
+
+/** 初回render後に遅延生成された実Rapier colliderをcomponent refへattachする。 */
+function attachFireHazardCollider(ref: FireHazardTestRef, collider: TestCollider): void {
   if (typeof ref === 'function') {
     ref(collider);
-  } else if (ref) {
+  } else {
     ref.current = collider;
   }
 }
@@ -95,6 +119,7 @@ describe('WaterAndFire', () => {
   });
 
   it('遅延ref attachで初期falseを反映し、その後もfalse→true→falseを同期する', () => {
+    fireHazardLifecycle.refs.length = 0;
     const enabledHistory: boolean[] = [];
     let colliderEnabled = true;
     const collider = {
@@ -105,12 +130,16 @@ describe('WaterAndFire', () => {
       },
     };
 
-    attachFireHazardCollider(false, collider);
+    const initialRef = renderFireHazardCollider(false);
+    attachFireHazardCollider(initialRef, collider);
     expect(enabledHistory).toEqual([false]);
     expect(colliderEnabled).toBe(false);
 
-    attachFireHazardCollider(true, collider);
-    attachFireHazardCollider(false, collider);
+    renderFireHazardCollider(true);
+    expect(enabledHistory).toEqual([false, true]);
+    expect(colliderEnabled).toBe(true);
+
+    renderFireHazardCollider(false);
     expect(enabledHistory).toEqual([false, true, false]);
     expect(colliderEnabled).toBe(false);
   });

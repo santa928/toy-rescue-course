@@ -158,14 +158,22 @@ export function syncColliderEnabled(
   if (collider.isEnabled() !== enabled) collider.setEnabled(enabled);
 }
 
-/** 1個のfixed colliderを再利用し、低頻度な火勢変化だけをRapierへ同期する。 */
+/** 遅延attachと低頻度な火勢変化の両方を、常設する1個のfixed colliderへ同期する。 */
 export function FireHazardCollider({ enabled }: FireHazardColliderProps): ReactElement {
+  const colliderRef = useRef<RapierCollider>(null);
+
+  useEffect(() => {
+    const collider = colliderRef.current;
+    if (collider) syncColliderEnabled(collider, enabled);
+  }, [enabled]);
+
   return (
     <RigidBody colliders={false} type="fixed">
       <CuboidCollider
         args={scaleToHalfExtents(FIRE_HAZARD_BOX.scale)}
         position={FIRE_HAZARD_BOX.position}
         ref={(collider: RapierCollider | null) => {
+          colliderRef.current = collider;
           if (collider) syncColliderEnabled(collider, enabled);
         }}
       />
