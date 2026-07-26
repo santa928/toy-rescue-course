@@ -21,14 +21,105 @@ export const HUD_CAPTURE_TARGETS = Object.freeze({
 
 const MINIMUM_BACKGROUND_MATCH_RATIO = 0.08;
 const MINIMUM_EDGE_MATCH_RATIO = 0.2;
+const MINIMUM_LABEL_CONTRAST_RATIO = 4.5;
+const MINIMUM_LABEL_DISTINCT_PIXEL_RATIO = 0.08;
+const MINIMUM_LABEL_FOREGROUND_PIXEL_RATIO = 0.04;
+const LABEL_COLOR_TOLERANCE = 24;
 
-/** CSS rgb色へcomputed brightness filterを適用し、保存画像で期待する8-bit RGBを返す。 */
-export function resolveRenderedCssColor(color, filter = 'none') {
-  const channels = color.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number);
-  assert(channels?.length === 3, `Unsupported CSS color: ${color}`);
+/** computed rgb/rgba色をalpha付きchannelへ変換する。 */
+function parseCssColor(color) {
+  const channels = color.match(/\d+(?:\.\d+)?/g)?.map(Number);
+  assert(channels && channels.length >= 3 && channels.length <= 4, `Unsupported CSS color: ${color}`);
+  return [channels[0], channels[1], channels[2], channels[3] ?? 1];
+}
+
+/** 前景RGBAを不透明背景RGBへ合成する。 */
+function compositeColor(foreground, background, opacity = 1) {
+  const alpha = Math.max(0, Math.min(1, foreground[3] * opacity));
+  return foreground.slice(0, 3).map((channel, index) => (
+    channel * alpha + background[index] * (1 - alpha)
+  ));
+}
+
+/** RGB channelへcomputed brightness filterを適用する。 */
+function applyBrightnessFilter(channels, filter = 'none') {
   const brightness = filter.match(/brightness\(([\d.]+)\)/)?.[1];
   const multiplier = brightness === undefined ? 1 : Number.parseFloat(brightness);
   return channels.map((channel) => Math.min(255, Math.round(channel * multiplier)));
+}
+
+/** CSS rgb色へcomputed brightness filterを適用し、保存画像で期待する8-bit RGBを返す。 */
+export function resolveRenderedCssColor(color, filter = 'none') {
+  return applyBrightnessFilter(parseCssColor(color).slice(0, 3), filter);
+}
+
+/** labelのopacity・透明背景・親filterを反映した保存画像上の前景/背景RGBを返す。 */
+function resolveRenderedLabelColors(control) {
+  const parentBackground = parseCssColor(control.backgroundColor).slice(0, 3);
+  const labelBackground = compositeColor(
+    parseCssColor(control.labelStyle.backgroundColor),
+    parentBackground,
+  );
+  const labelForeground = compositeColor(
+    parseCssColor(control.labelStyle.color),
+    labelBackground,
+  );
+  const labelOpacity = Number.parseFloat(control.labelStyle.opacity);
+  const effectiveBackground = labelBackground.map((channel, index) => (
+    parentBackground[index] + (channel - parentBackground[index]) * labelOpacity
+  ));
+  const effectiveForeground = labelForeground.map((channel, index) => (
+    parentBackground[index] + (channel - parentBackground[index]) * labelOpacity
+  ));
+  return {
+    background: applyBrightnessFilter(effectiveBackground, control.filter),
+    foreground: applyBrightnessFilter(effectiveForeground, control.filter),
+  };
+}
+
+/** WCAG相対輝度による2色のcontrast ratioを返す。 */
+function contrastRatio(first, second) {
+  const luminance = (channels) => channels
+    .map((channel) => channel / 255)
+    .map((channel) => (
+      channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    ))
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const firstLuminance = luminance(first);
+  const secondLuminance = luminance(second);
+  return (Math.max(firstLuminance, secondLuminance) + 0.05)
+    / (Math.min(firstLuminance, secondLuminance) + 0.05);
+}
+
+/** label bboxの保存RGBAから期待前景と背景差の文字画素率を数える。 */
+export function analyzeHudLabelPixels(
+  pixels,
+  width,
+  height,
+  foreground,
+  background,
+) {
+  assert.equal(pixels.length, width * height * 4, 'HUD label pixel buffer size is invalid.');
+  let distinctFromBackground = 0;
+  let foregroundMatches = 0;
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    const opaque = pixels[offset + 3] >= 250;
+    const matchesForeground = opaque && foreground.every(
+      (channel, index) => Math.abs(pixels[offset + index] - channel) <= LABEL_COLOR_TOLERANCE,
+    );
+    const differsFromBackground = opaque && background.some(
+      (channel, index) => Math.abs(pixels[offset + index] - channel) > LABEL_COLOR_TOLERANCE,
+    );
+    if (matchesForeground) foregroundMatches += 1;
+    if (differsFromBackground) distinctFromBackground += 1;
+  }
+  const pixelCount = width * height;
+  return {
+    distinctFromBackgroundRatio: distinctFromBackground / pixelCount,
+    foregroundMatchRatio: foregroundMatches / pixelCount,
+    height,
+    width,
+  };
 }
 
 /** capture直前のHUDが非空label・可視style・viewport内boxを安定して持つか検証する。 */
@@ -54,6 +145,38 @@ export function assertHudCaptureReadiness(readiness, viewport) {
     );
     assert(Object.values(control.borderWidths).every((width) => width > 0),
       `${name} has a missing border width: ${JSON.stringify(control.borderWidths)}`);
+    const label = control.labelStyle;
+    assert(label && control.label.trim().length > 0, `${name} label is empty.`);
+    assert(
+      label.display !== 'none'
+        && label.visibility === 'visible'
+        && Number.parseFloat(label.opacity) > 0,
+      `${name} label is not visibly painted: ${JSON.stringify(label)}`,
+    );
+    assert(label.box.width > 0 && label.box.height > 0,
+      `${name} label has no painted area: ${JSON.stringify(label.box)}`);
+    assert(
+      label.box.left >= 0
+        && label.box.top >= 0
+        && label.box.right <= viewport.width
+        && label.box.bottom <= viewport.height,
+      `${name} label exceeds viewport ${viewport.width}x${viewport.height}: ${JSON.stringify(label.box)}`,
+    );
+    const containmentTolerance = 0.5;
+    assert(
+      label.box.left >= control.box.left - containmentTolerance
+        && label.box.top >= control.box.top - containmentTolerance
+        && label.box.right <= control.box.right + containmentTolerance
+        && label.box.bottom <= control.box.bottom + containmentTolerance,
+      `${name} label exceeds its control: ${JSON.stringify({
+        control: control.box,
+        label: label.box,
+      })}`,
+    );
+    const renderedColors = resolveRenderedLabelColors(control);
+    const ratio = contrastRatio(renderedColors.foreground, renderedColors.background);
+    assert(ratio >= MINIMUM_LABEL_CONTRAST_RATIO,
+      `${name} label contrast is insufficient: ${ratio}.`);
   }
 }
 
@@ -66,6 +189,11 @@ export function assertHudPixelProof(proof) {
       assert(ratio >= MINIMUM_EDGE_MATCH_RATIO,
         `${name} ${edge} edge is not painted: ${ratio}.`);
     }
+    assert(
+      control.label.foregroundMatchRatio >= MINIMUM_LABEL_FOREGROUND_PIXEL_RATIO
+        || control.label.distinctFromBackgroundRatio >= MINIMUM_LABEL_DISTINCT_PIXEL_RATIO,
+      `${name} label text is not painted: ${JSON.stringify(control.label)}.`,
+    );
   }
 }
 
@@ -80,7 +208,9 @@ export async function waitForHudCaptureReadiness(page) {
         const label = document.querySelector(target.labelSelector);
         if (!element || !label) throw new Error(`${name} HUD element is missing.`);
         const box = element.getBoundingClientRect();
+        const labelBox = label.getBoundingClientRect();
         const style = getComputedStyle(element);
+        const labelStyle = getComputedStyle(label);
         controls[name] = {
           backgroundColor: style.backgroundColor,
           borderColor: style.borderTopColor,
@@ -101,6 +231,21 @@ export async function waitForHudCaptureReadiness(page) {
           display: style.display,
           filter: style.filter,
           label: label.textContent ?? '',
+          labelStyle: {
+            backgroundColor: labelStyle.backgroundColor,
+            box: {
+              bottom: labelBox.bottom,
+              height: labelBox.height,
+              left: labelBox.left,
+              right: labelBox.right,
+              top: labelBox.top,
+              width: labelBox.width,
+            },
+            color: labelStyle.color,
+            display: labelStyle.display,
+            opacity: labelStyle.opacity,
+            visibility: labelStyle.visibility,
+          },
           opacity: style.opacity,
           visibility: style.visibility,
         };
@@ -121,11 +266,25 @@ export async function waitForHudCaptureReadiness(page) {
   }, HUD_CAPTURE_TARGETS);
   const viewport = page.viewportSize();
   assert(viewport, 'Screenshot viewport is unavailable.');
+  readiness.controls = Object.fromEntries(
+    Object.entries(readiness.controls).map(([name, control]) => {
+      const renderedColors = resolveRenderedLabelColors(control);
+      return [name, {
+        ...control,
+        labelStyle: {
+          ...control.labelStyle,
+          contrastRatio: contrastRatio(renderedColors.foreground, renderedColors.background),
+          renderedBackgroundColor: renderedColors.background,
+          renderedColor: renderedColors.foreground,
+        },
+      }];
+    }),
+  );
   assertHudCaptureReadiness(readiness, viewport);
   return readiness;
 }
 
-/** screenshot bufferをbrowser Canvasでdecodeし、HUD背景と四辺のCSS色一致率を返す。 */
+/** screenshot bufferをdecodeし、HUD背景・四辺・label文字の実画素率を返す。 */
 export async function readHudPixelProof(page, screenshotBuffer, readiness) {
   const renderedControls = Object.fromEntries(Object.entries(readiness.controls).map(([name, control]) => [
     name,
@@ -133,9 +292,11 @@ export async function readHudPixelProof(page, screenshotBuffer, readiness) {
       ...control,
       renderedBackgroundColor: resolveRenderedCssColor(control.backgroundColor, control.filter),
       renderedBorderColor: resolveRenderedCssColor(control.borderColor, control.filter),
+      renderedLabelBackgroundColor: control.labelStyle.renderedBackgroundColor,
+      renderedLabelColor: control.labelStyle.renderedColor,
     },
   ]));
-  return page.evaluate(async ({ dataUrl, controls }) => {
+  const decoded = await page.evaluate(async ({ dataUrl, controls }) => {
     const image = await createImageBitmap(await (await fetch(dataUrl)).blob());
     const canvas = new OffscreenCanvas(image.width, image.height);
     const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -148,6 +309,11 @@ export async function readHudPixelProof(page, screenshotBuffer, readiness) {
       const width = Math.max(1, Math.ceil(control.box.right) - x);
       const height = Math.max(1, Math.ceil(control.box.bottom) - y);
       const pixels = context.getImageData(x, y, width, height).data;
+      const labelX = Math.floor(control.labelStyle.box.left);
+      const labelY = Math.floor(control.labelStyle.box.top);
+      const labelWidth = Math.max(1, Math.ceil(control.labelStyle.box.right) - labelX);
+      const labelHeight = Math.max(1, Math.ceil(control.labelStyle.box.bottom) - labelY);
+      const labelPixels = context.getImageData(labelX, labelY, labelWidth, labelHeight).data;
       const background = control.renderedBackgroundColor;
       const border = control.renderedBorderColor;
       const matches = (offset, expected) => (
@@ -194,6 +360,9 @@ export async function readHudPixelProof(page, screenshotBuffer, readiness) {
           right: countEdge('right'),
           top: countEdge('top'),
         },
+        labelHeight,
+        labelPixels: Array.from(labelPixels),
+        labelWidth,
       };
     }
     return { controls: result };
@@ -201,4 +370,25 @@ export async function readHudPixelProof(page, screenshotBuffer, readiness) {
     controls: renderedControls,
     dataUrl: `data:image/png;base64,${screenshotBuffer.toString('base64')}`,
   });
+  return {
+    controls: Object.fromEntries(Object.entries(decoded.controls).map(([name, control]) => {
+      const rendered = renderedControls[name];
+      const label = analyzeHudLabelPixels(
+        Uint8ClampedArray.from(control.labelPixels),
+        control.labelWidth,
+        control.labelHeight,
+        rendered.renderedLabelColor,
+        rendered.renderedLabelBackgroundColor,
+      );
+      return [name, {
+        backgroundMatchRatio: control.backgroundMatchRatio,
+        edgeMatchRatios: control.edgeMatchRatios,
+        label: {
+          ...label,
+          expectedBackgroundColor: rendered.renderedLabelBackgroundColor,
+          expectedForegroundColor: rendered.renderedLabelColor,
+        },
+      }];
+    })),
+  };
 }

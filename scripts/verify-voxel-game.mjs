@@ -1578,6 +1578,71 @@ async function verifyFireHazardLifecycle(browser, errors) {
     assert.equal(restarted.vehicle.resetCount, before.vehicle.resetCount,
       'Fire-hazard lifecycle garage return used a vehicle reset.');
 
+    await driveMissionToFire(page, touch);
+    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 17.2,
+      'restored fire hazard east heading staging', touch);
+    await alignWorldCoordinate(page, 2, -10.1, 'restored fire hazard targeting lane Z', 0.15, touch);
+    await driveAlongWorldAxis(page, 'negativeX', (state) => -state.vehicle.forward[0] >= 0.999,
+      'restored fire hazard negative-X heading', touch);
+    await alignWorldCoordinate(page, 0, 15.7, 'restored fire hazard head-on X', 0.15, touch);
+    const reblockStart = await readGameState(page);
+    assert.equal(reblockStart.runtime.fireIntensity, 1,
+      'Restored fire intensity changed before second collider contact.');
+    assert.equal(reblockStart.visuals.fireHazardEnabled, true,
+      'Restored fire hazard telemetry changed before second collider contact.');
+    assert.equal(reblockStart.vehicle.resetCount, before.vehicle.resetCount,
+      'Second fire-hazard approach used a vehicle reset.');
+
+    await touch.setStick(...worldDirectionToTouchStick(reblockStart.camera, -1, 0));
+    let reblockMinimumClearance = Number.POSITIVE_INFINITY;
+    let reblockContactClearance = null;
+    const reblockContactPositions = [];
+    for (let frame = 0; frame < 360; frame += 1) {
+      await waitForFrames(page, 1);
+      const state = await readGameState(page);
+      assert.equal(state.vehicle.resetCount, before.vehicle.resetCount,
+        'Vehicle reset while pressing the restored fire hazard.');
+      const clearance = collisionClearance(state.vehicle, FIRE_HAZARD_BOX, 'x', 1);
+      const headingAlongApproach = -state.vehicle.forward[0];
+      if (headingAlongApproach >= 0.999) {
+        reblockMinimumClearance = Math.min(reblockMinimumClearance, clearance);
+      }
+      if (headingAlongApproach >= 0.999 && clearance <= 0.12) {
+        reblockContactClearance ??= clearance;
+        reblockContactPositions.push(state.vehicle.position[0]);
+        if (reblockContactPositions.length >= 45) break;
+      }
+    }
+    await touch.releaseStick();
+    await brakeVehicle(page);
+    const reblockedState = await readGameState(page);
+    assert(reblockContactPositions.length >= 45,
+      'Vehicle did not reach and hold the restored fire hazard for 45 frames.');
+    const reblockContactTravel = Math.max(...reblockContactPositions)
+      - Math.min(...reblockContactPositions);
+    assert(reblockMinimumClearance >= -0.09,
+      `Vehicle penetrated the restored fire hazard: ${JSON.stringify({
+        reblockContactTravel,
+        reblockMinimumClearance,
+        reblockStart: reblockStart.vehicle,
+        reblocked: reblockedState.vehicle,
+      })}`);
+    assert(reblockContactTravel <= 0.18,
+      `Vehicle traversed the restored fire hazard while input was held (${reblockContactTravel}).`);
+    const reblockCenterClearance = reblockedState.vehicle.position[0]
+      - (FIRE_HAZARD_BOX.position[0] + FIRE_HAZARD_BOX.scale[0] / 2);
+    assert(reblockCenterClearance > 0,
+      `Vehicle center crossed the restored fire hazard: ${JSON.stringify({
+        centerClearance: reblockCenterClearance,
+        position: reblockedState.vehicle.position,
+      })}`);
+    assert.equal(reblockedState.vehicle.resetCount, before.vehicle.resetCount,
+      'Restored fire-hazard contact used a vehicle reset.');
+    assert.equal(reblockedState.runtime.fireIntensity, 1,
+      'Fire intensity changed during restored fire-hazard contact.');
+    assert.equal(reblockedState.visuals.fireHazardEnabled, true,
+      'Fire hazard telemetry changed during restored fire-hazard contact.');
+
     return {
       before: {
         enabled: before.visuals.fireHazardEnabled,
@@ -1601,6 +1666,18 @@ async function verifyFireHazardLifecycle(browser, errors) {
         passedDistance,
         position: passed.vehicle.position,
         resetCount: passed.vehicle.resetCount,
+      },
+      reblocked: {
+        centerClearance: reblockCenterClearance,
+        contactClearance: reblockContactClearance,
+        contactFrameCount: reblockContactPositions.length,
+        contactTravel: reblockContactTravel,
+        enabled: reblockedState.visuals.fireHazardEnabled,
+        fireIntensity: reblockedState.runtime.fireIntensity,
+        minimumClearance: reblockMinimumClearance,
+        position: reblockedState.vehicle.position,
+        resetCount: reblockedState.vehicle.resetCount,
+        sameContext: true,
       },
       restarted: {
         atGarage: restarted.runtime.signals.atGarage,

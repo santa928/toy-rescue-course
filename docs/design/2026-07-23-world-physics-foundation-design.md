@@ -147,7 +147,7 @@
 1. PCとtouchで、車庫内の初期重なりなし、正面出庫、消火、自由走行、正面帰庫、再開を完走する。
 2. 車庫背面壁・側壁へ押し続けてもAABBを横断せず、逆入力で離脱できる。
 3. 公園遊具へ実車で接触し、貫通・reset・操作不能がない。
-4. 消火前の炎根元へ進入できず、放水で消火した後は同じ領域を横断できる。
+4. 消火前の炎根元へ進入できず、放水で消火した後は同じ領域を横断でき、帰庫再開後は同一browser contextの再接触でも再び停止する。
 5. 道しるべ上を走行でき、速度低下・衝突・破壊eventが発生しない。
 6. 既存の木・建物衝突、画面方向操作、水流、4色破壊、復元を回帰確認する。
 7. Desktop 1280×720、tablet landscape 1024×768、mobile landscape 844×390を原寸目視する。
@@ -160,10 +160,10 @@
 - Build: Docker内のproduction buildがPASSし、`index.html`、`vehicle-lab.html`、`voxel-game.html`を生成。既知の500kB超chunk警告のみ。
 - Voxel Game E2E: Fix round 1後のfresh full runが`full: true`、`mode: "full"`、`status: "completed"`、`contractFailures: []`、console/page/request errorが0/0/0で完了。
 - Mission: PC/touchとも消火・自由走行・帰庫を完走し、`assigned`かつ`atGarage: true`で再開。
-- Physics: 木、建物、車庫背面・右壁、遊具板の実接触、燃焼中の炎停止・消火後の同領域通過、12個の道しるべ通過を確認。
+- Physics: 木、建物、車庫背面・右壁、遊具板の実接触、燃焼中の炎停止・消火後の同領域通過・帰庫再開後の同一context再停止、12個の道しるべ通過を確認。fresh fullの再停止は45 frame、接触中移動`0.0567`、最小clearance`-0.0475`、車両中心余白`1.6850`、reset 0件。
 - Regression: 水pool 24 stream + 8 splash、fresh runのdraw-call delta 1（上限2）、4色それぞれ6主破片、約1.2秒終了、5秒復元を維持。
 - Vehicle Lab E2E: `status: "completed"`、`verificationFailures: []`、3 viewportともbrowser error 0件。
-- Visual: 27 PNGすべてでcapture直前のfont ready・2連続rAF安定、mission/fullscreen/joystick/sprayの非空label・computed visibility・viewport内包、保存bufferの背景と上下左右4辺のRGBA画素を検証した。`screenshotProofs`は27/27件、最小背景一致率`0.3409`、最小辺一致率`0.375`で、3 viewportの寸法確認とcontact sheet目視でもblank/clippingなし。大画像previewのタイル合成表示は実PNG判定の根拠にしない。
+- Visual: 27 PNGすべてでcapture直前のfont ready・2連続rAF安定を待ち、mission/fullscreen/joystick/sprayのlabel自身についてcomputed `display` / `visibility` / `opacity` / `color` / `backgroundColor` / bbox、viewport・親control内包、contrast 4.5以上を検証した。保存bufferでは親背景・上下左右4辺に加え、label bbox内の期待前景または背景差文字画素を検証・記録した。`screenshotProofs`は27/27件、最小contrast`6.5282`、最小背景差文字画素率`0.1441`、最小背景一致率`0.3409`、最小辺一致率`0.375`。3 viewport contact sheetと108個の原寸label crop目視でもblank/clipping/label消失なし。大画像previewのタイル合成表示は実PNG判定の根拠にしない。
 - Performance: DockerはSwiftShaderのため機能・レイアウト証跡のみ。物理GPUでの性能認証は未実施。
 
 ## 受け入れ条件
