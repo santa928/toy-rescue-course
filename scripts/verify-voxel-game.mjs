@@ -4,6 +4,11 @@ import fs from 'node:fs';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright';
 import * as THREE from 'three';
+import {
+  assertHudPixelProof,
+  readHudPixelProof,
+  waitForHudCaptureReadiness,
+} from './voxel-game-screenshot-proof.mjs';
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
@@ -16,6 +21,7 @@ if (focusMode !== null) {
 const outputDirectory = focusMode === null
   ? canonicalOutputDirectory
   : `${canonicalOutputDirectory}/focus/${focusMode}`;
+const screenshotProofs = {};
 const targets = [
   { hasTouch: false, height: 720, minimumFps: 60, name: 'desktop', width: 1_280 },
   { hasTouch: true, height: 768, minimumFps: 30, name: 'tablet-landscape', width: 1_024 },
@@ -234,6 +240,30 @@ function projectWorldPoint(cameraTelemetry, position) {
 /** JSON artifactを改行付きで保存する。 */
 function writeJsonArtifact(name, payload) {
   fs.writeFileSync(`${outputDirectory}/${name}`, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+/** HUDの安定DOM状態と保存bufferの実画素を検証してからPNGを成果物へ書き込む。 */
+async function captureVerifiedScreenshot(page, path) {
+  const readiness = await waitForHudCaptureReadiness(page);
+  const buffer = await page.screenshot();
+  const pixels = await readHudPixelProof(page, buffer, readiness);
+  assertHudPixelProof(pixels);
+  fs.writeFileSync(path, buffer);
+  screenshotProofs[path.split('/').at(-1)] = {
+    controls: readiness.controls,
+    pixels: pixels.controls,
+    stableSamples: readiness.stableSamples,
+  };
+}
+
+/** 検証済みPNGを代表名へ複製し、元画像の画素証跡も同時に引き継ぐ。 */
+function copyVerifiedScreenshot(sourcePath, targetPath) {
+  const sourceName = sourcePath.split('/').at(-1);
+  const targetName = targetPath.split('/').at(-1);
+  assert(sourceName && targetName && screenshotProofs[sourceName],
+    `Screenshot proof is unavailable for copy: ${sourcePath}`);
+  fs.copyFileSync(sourcePath, targetPath);
+  screenshotProofs[targetName] = { ...screenshotProofs[sourceName], copiedFrom: sourceName };
 }
 
 /** 6主破片の平均world Yを返す。 */
@@ -862,7 +892,9 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
     if (touch) await touch.pressSpray();
     else await page.keyboard.down('Space');
     await waitForTargetedSpray(page, `${name}: targeted spray`);
-    if (hasTouch) await page.screenshot({ path: `${outputDirectory}/mobile-landscape-water-fire.png` });
+    if (hasTouch) {
+      await captureVerifiedScreenshot(page, `${outputDirectory}/mobile-landscape-water-fire.png`);
+    }
     await page.evaluate(() => window.advanceTime?.(2_500));
     await waitForFrames(page, 2);
     if (touch) await touch.releaseSpray();
@@ -871,7 +903,7 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
     assert.equal(celebration.runtime.fireIntensity, 0, `${name}: fire remains after 2500ms.`);
     assert.equal(celebration.runtime.missionPhase, 'celebrating', `${name}: celebration did not start.`);
     assert.equal(celebration.visuals.starCubeCount, 30, `${name}: celebration stars are incomplete.`);
-    if (!hasTouch) await page.screenshot({ path: `${outputDirectory}/desktop-complete.png` });
+    if (!hasTouch) await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-complete.png`);
     await page.evaluate(() => window.advanceTime?.(1_800));
     await waitForFrames(page, 2);
     const freeRoam = await readGameState(page);
@@ -935,7 +967,7 @@ async function verifyWaterTimeline(browser, errors) {
       renderer: start.renderer,
       waterInstances: start.visuals.waterInstances,
     });
-    await page.screenshot({ path: `${outputDirectory}/desktop-water-start.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-water-start.png`);
 
     await page.waitForTimeout(60);
     const flow = await readGameState(page);
@@ -962,7 +994,7 @@ async function verifyWaterTimeline(browser, errors) {
       renderer: flow.renderer,
       waterInstances: flow.visuals.waterInstances,
     });
-    await page.screenshot({ path: `${outputDirectory}/desktop-water-flow.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-water-flow.png`);
 
     await page.waitForTimeout(60);
     const splash = await readGameState(page);
@@ -977,7 +1009,7 @@ async function verifyWaterTimeline(browser, errors) {
       splashCount,
       waterInstances: splash.visuals.waterInstances,
     });
-    await page.screenshot({ path: `${outputDirectory}/desktop-water-splash.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-water-splash.png`);
     return {
       advancingSlots,
       drawCallDelta: splash.renderer.rendererCalls - steadyCalls,
@@ -1200,15 +1232,18 @@ async function verifyBreakTimeline(browser, errors, contractFailures, blockId, c
         observer,
         state: latestCandidate,
       });
-      await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-first-observed.png` });
-      await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png` });
+      await captureVerifiedScreenshot(
+        page,
+        `${outputDirectory}/desktop-break-${colorName}-first-observed.png`,
+      );
+      await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png`);
       return {
         activationObserved: false,
         approach,
         impactSpeed: latestCandidate?.breakables.blocks.find(({ id }) => id === blockId)?.maxImpactSpeed,
       };
     }
-    await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-first-observed.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-break-${colorName}-first-observed.png`);
     await page.waitForFunction(
       () => window.__voxelBreakFrameObserver?.samples.some(
         ({ sinceFirstActiveMs }) => sinceFirstActiveMs !== null && sinceFirstActiveMs >= 250,
@@ -1216,7 +1251,7 @@ async function verifyBreakTimeline(browser, errors, contractFailures, blockId, c
       undefined,
       { timeout: 2_000 },
     );
-    await page.screenshot({ path: `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png`);
     await page.waitForFunction(() => window.__voxelBreakFrameObserver?.running === false, undefined, { timeout: 2_500 });
     const observer = await stopAndReadBreakFrameObserver(page);
     const analysis = analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId);
@@ -1401,7 +1436,7 @@ async function verifyWorldCollisionScenario(browser, errors, {
       && heldState.vehicle.position[2] <= heldState.worldBounds.maxZ,
     `${obstacle.id}: collision left the vehicle outside world bounds.`);
     await waitForFrames(page, 2);
-    await page.screenshot({ path: `${outputDirectory}/desktop-collision-${obstacle.id}.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-collision-${obstacle.id}.png`);
 
     await touch.releaseStick();
     await brakeVehicle(page);
@@ -1492,7 +1527,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
     assert(contactTravel <= 0.18, 'Vehicle traversed the enabled fire hazard while input was held.');
     assert.equal(blocked.vehicle.resetCount, before.vehicle.resetCount);
     await waitForFrames(page, 2);
-    await page.screenshot({ path: `${outputDirectory}/desktop-fire-hazard-before.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-fire-hazard-before.png`);
 
     await touch.pressSpray();
     await waitForTargetedSpray(page, 'Fire-hazard lifecycle spray');
@@ -1524,7 +1559,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
     })}`);
     assert.equal(passed.vehicle.resetCount, before.vehicle.resetCount);
     await waitForFrames(page, 2);
-    await page.screenshot({ path: `${outputDirectory}/desktop-fire-hazard-after.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-fire-hazard-after.png`);
 
     await page.evaluate(() => window.advanceTime?.(1_800));
     await waitForFrames(page, 2);
@@ -1664,7 +1699,7 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
     );
     assert.equal(after.visuals.routeCubeCount, 12);
     await waitForFrames(page, 2);
-    await page.screenshot({ path: `${outputDirectory}/desktop-route-marker-pass-through.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-route-marker-pass-through.png`);
     return {
       resetCount: after.vehicle.resetCount,
       routeMarkerCount: after.visuals.routeCubeCount,
@@ -1783,7 +1818,7 @@ async function verifyViewport(browser, target, errors) {
       const driven = await readGameState(page);
       assert(driven.controls.moveX > 0.45 && driven.controls.moveY > 0.45,
         `${target.name}: touch did not move toward screen upper-right.`);
-      await page.screenshot({ path: `${outputDirectory}/${target.name}-driving.png` });
+      await captureVerifiedScreenshot(page, `${outputDirectory}/${target.name}-driving.png`);
       await touch.releaseStick();
       const cancelled = await readGameState(page);
       assert(cancelled.controls.moveX === 0 && cancelled.controls.moveY === 0,
@@ -1794,7 +1829,7 @@ async function verifyViewport(browser, target, errors) {
       await waitForFrames(page, 30);
       await page.keyboard.up('KeyW');
       await page.keyboard.up('KeyA');
-      await page.screenshot({ path: `${outputDirectory}/desktop-driving.png` });
+      await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-driving.png`);
       await brakeVehicle(page);
       const beforeTurn = await readGameState(page);
       await page.keyboard.down('KeyA');
@@ -1821,7 +1856,7 @@ async function verifyViewport(browser, target, errors) {
         && water.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length >= 1
         && water.visuals.fireLayerCount === 2,
         `Tablet water/fire visuals are wrong: ${JSON.stringify(water.visuals)}`);
-      await page.screenshot({ path: `${outputDirectory}/tablet-landscape-water-fire.png` });
+      await captureVerifiedScreenshot(page, `${outputDirectory}/tablet-landscape-water-fire.png`);
       await touch.releaseSpray();
     }
 
@@ -1843,7 +1878,7 @@ function assembleRepresentativeScreenshots() {
   ];
   for (const [source, target] of copies) {
     assert(fs.existsSync(`${outputDirectory}/${source}`), `Missing source screenshot: ${source}`);
-    fs.copyFileSync(`${outputDirectory}/${source}`, `${outputDirectory}/${target}`);
+    copyVerifiedScreenshot(`${outputDirectory}/${source}`, `${outputDirectory}/${target}`);
   }
   for (const screenshot of expectedScreenshots) {
     assert(fs.existsSync(`${outputDirectory}/${screenshot}`), `Missing representative screenshot: ${screenshot}`);
@@ -1873,8 +1908,18 @@ async function verifyVoxelGame() {
       const waterTimeline = await verifyWaterTimeline(browser, errors);
       for (const target of targets) viewports[target.name] = await verifyViewport(browser, target, errors);
       assert.equal(errors.length, 0, `Focused non-break browser/request errors: ${errors.join(' | ')}`);
-      fs.copyFileSync(`${outputDirectory}/desktop-water-splash.png`, `${outputDirectory}/desktop-water-fire.png`);
-      writeJsonArtifact('focused-nonbreak.json', { directMovement, errors, missions, viewports, waterTimeline });
+      copyVerifiedScreenshot(
+        `${outputDirectory}/desktop-water-splash.png`,
+        `${outputDirectory}/desktop-water-fire.png`,
+      );
+      writeJsonArtifact('focused-nonbreak.json', {
+        directMovement,
+        errors,
+        missions,
+        screenshotProofs,
+        viewports,
+        waterTimeline,
+      });
       console.log(JSON.stringify({ directMovement, missions, viewports, waterTimeline }));
       return;
     } finally {
@@ -1894,6 +1939,7 @@ async function verifyVoxelGame() {
         artifacts: collisionScreenshots,
         collisions,
         errors,
+        screenshotProofs,
       });
       assert.equal(errors.length, 0, `Focused collision browser/request errors: ${errors.join(' | ')}`);
       console.log(JSON.stringify({ artifacts: collisionScreenshots, collisions, errors }));
@@ -1910,7 +1956,12 @@ async function verifyVoxelGame() {
     const contractFailures = [];
     try {
       const result = await verifyBreakTimeline(browser, errors, contractFailures, blockId, focusedBreak);
-      writeJsonArtifact(`focused-break-${focusedBreak}.json`, { contractFailures, errors, result });
+      writeJsonArtifact(`focused-break-${focusedBreak}.json`, {
+        contractFailures,
+        errors,
+        result,
+        screenshotProofs,
+      });
       assert.equal(errors.length, 0, `Focused browser/request errors: ${errors.join(' | ')}`);
       assert.equal(contractFailures.length, 0, `Focused break contract failures: ${contractFailures.join(' | ')}`);
       console.log(JSON.stringify({ blockId, contractFailures, result }));
@@ -1981,6 +2032,7 @@ async function verifyVoxelGame() {
       targets: Object.fromEntries(targets.map(({ minimumFps, name }) => [name, minimumFps])),
     },
     regressions,
+    screenshotProofs,
     task7,
     viewports,
     waterTimeline,

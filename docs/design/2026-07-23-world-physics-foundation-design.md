@@ -158,12 +158,12 @@
 - Tasks 1〜4: 2026-07-26 実装・レビュー完了。
 - Unit: Docker内で19 files / 123 testsがPASS、失敗0件。
 - Build: Docker内のproduction buildがPASSし、`index.html`、`vehicle-lab.html`、`voxel-game.html`を生成。既知の500kB超chunk警告のみ。
-- Voxel Game E2E: fresh full runが`full: true`、`mode: "full"`、`status: "completed"`、`contractFailures: []`、console/page/request errorが0/0/0で完了。
+- Voxel Game E2E: Fix round 1後のfresh full runが`full: true`、`mode: "full"`、`status: "completed"`、`contractFailures: []`、console/page/request errorが0/0/0で完了。
 - Mission: PC/touchとも消火・自由走行・帰庫を完走し、`assigned`かつ`atGarage: true`で再開。
 - Physics: 木、建物、車庫背面・右壁、遊具板の実接触、燃焼中の炎停止・消火後の同領域通過、12個の道しるべ通過を確認。
-- Regression: 水pool 24 stream + 8 splash、draw-call delta 2、4色それぞれ6主破片、約1.2秒終了、5秒復元を維持。
+- Regression: 水pool 24 stream + 8 splash、fresh runのdraw-call delta 1（上限2）、4色それぞれ6主破片、約1.2秒終了、5秒復元を維持。
 - Vehicle Lab E2E: `status: "completed"`、`verificationFailures: []`、3 viewportともbrowser error 0件。
-- Visual: Desktop 1280×720、tablet landscape 1024×768、mobile landscape 844×390の代表画像を原寸目視し、HUDの安全余白、車庫開口、車両、道しるべ、放水、blank/clippingなしを確認。
+- Visual: 27 PNGすべてでcapture直前のfont ready・2連続rAF安定、mission/fullscreen/joystick/sprayの非空label・computed visibility・viewport内包、保存bufferの背景と上下左右4辺のRGBA画素を検証した。`screenshotProofs`は27/27件、最小背景一致率`0.3409`、最小辺一致率`0.375`で、3 viewportの寸法確認とcontact sheet目視でもblank/clippingなし。大画像previewのタイル合成表示は実PNG判定の根拠にしない。
 - Performance: DockerはSwiftShaderのため機能・レイアウト証跡のみ。物理GPUでの性能認証は未実施。
 
 ## 受け入れ条件
