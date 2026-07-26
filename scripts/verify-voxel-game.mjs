@@ -444,8 +444,8 @@ function assertPoolIdentity(state, expected, scenario) {
   assert.deepEqual(actual, expected, `${scenario}: fixed pool identity changed.`);
 }
 
-/** console/page/request failureを収集し、独立contextでscene/HUD/hookを開く。 */
-async function openViewportPage(browser, target, errors) {
+/** console/page/request failureを収集し、指定entryの独立contextでscene/HUD/hookを開く。 */
+async function openViewportPage(browser, target, errors, pathname = '/voxel-game.html') {
   const context = await browser.newContext({
     hasTouch: target.hasTouch,
     viewport: { height: target.height, width: target.width },
@@ -458,7 +458,7 @@ async function openViewportPage(browser, target, errors) {
   page.on('requestfailed', (request) => errors.push(
     `${target.name}: requestfailed: ${request.url()} ${request.failure()?.errorText ?? ''}`,
   ));
-  await page.goto(`${baseUrl}/voxel-game.html?release=${target.name}-${Date.now()}`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}${pathname}?release=${target.name}-${Date.now()}`, { waitUntil: 'networkidle' });
   await page.locator('.voxel-game-canvas canvas').waitFor({ state: 'visible' });
   await page.locator('.voxel-game-hud').waitFor({ state: 'visible' });
   await page.waitForFunction(
@@ -521,6 +521,35 @@ async function measureLayout(page, target) {
       `${target.name}: ${first}/${second} overlap.`);
   }
   return layout;
+}
+
+/** 標準rootがDesktop/Mobileとも新Voxel Gameの初期状態とlayoutを公開するか検証する。 */
+async function verifyCanonicalRoot(browser, errors) {
+  const results = {};
+  for (const target of [
+    { hasTouch: false, height: 720, name: 'root-desktop', width: 1_280 },
+    { hasTouch: true, height: 390, name: 'root-mobile-landscape', width: 844 },
+  ]) {
+    const { context, page } = await openViewportPage(browser, target, errors, '/');
+    try {
+      const state = await readGameState(page);
+      const layout = await measureLayout(page, target);
+      assert.equal(state.mode, 'drive-ready');
+      assert.equal(state.runtime.missionPhase, 'assigned');
+      assert(Math.abs(state.vehicle.position[0]) <= 0.5);
+      assert(Math.abs(state.vehicle.position[2] - 14) <= 0.5);
+      assert(state.vehicle.mass >= 1.3);
+      results[target.name] = {
+        layout,
+        mode: state.mode,
+        missionPhase: state.runtime.missionPhase,
+        vehiclePosition: state.vehicle.position,
+      };
+    } finally {
+      await context.close();
+    }
+  }
+  return results;
 }
 
 /** Canvasが公開するWebGL renderer情報を取得する。 */
@@ -1973,6 +2002,7 @@ async function verifyVoxelGame() {
     const errors = [];
     const viewports = {};
     try {
+      const canonicalRoot = await verifyCanonicalRoot(browser, errors);
       const directMovement = await verifyDirectMovement(browser, errors);
       const missions = {
         desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
@@ -1986,6 +2016,7 @@ async function verifyVoxelGame() {
         `${outputDirectory}/desktop-water-fire.png`,
       );
       writeJsonArtifact('focused-nonbreak.json', {
+        canonicalRoot,
         directMovement,
         errors,
         missions,
@@ -1993,7 +2024,13 @@ async function verifyVoxelGame() {
         viewports,
         waterTimeline,
       });
-      console.log(JSON.stringify({ directMovement, missions, viewports, waterTimeline }));
+      console.log(JSON.stringify({
+        canonicalRoot,
+        directMovement,
+        missions,
+        viewports,
+        waterTimeline,
+      }));
       return;
     } finally {
       await browser.close();
@@ -2051,11 +2088,13 @@ async function verifyVoxelGame() {
   const contractFailures = [];
   const viewports = {};
   const breakTimelines = {};
+  let canonicalRoot;
   let collisions;
   let directMovement;
   let missions;
   let waterTimeline;
   try {
+    canonicalRoot = await verifyCanonicalRoot(browser, errors);
     directMovement = await verifyDirectMovement(browser, errors);
     missions = {
       desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
@@ -2093,6 +2132,7 @@ async function verifyVoxelGame() {
   const report = {
     artifacts: [...expectedScreenshots, ...timelineScreenshots, ...collisionScreenshots],
     breakTimelines,
+    canonicalRoot,
     collisions,
     contractFailures,
     directMovement,
