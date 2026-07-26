@@ -73,14 +73,6 @@ declare global {
     set_vehicle_lab_view?: (
       view: import('./vehicle-lab/scene/VehicleShowroom').VehicleLabView,
     ) => void;
-    __toyRescueTelemetry?: {
-      vehicleId: string;
-      position: readonly [number, number, number];
-      speed?: number;
-      activeBlocks: number;
-      terrain?: 'table' | 'sand' | 'water' | 'paintPool';
-      colorEffect: import('./game/simulation/colorEffect').ColorEffect | null;
-    };
     __vehicleLabTelemetry?: {
       cameraPosition: readonly [number, number, number];
       cameraZoom: number;
