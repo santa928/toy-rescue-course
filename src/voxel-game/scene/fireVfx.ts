@@ -45,7 +45,7 @@ export const FIRE_VOXEL_SLOTS: readonly FireVoxelSlot[] = [
   { slot: 9, role: 'middle', kind: 'flame', minimumLayerCount: 2, basePosition: [12.72, 1.38, -9.05], baseScale: [0.36, 0.7, 0.35], phase: 0.91, cycleSeconds: 0.97 },
   { slot: 10, role: 'middle', kind: 'flame', minimumLayerCount: 3, basePosition: [13.08, 1.88, -9.12], baseScale: [0.32, 0.82, 0.32], phase: 0.28, cycleSeconds: 0.86 },
   { slot: 11, role: 'core', kind: 'flame', minimumLayerCount: 1, basePosition: [12.9, 0.55, -8.85], baseScale: [0.48, 0.58, 0.44], phase: 0.17, cycleSeconds: 0.69 },
-  { slot: 12, role: 'core', kind: 'flame', minimumLayerCount: 1, basePosition: [12.74, 0.82, -8.82], baseScale: [0.3, 0.46, 0.28], phase: 0.56, cycleSeconds: 0.81 },
+  { slot: 12, role: 'core', kind: 'flame', minimumLayerCount: 1, basePosition: [12.78, 0.82, -8.82], baseScale: [0.3, 0.46, 0.28], phase: 0.56, cycleSeconds: 0.81 },
   { slot: 13, role: 'core', kind: 'flame', minimumLayerCount: 2, basePosition: [13.05, 1.08, -8.92], baseScale: [0.3, 0.55, 0.3], phase: 0.76, cycleSeconds: 0.9 },
   { slot: 14, role: 'core', kind: 'flame', minimumLayerCount: 3, basePosition: [12.88, 1.5, -8.92], baseScale: [0.26, 0.62, 0.26], phase: 0.38, cycleSeconds: 0.72 },
   { slot: 15, role: 'middle', kind: 'spark', minimumLayerCount: 1, basePosition: [12.6, 0.78, -8.8], baseScale: [0.16, 0.16, 0.16], phase: 0.1, cycleSeconds: 0.85 },

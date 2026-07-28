@@ -16,6 +16,16 @@ const maximumTop = (layerCount: number): number => Math.max(
   ...activeFlames(layerCount).map(({ position, scale }) => position[1] + scale[1] / 2),
 );
 
+/** 指定axisでactive flame cube群が画面上に占める可視幅を返す。 */
+const visibleFootprint = (
+  flames: ReturnType<typeof activeFlames>,
+  axis: 0 | 1 | 2,
+): number => {
+  const minimum = Math.min(...flames.map(({ position, scale }) => position[axis] - scale[axis] / 2));
+  const maximum = Math.max(...flames.map(({ position, scale }) => position[axis] + scale[axis] / 2));
+  return maximum - minimum;
+};
+
 describe('fireVfx', () => {
   it('0〜17の一意な固定slotを3色batchへ配る', () => {
     expect(FIRE_VOXEL_POOL_SIZE).toBe(18);
@@ -38,10 +48,8 @@ describe('fireVfx', () => {
       .map(({ position, scale }) => position[1] + scale[1] / 2)
       .filter((top) => top > 1.8);
 
-    expect(Math.max(...base.map(({ position }) => position[0]))
-      - Math.min(...base.map(({ position }) => position[0]))).toBeGreaterThanOrEqual(0.5);
-    expect(Math.max(...base.map(({ position }) => position[2]))
-      - Math.min(...base.map(({ position }) => position[2]))).toBeGreaterThanOrEqual(0.15);
+    expect(visibleFootprint(base, 0)).toBeGreaterThanOrEqual(0.5);
+    expect(visibleFootprint(base, 2)).toBeGreaterThanOrEqual(0.15);
     expect(highTops.length).toBeGreaterThanOrEqual(3);
   });
 
