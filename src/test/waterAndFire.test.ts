@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from 'react';
 import type * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { VoxelGameRuntime } from '../voxel-game/domain/VoxelGameRuntime';
+import * as WaterAndFireModule from '../voxel-game/scene/WaterAndFire';
 import {
   createFireVoxelFrame,
   getActiveFireVoxelCount,
@@ -14,6 +15,7 @@ import {
   FireHazardCollider,
   ROUTE_BOXES,
   advanceWaterVfxClock,
+  createFireBatchScratch,
   getFireLayerCount,
   getWaterVisibleDistance,
   isFireHazardEnabled,
@@ -62,6 +64,8 @@ interface TestCollider {
 type FireHazardTestRef = ((collider: TestCollider | null) => void) | {
   current: TestCollider | null;
 };
+
+type FireFrameUpdateMode = 'skip' | 'update' | 'zero';
 
 /** componentを再renderし、ref再attachなしで低頻度effectだけを進める。 */
 function renderFireHazardCollider(enabled: boolean): FireHazardTestRef {
@@ -202,6 +206,26 @@ describe('WaterAndFire', () => {
     expect(getActiveFireVoxelCount(layerCount)).toBe(expectedVoxels);
   });
 
+  it('stage 0初回だけzero転送し、継続時はskip、再点火時はupdateする', () => {
+    const selectUpdateMode = (
+      WaterAndFireModule as typeof WaterAndFireModule & {
+        readonly selectFireFrameUpdateMode?: (
+          previousLayerCount: number,
+          nextLayerCount: number,
+        ) => FireFrameUpdateMode;
+      }
+    ).selectFireFrameUpdateMode;
+    expect(selectUpdateMode).toBeTypeOf('function');
+    if (!selectUpdateMode) return;
+
+    expect([
+      selectUpdateMode(3, 0),
+      selectUpdateMode(0, 0),
+      selectUpdateMode(0, 2),
+      selectUpdateMode(2, 1),
+    ]).toEqual(['zero', 'skip', 'update', 'update']);
+  });
+
   it('全18 transformからouter 6 slotだけを固定batch順へ転送する', () => {
     const setMatrixAt = vi.fn();
     const mesh = {
@@ -211,7 +235,7 @@ describe('WaterAndFire', () => {
     } as unknown as THREE.InstancedMesh;
     const frame = createFireVoxelFrame({ elapsedSeconds: 0.2, layerCount: 3 });
 
-    updateFireBatch(mesh, 'outer', frame.instances);
+    updateFireBatch(mesh, 'outer', frame.instances, createFireBatchScratch());
 
     expect(setMatrixAt).toHaveBeenCalledTimes(6);
     expect(mesh.visible).toBe(true);
@@ -227,7 +251,7 @@ describe('WaterAndFire', () => {
     } as unknown as THREE.InstancedMesh;
     const frame = createFireVoxelFrame({ elapsedSeconds: 0.2, layerCount: 0 });
 
-    updateFireBatch(mesh, 'middle', frame.instances);
+    updateFireBatch(mesh, 'middle', frame.instances, createFireBatchScratch());
 
     expect(setMatrixAt).toHaveBeenCalledTimes(8);
     expect(mesh.visible).toBe(false);

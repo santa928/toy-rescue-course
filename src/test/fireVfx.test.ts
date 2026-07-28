@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as fireVfxModule from '../voxel-game/scene/fireVfx';
 import {
   FIRE_ROLE_CAPACITY,
   FIRE_VOXEL_POOL_SIZE,
@@ -6,6 +7,13 @@ import {
   createFireVoxelFrame,
   getActiveFireVoxelCount,
 } from '../voxel-game/scene/fireVfx';
+
+type ReusableFireFrameFactory = (
+  input: { readonly elapsedSeconds: number; readonly layerCount: number },
+  target: ReturnType<typeof createFireVoxelFrame>,
+) => ReturnType<typeof createFireVoxelFrame>;
+
+type FireElapsedAdvancer = (elapsedSeconds: number, deltaSeconds: number) => number;
 
 const activeFlames = (layerCount: number, elapsedSeconds = 0.25) => (
   createFireVoxelFrame({ elapsedSeconds, layerCount }).instances
@@ -58,6 +66,78 @@ describe('fireVfx', () => {
     expect(maximumTop(2)).toBeGreaterThan(maximumTop(1));
     expect(getActiveFireVoxelCount(3)).toBeGreaterThan(getActiveFireVoxelCount(2));
     expect(getActiveFireVoxelCount(2)).toBeGreaterThan(getActiveFireVoxelCount(1));
+  });
+
+  it('再利用targetへ書き込んでもframe・18 transform・tupleのidentityを維持する', () => {
+    const frame = createFireVoxelFrame({ elapsedSeconds: 0, layerCount: 3 });
+    const transformIdentities = [...frame.instances];
+    const positionIdentities = frame.instances.map(({ position }) => position);
+    const scaleIdentities = frame.instances.map(({ scale }) => scale);
+    const createReusableFrame = createFireVoxelFrame as unknown as ReusableFireFrameFactory;
+
+    const result = createReusableFrame({ elapsedSeconds: 0.37, layerCount: 2 }, frame);
+
+    expect(result).toBe(frame);
+    expect(result.instances).toBe(frame.instances);
+    result.instances.forEach((transform, index) => {
+      expect(transform).toBe(transformIdentities[index]);
+      expect(transform.position).toBe(positionIdentities[index]);
+      expect(transform.scale).toBe(scaleIdentities[index]);
+    });
+    expect(result.instances.filter(({ active }) => active)).toHaveLength(12);
+  });
+
+  it('同一inputを別bufferで2回評価してもdeep equalになる', () => {
+    const input = { elapsedSeconds: 7.43, layerCount: 2 };
+
+    expect(createFireVoxelFrame(input)).toEqual(createFireVoxelFrame(input));
+  });
+
+  it('複数flame slotはnormalized deltaと移動方向が同一にならない', () => {
+    const start = createFireVoxelFrame({ elapsedSeconds: 0, layerCount: 3 });
+    const later = createFireVoxelFrame({ elapsedSeconds: 0.05, layerCount: 3 });
+    const slot0Delta = [
+      (later.instances[0].position[0] - start.instances[0].position[0]) / 0.08,
+      (later.instances[0].scale[1] - start.instances[0].scale[1])
+        / FIRE_VOXEL_SLOTS[0].baseScale[1],
+    ];
+    const slot3Delta = [
+      (later.instances[3].position[0] - start.instances[3].position[0]) / 0.08,
+      (later.instances[3].scale[1] - start.instances[3].scale[1])
+        / FIRE_VOXEL_SLOTS[3].baseScale[1],
+    ];
+
+    expect(Math.sign(slot0Delta[0])).not.toBe(Math.sign(slot3Delta[0]));
+    expect(slot0Delta).not.toEqual(slot3Delta);
+  });
+
+  it('119.99→120.01秒で時計をwrapせずflame位置・scaleを連続させる', () => {
+    const advanceElapsed = (
+      fireVfxModule as typeof fireVfxModule & {
+        readonly advanceFireVoxelElapsedSeconds?: FireElapsedAdvancer;
+      }
+    ).advanceFireVoxelElapsedSeconds;
+    expect(advanceElapsed).toBeTypeOf('function');
+    if (!advanceElapsed) return;
+
+    const elapsedSeconds = advanceElapsed(119.99, 0.02);
+    const before = createFireVoxelFrame({ elapsedSeconds: 119.99, layerCount: 3 });
+    const after = createFireVoxelFrame({ elapsedSeconds, layerCount: 3 });
+    const flameDeltas = after.instances.flatMap((transform, index) => (
+      transform.kind === 'flame'
+        ? [
+          ...transform.position.map((value, axis) => (
+            Math.abs(value - before.instances[index].position[axis])
+          )),
+          ...transform.scale.map((value, axis) => (
+            Math.abs(value - before.instances[index].scale[axis])
+          )),
+        ]
+        : []
+    ));
+
+    expect(elapsedSeconds).toBeCloseTo(120.01, 10);
+    expect(Math.max(...flameDeltas)).toBeLessThan(0.1);
   });
 
   it('複数の炎が非同期に動き、基準位置0.18・基準scale18%以内に収まる', () => {

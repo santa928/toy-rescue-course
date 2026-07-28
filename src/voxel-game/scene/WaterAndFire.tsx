@@ -17,8 +17,11 @@ import {
   type WaterInstanceTransform,
 } from './waterFlow';
 import {
+  advanceFireVoxelElapsedSeconds,
   createFireVoxelFrame,
   FIRE_ROLE_CAPACITY,
+  updateFireVoxelFrame,
+  type FireVoxelFrame,
   type FireVoxelRole,
   type FireVoxelTransform,
 } from './fireVfx';
@@ -224,26 +227,60 @@ export function getFireLayerCount(intensity: number): number {
   return 0;
 }
 
+export type FireFrameUpdateMode = 'skip' | 'update' | 'zero';
+
+/** 火勢段階から、matrix更新・消火時zero転送・継続停止をpureに判定する。 */
+export function selectFireFrameUpdateMode(
+  previousLayerCount: number,
+  nextLayerCount: number,
+): FireFrameUpdateMode {
+  if (nextLayerCount > 0) return 'update';
+  return previousLayerCount > 0 ? 'zero' : 'skip';
+}
+
+/** 炎3 batchが共有するThree.js計算object。component mount時に一度だけ作る。 */
+export interface FireBatchScratch {
+  readonly matrix: THREE.Matrix4;
+  readonly position: THREE.Vector3;
+  readonly quaternion: THREE.Quaternion;
+  readonly scale: THREE.Vector3;
+}
+
+/** 炎matrix転送で再利用するscratch object群を作る。 */
+export function createFireBatchScratch(): FireBatchScratch {
+  return {
+    matrix: new THREE.Matrix4(),
+    position: new THREE.Vector3(),
+    quaternion: new THREE.Quaternion(),
+    scale: new THREE.Vector3(),
+  };
+}
+
 /** 全18 transformから同色slotだけを固定batch順へ転送する。 */
 export function updateFireBatch(
   mesh: THREE.InstancedMesh | null,
   role: FireVoxelRole,
   instances: readonly FireVoxelTransform[],
+  scratch: FireBatchScratch,
 ): void {
   if (!mesh) return;
-  const matrix = new THREE.Matrix4();
-  const position = new THREE.Vector3();
-  const quaternion = new THREE.Quaternion();
-  const scale = new THREE.Vector3();
   let batchIndex = 0;
   let visible = false;
 
   for (const instance of instances) {
     if (instance.role !== role) continue;
-    position.fromArray(instance.position);
-    scale.fromArray(instance.active ? instance.scale : [0, 0, 0]);
-    matrix.compose(position, quaternion, scale);
-    mesh.setMatrixAt(batchIndex, matrix);
+    scratch.position.fromArray(instance.position);
+    if (instance.active) {
+      scratch.scale.fromArray(instance.scale);
+    } else {
+      scratch.scale.set(0, 0, 0);
+    }
+    scratch.matrix.compose(
+      scratch.position,
+      scratch.quaternion,
+      scratch.scale,
+    );
+    mesh.setMatrixAt(batchIndex, scratch.matrix);
     visible ||= instance.active;
     batchIndex += 1;
   }
@@ -361,10 +398,18 @@ export function WaterAndFire({
   const middleFireRef = useRef<THREE.InstancedMesh>(null);
   const coreFireRef = useRef<THREE.InstancedMesh>(null);
   const fireElapsedRef = useRef(0);
+  const fireFrameRef = useRef<FireVoxelFrame | null>(null);
+  const fireBatchScratchRef = useRef<FireBatchScratch | null>(null);
+  const previousFireLayerCountRef = useRef(0);
   const sprayElapsedRef = useRef(0);
   const splashElapsedRef = useRef(0);
   const previousResetCountRef = useRef<number | null>(null);
   const previousMissionPhaseRef = useRef<VoxelGameSnapshot['missionPhase'] | null>(null);
+  const fireFrame = fireFrameRef.current
+    ?? createFireVoxelFrame({ elapsedSeconds: 0, layerCount: 0 });
+  const fireBatchScratch = fireBatchScratchRef.current ?? createFireBatchScratch();
+  fireFrameRef.current = fireFrame;
+  fireBatchScratchRef.current = fireBatchScratch;
 
   useEffect(() => runtime.subscribe((snapshot) => {
     const next = selectMissionVisualState(snapshot);
@@ -380,16 +425,43 @@ export function WaterAndFire({
 
   useFrame((_state, delta) => {
     const missionSnapshot = runtime.getSnapshot();
-    fireElapsedRef.current = (
-      fireElapsedRef.current + (Number.isFinite(delta) ? Math.max(0, delta) : 0)
-    ) % 120;
-    const fireFrame = createFireVoxelFrame({
-      elapsedSeconds: fireElapsedRef.current,
-      layerCount: getFireLayerCount(missionSnapshot.fireIntensity),
-    });
-    updateFireBatch(outerFireRef.current, 'outer', fireFrame.instances);
-    updateFireBatch(middleFireRef.current, 'middle', fireFrame.instances);
-    updateFireBatch(coreFireRef.current, 'core', fireFrame.instances);
+    const fireLayerCount = getFireLayerCount(missionSnapshot.fireIntensity);
+    const fireUpdateMode = selectFireFrameUpdateMode(
+      previousFireLayerCountRef.current,
+      fireLayerCount,
+    );
+    if (fireUpdateMode !== 'skip') {
+      if (fireUpdateMode === 'update') {
+        fireElapsedRef.current = advanceFireVoxelElapsedSeconds(
+          fireElapsedRef.current,
+          delta,
+        );
+      }
+      updateFireVoxelFrame(
+        fireFrame,
+        fireElapsedRef.current,
+        fireLayerCount,
+      );
+      updateFireBatch(
+        outerFireRef.current,
+        'outer',
+        fireFrame.instances,
+        fireBatchScratch,
+      );
+      updateFireBatch(
+        middleFireRef.current,
+        'middle',
+        fireFrame.instances,
+        fireBatchScratch,
+      );
+      updateFireBatch(
+        coreFireRef.current,
+        'core',
+        fireFrame.instances,
+        fireBatchScratch,
+      );
+    }
+    previousFireLayerCountRef.current = fireLayerCount;
     const resetEvent = previousResetCountRef.current !== null && previousMissionPhaseRef.current !== null
       && isWaterVfxResetEvent(
         previousResetCountRef.current,

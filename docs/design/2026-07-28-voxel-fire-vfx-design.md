@@ -171,6 +171,14 @@ pure frameを色別InstancedMeshへ反映する。既存`useFrame`内で炎時�
 
 ## 実装結果
 
+- 最終レビューで、18 transformと各position/scale tupleをcomponent mount時に一度だけ
+  確保し、`useFrame`では同じidentityへin-place更新する方式へ修正した。3 batchの
+  `Matrix4`・`Vector3`・`Quaternion`もmount時に作る1組のscratchを共有し、fire hot path
+  ではarray/object/Three.js objectを新規生成しない。
+- 火勢が0へ遷移するframeだけ全18 slotのzero matrixを転送し、stage 0継続中は炎frameの
+  再計算と3 batch転送を停止する。0から再点火した場合は同じbufferとbatchで更新を再開する。
+- 炎時計のglobal 120秒wrapを廃止した。経過秒は単調に進め、三角関数へ渡す角度だけを
+  slotごとのoscillator周期内へ正規化するため、119.99秒から120.01秒でも位置・scaleは連続する。
 - `fireVfx.ts`は18固定slot（outer 6、middle 8、core 4）を維持し、赤・橙・黄白の
   3色`InstancedMesh` batchだけで描画する。炎専用のdraw call上限は3で、火勢は
   18→12→6→0、車庫復帰後は18へ戻ることをunit・text telemetry・E2Eで追跡した。

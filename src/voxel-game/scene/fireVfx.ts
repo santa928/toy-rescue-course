@@ -27,6 +27,21 @@ export interface FireVoxelFrame {
   readonly instances: readonly FireVoxelTransform[];
 }
 
+type MutableFireVoxelTuple = [number, number, number];
+
+interface MutableFireVoxelTransform {
+  active: boolean;
+  readonly kind: FireVoxelKind;
+  readonly position: MutableFireVoxelTuple;
+  readonly role: FireVoxelRole;
+  readonly scale: MutableFireVoxelTuple;
+  readonly slot: number;
+}
+
+interface MutableFireVoxelFrame {
+  readonly instances: MutableFireVoxelTransform[];
+}
+
 const TAU = Math.PI * 2;
 
 export const FIRE_VOXEL_POOL_SIZE = 18;
@@ -69,6 +84,25 @@ function modulo(value: number, modulus: number): number {
   return ((value % modulus) + modulus) % modulus;
 }
 
+/** finiteな非負deltaだけを累積し、任意のglobal周期ではwrapしない。 */
+export function advanceFireVoxelElapsedSeconds(
+  elapsedSeconds: number,
+  deltaSeconds: number,
+): number {
+  const elapsed = normalizeElapsedSeconds(elapsedSeconds);
+  const delta = Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0;
+  return elapsed + delta;
+}
+
+/** 長時間経過後も巨大角を三角関数へ渡さず、oscillator固有周期の角度を返す。 */
+function createOscillatorAngle(
+  elapsedSeconds: number,
+  cycleSeconds: number,
+  phase: number,
+): number {
+  return modulo(elapsedSeconds, cycleSeconds) / cycleSeconds * TAU + phase * TAU;
+}
+
 /** 固定slotのうち現在火勢で表示する個数を返す。 */
 export function getActiveFireVoxelCount(layerCount: number): number {
   const normalized = normalizeLayerCount(layerCount);
@@ -78,77 +112,108 @@ export function getActiveFireVoxelCount(layerCount: number): number {
   );
 }
 
-/** 通常炎1slotの非同期な揺れと伸縮を計算する。 */
-function createFlameTransform(
+/** 通常炎1slotの非同期な揺れと伸縮を既存tupleへ上書きする。 */
+function updateFlameTransform(
+  transform: MutableFireVoxelTransform,
   slot: FireVoxelSlot,
   elapsedSeconds: number,
   active: boolean,
-): FireVoxelTransform {
-  const phaseRadians = slot.phase * TAU;
-  const verticalWave = Math.sin(elapsedSeconds / slot.cycleSeconds * TAU + phaseRadians);
-  const horizontalWave = Math.sin(
-    elapsedSeconds / (slot.cycleSeconds * 1.37) * TAU + phaseRadians,
-  );
-  const depthWave = Math.cos(
-    elapsedSeconds / (slot.cycleSeconds * 1.19) * TAU + phaseRadians,
-  );
-  return {
-    active,
-    kind: slot.kind,
-    position: [
-      slot.basePosition[0] + horizontalWave * 0.08,
-      slot.basePosition[1] + verticalWave * 0.07,
-      slot.basePosition[2] + depthWave * 0.04,
-    ],
-    role: slot.role,
-    scale: active ? [
-      slot.baseScale[0] * (1 - verticalWave * 0.05),
-      slot.baseScale[1] * (1 + verticalWave * 0.14),
-      slot.baseScale[2] * (1 - verticalWave * 0.05),
-    ] : [0, 0, 0],
-    slot: slot.slot,
-  };
+): void {
+  const verticalWave = Math.sin(createOscillatorAngle(
+    elapsedSeconds,
+    slot.cycleSeconds,
+    slot.phase,
+  ));
+  const horizontalWave = Math.sin(createOscillatorAngle(
+    elapsedSeconds,
+    slot.cycleSeconds * 1.37,
+    slot.phase,
+  ));
+  const depthWave = Math.cos(createOscillatorAngle(
+    elapsedSeconds,
+    slot.cycleSeconds * 1.19,
+    slot.phase,
+  ));
+  transform.active = active;
+  transform.position[0] = slot.basePosition[0] + horizontalWave * 0.08;
+  transform.position[1] = slot.basePosition[1] + verticalWave * 0.07;
+  transform.position[2] = slot.basePosition[2] + depthWave * 0.04;
+  transform.scale[0] = active
+    ? slot.baseScale[0] * (1 - verticalWave * 0.05)
+    : 0;
+  transform.scale[1] = active
+    ? slot.baseScale[1] * (1 + verticalWave * 0.14)
+    : 0;
+  transform.scale[2] = active
+    ? slot.baseScale[2] * (1 - verticalWave * 0.05)
+    : 0;
 }
 
-/** 火の粉1slotを上昇・縮小させ、寿命後に同じslotへ循環させる。 */
-function createSparkTransform(
+/** 火の粉1slotを既存tuple上で上昇・縮小させ、寿命後に同じslotへ循環させる。 */
+function updateSparkTransform(
+  transform: MutableFireVoxelTransform,
   slot: FireVoxelSlot,
   elapsedSeconds: number,
   active: boolean,
-): FireVoxelTransform {
+): void {
   const age = modulo(elapsedSeconds / slot.cycleSeconds + slot.phase, 1);
   const scaleFactor = 1 - age * 0.7;
+  transform.active = active;
+  transform.position[0] = slot.basePosition[0]
+    + Math.sin(age * TAU + slot.phase * TAU) * 0.12;
+  transform.position[1] = slot.basePosition[1] + age * 2;
+  transform.position[2] = slot.basePosition[2]
+    + Math.cos(age * TAU + slot.phase * TAU) * 0.09;
+  transform.scale[0] = active ? slot.baseScale[0] * scaleFactor : 0;
+  transform.scale[1] = active ? slot.baseScale[1] * scaleFactor : 0;
+  transform.scale[2] = active ? slot.baseScale[2] * scaleFactor : 0;
+}
+
+/** 18 transformとtupleを一度だけ確保する。 */
+function allocateFireVoxelFrame(): FireVoxelFrame {
   return {
-    active,
-    kind: slot.kind,
-    position: [
-      slot.basePosition[0] + Math.sin(age * TAU + slot.phase * TAU) * 0.12,
-      slot.basePosition[1] + age * 2,
-      slot.basePosition[2] + Math.cos(age * TAU + slot.phase * TAU) * 0.09,
-    ],
-    role: slot.role,
-    scale: active ? [
-      slot.baseScale[0] * scaleFactor,
-      slot.baseScale[1] * scaleFactor,
-      slot.baseScale[2] * scaleFactor,
-    ] : [0, 0, 0],
-    slot: slot.slot,
+    instances: FIRE_VOXEL_SLOTS.map((slot) => ({
+      active: false,
+      kind: slot.kind,
+      position: [0, 0, 0],
+      role: slot.role,
+      scale: [0, 0, 0],
+      slot: slot.slot,
+    })),
   };
 }
 
-/** 同じ時刻・火勢から同じ18 transformを返すpureな炎frame計算。 */
+/** 既存18 transform bufferを同じidentityのまま指定時刻・火勢へ更新する。 */
+export function updateFireVoxelFrame(
+  frame: FireVoxelFrame,
+  elapsedSecondsInput: number,
+  layerCountInput: number,
+): FireVoxelFrame {
+  const elapsedSeconds = normalizeElapsedSeconds(elapsedSecondsInput);
+  const layerCount = normalizeLayerCount(layerCountInput);
+  const mutableFrame = frame as MutableFireVoxelFrame;
+
+  for (let index = 0; index < FIRE_VOXEL_SLOTS.length; index += 1) {
+    const slot = FIRE_VOXEL_SLOTS[index];
+    const transform = mutableFrame.instances[index];
+    const active = layerCount >= slot.minimumLayerCount;
+    if (slot.kind === 'spark') {
+      updateSparkTransform(transform, slot, elapsedSeconds, active);
+    } else {
+      updateFlameTransform(transform, slot, elapsedSeconds, active);
+    }
+  }
+  return frame;
+}
+
+/** 同じ時刻・火勢から決定的な18 transformを返し、任意targetはin-place再利用する。 */
 export function createFireVoxelFrame(input: {
   readonly elapsedSeconds: number;
   readonly layerCount: number;
-}): FireVoxelFrame {
-  const elapsedSeconds = normalizeElapsedSeconds(input.elapsedSeconds);
-  const layerCount = normalizeLayerCount(input.layerCount);
-  return {
-    instances: FIRE_VOXEL_SLOTS.map((slot) => {
-      const active = layerCount >= slot.minimumLayerCount;
-      return slot.kind === 'spark'
-        ? createSparkTransform(slot, elapsedSeconds, active)
-        : createFlameTransform(slot, elapsedSeconds, active);
-    }),
-  };
+}, target?: FireVoxelFrame): FireVoxelFrame {
+  return updateFireVoxelFrame(
+    target ?? allocateFireVoxelFrame(),
+    input.elapsedSeconds,
+    input.layerCount,
+  );
 }
