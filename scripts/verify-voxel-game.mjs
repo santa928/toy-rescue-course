@@ -213,9 +213,11 @@ async function readGameState(page) {
   return state;
 }
 
-/** 初期sceneがfire hazardと非障害物route markerの公開契約を満たすことを確認する。 */
+/** 初期sceneがfire hazard、18個の火炎slot、非障害物route markerの公開契約を満たすことを確認する。 */
 function assertInitialWorldPhysicsContract(initial) {
   assert.equal(initial.visuals.fireHazardEnabled, true, 'Initial fire hazard is disabled.');
+  assert.equal(initial.visuals.fireVoxelCount, 18, 'Initial voxel fire pool is incomplete.');
+  assert.equal(initial.visuals.fireLayerCount, 3, 'Initial fire layer compatibility changed.');
   assert.deepEqual(initial.visualLayout.fireHazard, FIRE_HAZARD_BOX,
     'Fire hazard telemetry differs from the E2E clearance contract.');
   assert.equal(initial.visualLayout.routeMarkers.length, 12, 'Route marker layout is incomplete.');
@@ -922,6 +924,7 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
     else await page.keyboard.up('Space');
     const celebration = await readGameState(page);
     assert.equal(celebration.runtime.fireIntensity, 0, `${name}: fire remains after 2500ms.`);
+    assert.equal(celebration.visuals.fireVoxelCount, 0, `${name}: voxel fire remains after 2500ms.`);
     assert.equal(celebration.runtime.missionPhase, 'celebrating', `${name}: celebration did not start.`);
     assert.equal(celebration.visuals.starCubeCount, 30, `${name}: celebration stars are incomplete.`);
     if (!hasTouch) await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-complete.png`);
@@ -934,6 +937,7 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
     assert.equal(restarted.runtime.signals.atGarage, true, `${name}: garage signal is not active.`);
     assert.equal(restarted.runtime.fireIntensity, 1, `${name}: fire was not restored at garage.`);
     assert.equal(restarted.visuals.fireHazardEnabled, true, `${name}: fire hazard was not restored at garage.`);
+    assert.equal(restarted.visuals.fireVoxelCount, 18, `${name}: voxel fire was not restored.`);
     assert.equal(restarted.vehicle.resetCount, initialResetCount, `${name}: mission route used a vehicle reset.`);
     assert(restarted.runtime.routeVisible, `${name}: route was not restored at garage.`);
     return {
@@ -1045,10 +1049,26 @@ async function verifyWaterTimeline(browser, errors) {
   }
 }
 
-/** 新しい木/建物colliderを横断しない道路waypointから指定blockの正面へ揃える。 */
+/**
+ * 新しい木/建物colliderを横断しない道路waypointから指定blockの正面へ揃え、
+ * garage exitの開始・到達telemetryをbreak結果へ残す。
+ */
 async function driveToBlockApproach(page, block) {
-  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+  const garageExitBefore = await readGameState(page);
+  const garageExitAfter = await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
     `${block.id} garage exit`);
+  const garageExit = {
+    after: {
+      controls: garageExitAfter.controls,
+      position: garageExitAfter.vehicle.position,
+      resetCount: garageExitAfter.vehicle.resetCount,
+    },
+    before: {
+      controls: garageExitBefore.controls,
+      position: garageExitBefore.vehicle.position,
+      resetCount: garageExitBefore.vehicle.resetCount,
+    },
+  };
   if (block.id === 'plaza-blue') {
     const westOuterX = -17.2;
     const approachZ = -1;
@@ -1064,13 +1084,13 @@ async function driveToBlockApproach(page, block) {
       `${block.id}: west corridor drifted into the red-block support envelope: ${JSON.stringify(staged.vehicle.position)}.`);
     await alignWorldCoordinate(page, 0, westOuterX, `${block.id} west lower correction X`);
     await alignWorldCoordinate(page, 2, approachZ, `${block.id} west approach Z`);
-    return { axis: 'positiveX', approach: 'west-corrected-corridor' };
+    return { axis: 'positiveX', approach: 'west-corrected-corridor', garageExit };
   }
   if (block.id === 'plaza-red') {
     await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= block.position[0] + 2.5,
       `${block.id} north-road longitude`);
     await alignWorldCoordinate(page, 0, block.position[0], `${block.id} north approach X`);
-    return { axis: 'negativeZ', approach: 'north-road' };
+    return { axis: 'negativeZ', approach: 'north-road', garageExit };
   }
   if (block.id === 'plaza-yellow' || block.id === 'plaza-green') {
     await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 12,
@@ -1080,7 +1100,7 @@ async function driveToBlockApproach(page, block) {
     await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= block.position[0] + 2.5,
       `${block.id} south-road longitude`);
     await alignWorldCoordinate(page, 0, block.position[0], `${block.id} south approach X`);
-    return { axis: 'positiveZ', approach: 'south-outer-road' };
+    return { axis: 'positiveZ', approach: 'south-outer-road', garageExit };
   }
   throw new Error(`${block.id}: no collider-safe block approach is defined.`);
 }
@@ -1564,6 +1584,8 @@ async function verifyFireHazardLifecycle(browser, errors) {
     const extinguished = await readGameState(page);
     assert.equal(extinguished.runtime.fireIntensity, 0);
     assert.equal(extinguished.visuals.fireHazardEnabled, false);
+    assert.equal(extinguished.visuals.fireVoxelCount, 0,
+      'Fire-hazard lifecycle: voxel fire remains after extinguishing.');
     await page.locator('.mission-pill[data-phase="celebrating"]').waitFor({ state: 'visible' });
     await waitForFrames(page, 2);
 
@@ -1602,6 +1624,8 @@ async function verifyFireHazardLifecycle(browser, errors) {
       'Fire intensity was not fully restored after returning to the garage.');
     assert.equal(restarted.visuals.fireHazardEnabled, true,
       'Fire hazard was not restored after returning to the garage.');
+    assert.equal(restarted.visuals.fireVoxelCount, 18,
+      'Fire-hazard lifecycle: voxel fire was not restored after returning to the garage.');
     assert.equal(restarted.vehicle.resetCount, before.vehicle.resetCount,
       'Fire-hazard lifecycle garage return used a vehicle reset.');
 
@@ -1956,10 +1980,12 @@ async function verifyViewport(browser, target, errors) {
       await page.evaluate(() => window.advanceTime?.(1_000));
       await page.waitForTimeout(180);
       const water = await readGameState(page);
-      assert(water.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'stream').length >= 4
-        && water.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length >= 1
-        && water.visuals.fireLayerCount === 2,
-        `Tablet water/fire visuals are wrong: ${JSON.stringify(water.visuals)}`);
+      assert(water.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'stream').length >= 4,
+        `Tablet water stream is incomplete: ${JSON.stringify(water.visuals)}`);
+      assert(water.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length >= 1,
+        `Tablet water splash is incomplete: ${JSON.stringify(water.visuals)}`);
+      assert.equal(water.visuals.fireLayerCount, 2, 'Tablet fire did not enter the middle stage.');
+      assert.equal(water.visuals.fireVoxelCount, 12, 'Tablet middle-stage voxel count is wrong.');
       await captureVerifiedScreenshot(page, `${outputDirectory}/tablet-landscape-water-fire.png`);
       await touch.releaseSpray();
     }
