@@ -168,3 +168,24 @@ pure frameを色別InstancedMeshへ反映する。既存`useFrame`内で炎時�
 - material・geometry・InstancedMeshの毎frame生成なし。
 - 既存の物理GPU目標を維持する: Desktop 60fps、Tablet/Mobile landscape 30fps以上。
 - DockerのSwiftShader fpsは記録だけに使い、物理GPU認証には使わない。
+
+## 実装結果
+
+- `fireVfx.ts`は18固定slot（outer 6、middle 8、core 4）を維持し、赤・橙・黄白の
+  3色`InstancedMesh` batchだけで描画する。炎専用のdraw call上限は3で、火勢は
+  18→12→6→0、車庫復帰後は18へ戻ることをunit・text telemetry・E2Eで追跡した。
+- Docker内fresh unitは`18 files / 138 tests`がPASS（exit 0）。production buildも
+  `tsc -b && vite build`がexit 0で、3 HTML entryを生成した。Viteの500kB超chunk警告は
+  既存の警告であり、本VFXの失敗ではない。
+- Docker内canonical full E2Eはexit 0。`run-manifest.json`は`status: "completed"`、
+  `mode: "full"`、`full: true`、`error: null`で、`results.json`は
+  `contractFailures: []`、browser error（console/page/request）`0/0/0`、
+  artifacts 27・`screenshotProofs` 27だった。
+- `desktop-fire-hazard-before.png`と`desktop-water-fire.png`（1280×720）、
+  `mobile-landscape-water-fire.png`（844×390）をoriginal detailで目視した。幅広い赤い外炎、
+  橙の中炎、黄白い芯、非対称な炎の舌と暖色の火の粉を確認し、放水、消防車、mission HUD、
+  joystick、放水buttonとの意図しない重なり・欠け・はみ出しはなかった。Tabletの弱火画像でも
+  火勢低下が読めた。
+- 残課題: 機能・回帰・代表画面の範囲にはない。Docker ChromiumはSwiftShaderであり、
+  Dockerで得たfpsを物理GPUの性能認証には使わない。VFX込みの性能認証が必要な場合は、
+  物理GPUが見える実機browserで別途測定する。
