@@ -16,6 +16,12 @@ import {
   WATER_INSTANCE_COUNT,
   type WaterInstanceTransform,
 } from './waterFlow';
+import {
+  createFireVoxelFrame,
+  FIRE_ROLE_CAPACITY,
+  type FireVoxelRole,
+  type FireVoxelTransform,
+} from './fireVfx';
 import { scaleToHalfExtents } from './worldCollisionLayout';
 import { FIRE_POSITION } from './worldLayout';
 
@@ -218,6 +224,33 @@ export function getFireLayerCount(intensity: number): number {
   return 0;
 }
 
+/** 全18 transformから同色slotだけを固定batch順へ転送する。 */
+export function updateFireBatch(
+  mesh: THREE.InstancedMesh | null,
+  role: FireVoxelRole,
+  instances: readonly FireVoxelTransform[],
+): void {
+  if (!mesh) return;
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  let batchIndex = 0;
+  let visible = false;
+
+  for (const instance of instances) {
+    if (instance.role !== role) continue;
+    position.fromArray(instance.position);
+    scale.fromArray(instance.active ? instance.scale : [0, 0, 0]);
+    matrix.compose(position, quaternion, scale);
+    mesh.setMatrixAt(batchIndex, matrix);
+    visible ||= instance.active;
+    batchIndex += 1;
+  }
+  mesh.visible = visible;
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
 /** 車両telemetryからnozzle起点を作り、放水表示と消火signalを同じ照準結果へ束ねる。 */
 export function resolveWaterAndFireFrame(
   telemetry: VehicleTelemetry,
@@ -324,6 +357,10 @@ export function WaterAndFire({
   const [visualState, setVisualState] = useState(() => selectMissionVisualState(runtime.getSnapshot()));
   const blueWaterRef = useRef<THREE.InstancedMesh>(null);
   const whiteWaterRef = useRef<THREE.InstancedMesh>(null);
+  const outerFireRef = useRef<THREE.InstancedMesh>(null);
+  const middleFireRef = useRef<THREE.InstancedMesh>(null);
+  const coreFireRef = useRef<THREE.InstancedMesh>(null);
+  const fireElapsedRef = useRef(0);
   const sprayElapsedRef = useRef(0);
   const splashElapsedRef = useRef(0);
   const previousResetCountRef = useRef<number | null>(null);
@@ -343,6 +380,16 @@ export function WaterAndFire({
 
   useFrame((_state, delta) => {
     const missionSnapshot = runtime.getSnapshot();
+    fireElapsedRef.current = (
+      fireElapsedRef.current + (Number.isFinite(delta) ? Math.max(0, delta) : 0)
+    ) % 120;
+    const fireFrame = createFireVoxelFrame({
+      elapsedSeconds: fireElapsedRef.current,
+      layerCount: getFireLayerCount(missionSnapshot.fireIntensity),
+    });
+    updateFireBatch(outerFireRef.current, 'outer', fireFrame.instances);
+    updateFireBatch(middleFireRef.current, 'middle', fireFrame.instances);
+    updateFireBatch(coreFireRef.current, 'core', fireFrame.instances);
     const resetEvent = previousResetCountRef.current !== null && previousMissionPhaseRef.current !== null
       && isWaterVfxResetEvent(
         previousResetCountRef.current,
@@ -386,24 +433,33 @@ export function WaterAndFire({
   return (
     <group>
       <FireHazardCollider enabled={visualState.fireHazardEnabled} />
-      {visualState.fireLayerCount >= 1 ? (
-        <mesh position={FIRE_LAYER_BOXES[0].position}>
-          <boxGeometry args={FIRE_LAYER_BOXES[0].scale} />
-          <meshLambertMaterial color="#ffd23f" emissive="#ef7d22" emissiveIntensity={0.48} />
-        </mesh>
-      ) : null}
-      {visualState.fireLayerCount >= 2 ? (
-        <mesh position={FIRE_LAYER_BOXES[1].position}>
-          <boxGeometry args={FIRE_LAYER_BOXES[1].scale} />
-          <meshLambertMaterial color="#f47c20" emissive="#ef4c23" emissiveIntensity={0.42} />
-        </mesh>
-      ) : null}
-      {visualState.fireLayerCount >= 3 ? (
-        <mesh position={FIRE_LAYER_BOXES[2].position}>
-          <boxGeometry args={FIRE_LAYER_BOXES[2].scale} />
-          <meshLambertMaterial color="#ef4c23" emissive="#f47c20" emissiveIntensity={0.38} />
-        </mesh>
-      ) : null}
+      <instancedMesh
+        args={[undefined, undefined, FIRE_ROLE_CAPACITY.outer]}
+        frustumCulled={false}
+        ref={outerFireRef}
+        visible={false}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshLambertMaterial color="#ef3b24" emissive="#a51d16" emissiveIntensity={0.48} />
+      </instancedMesh>
+      <instancedMesh
+        args={[undefined, undefined, FIRE_ROLE_CAPACITY.middle]}
+        frustumCulled={false}
+        ref={middleFireRef}
+        visible={false}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshLambertMaterial color="#ff7a1a" emissive="#ef3b24" emissiveIntensity={0.55} />
+      </instancedMesh>
+      <instancedMesh
+        args={[undefined, undefined, FIRE_ROLE_CAPACITY.core]}
+        frustumCulled={false}
+        ref={coreFireRef}
+        visible={false}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshLambertMaterial color="#fff2a6" emissive="#ffb11b" emissiveIntensity={0.62} />
+      </instancedMesh>
       <instancedMesh
         args={[undefined, undefined, WATER_BLUE_INSTANCE_COUNT]}
         frustumCulled={false}

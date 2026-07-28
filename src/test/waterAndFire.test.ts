@@ -1,7 +1,12 @@
 import { Children, isValidElement } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import type * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { VoxelGameRuntime } from '../voxel-game/domain/VoxelGameRuntime';
+import {
+  createFireVoxelFrame,
+  getActiveFireVoxelCount,
+} from '../voxel-game/scene/fireVfx';
 import {
   CELEBRATION_STAR_CENTERS,
   FIRE_HAZARD_BOX,
@@ -15,6 +20,7 @@ import {
   isWaterVfxResetEvent,
   resolveWaterAndFireFrame,
   syncColliderEnabled,
+  updateFireBatch,
 } from '../voxel-game/scene/WaterAndFire';
 
 const fireHazardLifecycle = vi.hoisted(() => ({
@@ -182,6 +188,50 @@ describe('WaterAndFire', () => {
     [0, 0],
   ])('火の強さ%fを純ボクセル%f層へ変換する', (intensity, expectedLayers) => {
     expect(getFireLayerCount(intensity)).toBe(expectedLayers);
+  });
+
+  it.each([
+    [1, 3, 18], [0.66, 2, 12], [0.33, 1, 6], [0, 0, 0],
+  ])('火の強さ%fは既存%s層・新VFX%s個へ一致する', (
+    intensity,
+    expectedLayers,
+    expectedVoxels,
+  ) => {
+    const layerCount = getFireLayerCount(intensity);
+    expect(layerCount).toBe(expectedLayers);
+    expect(getActiveFireVoxelCount(layerCount)).toBe(expectedVoxels);
+  });
+
+  it('全18 transformからouter 6 slotだけを固定batch順へ転送する', () => {
+    const setMatrixAt = vi.fn();
+    const mesh = {
+      instanceMatrix: { needsUpdate: false },
+      setMatrixAt,
+      visible: false,
+    } as unknown as THREE.InstancedMesh;
+    const frame = createFireVoxelFrame({ elapsedSeconds: 0.2, layerCount: 3 });
+
+    updateFireBatch(mesh, 'outer', frame.instances);
+
+    expect(setMatrixAt).toHaveBeenCalledTimes(6);
+    expect(mesh.visible).toBe(true);
+    expect(mesh.instanceMatrix.needsUpdate).toBe(true);
+  });
+
+  it('消火後も固定batch全slotへzero scale matrixを書き、batchを非表示にする', () => {
+    const setMatrixAt = vi.fn();
+    const mesh = {
+      instanceMatrix: { needsUpdate: false },
+      setMatrixAt,
+      visible: true,
+    } as unknown as THREE.InstancedMesh;
+    const frame = createFireVoxelFrame({ elapsedSeconds: 0.2, layerCount: 0 });
+
+    updateFireBatch(mesh, 'middle', frame.instances);
+
+    expect(setMatrixAt).toHaveBeenCalledTimes(8);
+    expect(mesh.visible).toBe(false);
+    expect(mesh.instanceMatrix.needsUpdate).toBe(true);
   });
 
   it('前方6unit内へ放水したときだけtargetedな消火signalを作る', () => {

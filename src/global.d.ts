@@ -42,6 +42,7 @@ declare global {
     readonly visuals: {
       readonly fireHazardEnabled: boolean;
       readonly fireLayerCount: number;
+      readonly fireVoxelCount: number;
       readonly fragmentCollisionEnabledCount: number;
       readonly fragmentPoolSlotCount: number;
       readonly fragmentVisibleCount: number;

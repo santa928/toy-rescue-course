@@ -30,6 +30,7 @@ import {
   isFireHazardEnabled,
   type MissionTelemetry,
 } from './scene/WaterAndFire';
+import { getActiveFireVoxelCount } from './scene/fireVfx';
 import { createWaterFlowFrame } from './scene/waterFlow';
 import type { WorldCameraTelemetry } from './scene/WorldFixedCamera';
 import {
@@ -168,6 +169,7 @@ export function VoxelGameApp(): ReactElement {
         visibleDistance: getWaterVisibleDistance(missionTelemetry.distance, missionTelemetry.targeted),
       });
       const vehicle = telemetryRef.current;
+      const fireLayerCount = getFireLayerCount(runtime.fireIntensity);
       const breakables = breakablePoolHandleRef.current?.readActualTelemetry()
         ?? breakableTelemetryRef.current;
       const payload: VoxelGameTextState = {
@@ -215,7 +217,8 @@ export function VoxelGameApp(): ReactElement {
         },
         visuals: {
           fireHazardEnabled: isFireHazardEnabled(runtime.fireIntensity),
-          fireLayerCount: getFireLayerCount(runtime.fireIntensity),
+          fireLayerCount,
+          fireVoxelCount: getActiveFireVoxelCount(fireLayerCount),
           routeCubeCount: runtime.routeVisible ? ROUTE_BOXES.length : 0,
           starCubeCount: runtime.missionPhase === 'celebrating' ? 30 : 0,
           waterCubeCount: waterFrame.instances.filter(({ active }) => active).length,
