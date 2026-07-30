@@ -5,34 +5,69 @@ export interface SprayTargetResult {
   readonly targeted: boolean;
 }
 
-const SPRAY_RANGE = 6;
-const TARGET_DOT_THRESHOLD = 0.67;
-const TARGET_ASSIST_RATIO = 0.35;
+const SPRAY_HORIZONTAL_RANGE = 7;
+const TARGET_HORIZONTAL_DOT_THRESHOLD = 0.5;
+const TARGET_ASSIST_RATIO = 0.55;
+const SAFE_FORWARD: readonly [number, number, number] = [0, 0, -1];
 
-/** 前方6unit、約48度以内の火へだけ放水方向を35%補正する。 */
+/** 3要素vectorがすべて有限かを確認する。 */
+function isFiniteVector(value: readonly [number, number, number]): boolean {
+  return value.every(Number.isFinite);
+}
+
+/**
+ * 見える炎が水平7unit・前方60度以内なら対象とし、水流方向を炎側へ55%補正する。
+ * 判定の距離と角度はXZ平面、返すdistanceとdirectionは3次元で扱う。
+ */
 export function resolveSprayTarget(
   origin: readonly [number, number, number],
   forward: readonly [number, number, number],
   target: readonly [number, number, number],
 ): SprayTargetResult {
-  const delta = [target[0] - origin[0], target[1] - origin[1], target[2] - origin[2]] as const;
-  const distance = Math.hypot(...delta);
-  const normalizedTarget: readonly [number, number, number] = distance > 0
-    ? [delta[0] / distance, delta[1] / distance, delta[2] / distance]
-    : [0, 0, 0];
-  const dot = forward[0] * normalizedTarget[0] + forward[1] * normalizedTarget[1] + forward[2] * normalizedTarget[2];
-  const targeted = distance <= SPRAY_RANGE && dot >= TARGET_DOT_THRESHOLD;
+  const forwardIsValid = isFiniteVector(forward) && Math.hypot(...forward) > 0;
+  const safeForward = forwardIsValid ? forward : SAFE_FORWARD;
+  if (!isFiniteVector(origin) || !isFiniteVector(target) || !forwardIsValid) {
+    return { direction: safeForward, distance: 0, targeted: false };
+  }
 
-  if (!targeted) return { direction: forward, distance, targeted };
+  const deltaX = target[0] - origin[0];
+  const deltaY = target[1] - origin[1];
+  const deltaZ = target[2] - origin[2];
+  const distance = Math.hypot(deltaX, deltaY, deltaZ);
+  const horizontalDistance = Math.hypot(deltaX, deltaZ);
+  const forwardHorizontalLength = Math.hypot(safeForward[0], safeForward[2]);
 
-  const mixed: readonly [number, number, number] = [
-    forward[0] * (1 - TARGET_ASSIST_RATIO) + normalizedTarget[0] * TARGET_ASSIST_RATIO,
-    forward[1] * (1 - TARGET_ASSIST_RATIO) + normalizedTarget[1] * TARGET_ASSIST_RATIO,
-    forward[2] * (1 - TARGET_ASSIST_RATIO) + normalizedTarget[2] * TARGET_ASSIST_RATIO,
-  ];
-  const length = Math.hypot(...mixed) || 1;
+  if (horizontalDistance === 0 || forwardHorizontalLength === 0) {
+    return { direction: safeForward, distance, targeted: false };
+  }
+
+  const targetHorizontalX = deltaX / horizontalDistance;
+  const targetHorizontalZ = deltaZ / horizontalDistance;
+  const forwardHorizontalX = safeForward[0] / forwardHorizontalLength;
+  const forwardHorizontalZ = safeForward[2] / forwardHorizontalLength;
+  const horizontalDot = (
+    forwardHorizontalX * targetHorizontalX
+    + forwardHorizontalZ * targetHorizontalZ
+  );
+  const targeted = (
+    horizontalDistance <= SPRAY_HORIZONTAL_RANGE
+    && horizontalDot >= TARGET_HORIZONTAL_DOT_THRESHOLD
+  );
+
+  if (!targeted) return { direction: safeForward, distance, targeted };
+
+  const targetLength = distance || 1;
+  const forwardLength = Math.hypot(...safeForward) || 1;
+  const mixedX = safeForward[0] / forwardLength * (1 - TARGET_ASSIST_RATIO)
+    + deltaX / targetLength * TARGET_ASSIST_RATIO;
+  const mixedY = safeForward[1] / forwardLength * (1 - TARGET_ASSIST_RATIO)
+    + deltaY / targetLength * TARGET_ASSIST_RATIO;
+  const mixedZ = safeForward[2] / forwardLength * (1 - TARGET_ASSIST_RATIO)
+    + deltaZ / targetLength * TARGET_ASSIST_RATIO;
+  const mixedLength = Math.hypot(mixedX, mixedY, mixedZ) || 1;
+
   return {
-    direction: [mixed[0] / length, mixed[1] / length, mixed[2] / length],
+    direction: [mixedX / mixedLength, mixedY / mixedLength, mixedZ / mixedLength],
     distance,
     targeted,
   };
