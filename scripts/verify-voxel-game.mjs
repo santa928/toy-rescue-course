@@ -41,6 +41,7 @@ const expectedScreenshots = [
   'mobile-landscape-water-fire.png',
 ];
 const timelineScreenshots = [
+  'desktop-forgiving-spray.png',
   'desktop-water-start.png',
   'desktop-water-flow.png',
   'desktop-water-splash.png',
@@ -741,6 +742,68 @@ async function driveAlongWorldAxis(page, axis, predicate, description, touchDriv
   }
 }
 
+/** 実キーボードの北西入力で、旧6unit外かつ照準済みの炎位置へ有界走行する。 */
+async function driveToForgivingSprayTarget(page) {
+  const heldKeys = new Set();
+  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
+  const initialState = await readGameState(page);
+  let latestState = null;
+  try {
+    if (initialState.mission.distance <= 6) {
+      await syncKeyboardKeys(page, heldKeys, ['KeyS']);
+      for (let burst = 0; burst < 120; burst += 1) {
+        const state = await readGameState(page);
+        if (state.mission.distance > 7.2) {
+          await releaseKeyboardKeys(page, heldKeys);
+          await brakeVehicle(page);
+          break;
+        }
+        assert.equal(state.vehicle.resetCount, initialResetCount,
+          `forgiving spray exterior correction reset unexpectedly: ${JSON.stringify({
+            direction: state.mission.direction,
+            distance: state.mission.distance,
+            vehiclePosition: state.vehicle.position,
+          })}`);
+        await waitForFrames(page, 2);
+      }
+      assert((await readGameState(page)).mission.distance > 6,
+        'forgiving spray exterior correction did not leave the old 6-unit range.');
+    }
+    await syncKeyboardKeys(page, heldKeys, ['KeyW']);
+    // 進行前に消防車のyawを北西へ寄せ、距離境界を横切る時点で正面判定を安定させる。
+    await waitForFrames(page, 4);
+    for (let burst = 0; burst < 120; burst += 1) {
+      const state = await readGameState(page);
+      latestState = state;
+      if (state.mission.targeted && state.mission.distance > 6) {
+        await releaseKeyboardKeys(page, heldKeys);
+        return state;
+      }
+      assert.equal(state.vehicle.resetCount, initialResetCount,
+        `forgiving spray target acquisition reset unexpectedly: ${JSON.stringify({
+          direction: state.mission.direction,
+          distance: state.mission.distance,
+          vehiclePosition: state.vehicle.position,
+        })}`);
+      await waitForFrames(page, 2);
+    }
+    throw new Error(`forgiving spray target acquisition did not reach the old-range exterior: ${JSON.stringify({
+      initial: {
+        direction: initialState.mission.direction,
+        distance: initialState.mission.distance,
+        nozzleOrigin: initialState.mission.nozzleOrigin,
+        targeted: initialState.mission.targeted,
+        vehiclePosition: initialState.vehicle.position,
+      },
+      direction: latestState?.mission.direction,
+      distance: latestState?.mission.distance,
+      vehiclePosition: latestState?.vehicle.position,
+    })}`);
+  } finally {
+    await releaseKeyboardKeys(page, heldKeys);
+  }
+}
+
 /** world cardinal方向へ短く入力し、停止後のheadingを同方向へ揃える。 */
 async function pulseAlongWorldAxis(page, axis, frameCount, touchDriver) {
   const input = WORLD_AXIS_INPUTS[axis];
@@ -798,7 +861,7 @@ async function driveMissionToFire(page, touchDriver) {
   await driveAlongWorldAxis(page, 'negativeX', (state) => state.mission.targeted,
     'fire route east-wall targeting', touchDriver);
   const state = await readGameState(page);
-  assert(state.mission.distance <= 6 && state.mission.targeted,
+  assert(Number.isFinite(state.mission.distance) && state.mission.targeted,
     `Fire route did not end targeted: ${JSON.stringify(state.mission)}`);
   return state;
 }
@@ -819,6 +882,69 @@ async function waitForTargetedSpray(page, description, maximumFrames = 60) {
     mission: spraying?.mission,
     vehicle: spraying?.vehicle,
   })}`);
+}
+
+/** 旧6unit外の見える炎を前方から消火でき、背後では火勢が減らないことを確認する。 */
+async function verifyForgivingSprayTargeting(browser, errors) {
+  const target = { hasTouch: false, height: 720, name: 'forgiving-spray', width: 1_280 };
+  const { context, page } = await openViewportPage(browser, target, errors);
+  try {
+    await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+      'forgiving spray garage opening');
+    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 11.5,
+      'forgiving spray east road');
+    await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= 0.5,
+      'forgiving spray old-range exterior');
+    const staged = await driveToForgivingSprayTarget(page);
+    const stagedDiagnostics = {
+      direction: staged.mission.direction,
+      distance: staged.mission.distance,
+      vehiclePosition: staged.vehicle.position,
+    };
+    assert(staged.mission.targeted,
+      `Forgiving spray did not acquire visible fire: ${JSON.stringify(stagedDiagnostics)}`);
+    assert(staged.mission.distance > 6,
+      `Forgiving spray did not exercise the old 6-unit exterior: ${JSON.stringify(stagedDiagnostics)}`);
+
+    await page.keyboard.down('Space');
+    const spraying = await waitForTargetedSpray(page, 'forgiving spray targeted');
+    await page.evaluate(() => window.advanceTime?.(500));
+    await waitForFrames(page, 2);
+    const partiallyExtinguished = await readGameState(page);
+    assert(partiallyExtinguished.runtime.fireIntensity < 1,
+      'Forgiving spray did not reduce fire intensity.');
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-forgiving-spray.png`);
+    await page.keyboard.up('Space');
+
+    await driveAlongWorldAxis(page, 'positiveX', (state) => !state.mission.targeted,
+      'forgiving spray backward facing');
+    const behind = await readGameState(page);
+    assert.equal(behind.mission.targeted, false,
+      `Backward spray retained the fire target: ${JSON.stringify({
+        direction: behind.mission.direction,
+        distance: behind.mission.distance,
+        vehiclePosition: behind.vehicle.position,
+      })}`);
+    const beforeBackwardSpray = behind.runtime.fireIntensity;
+    await page.keyboard.down('Space');
+    await waitForFrames(page, 2);
+    await page.evaluate(() => window.advanceTime?.(500));
+    await waitForFrames(page, 2);
+    await page.keyboard.up('Space');
+    const afterBackwardSpray = await readGameState(page);
+    assert.equal(afterBackwardSpray.runtime.fireIntensity, beforeBackwardSpray,
+      'Backward spray reduced fire intensity.');
+
+    return {
+      backwardTargeted: behind.mission.targeted,
+      fireIntensityAfterForwardSpray: partiallyExtinguished.runtime.fireIntensity,
+      stagedDistance: staged.mission.distance,
+      targeted: spraying.mission.targeted,
+    };
+  } finally {
+    await page.keyboard.up('Space').catch(() => undefined);
+    await context.close();
+  }
 }
 
 /** 火災現場から外周東側道路を戻り、車庫でassigned再開まで走る。 */
@@ -1536,7 +1662,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
     await driveMissionToFire(page, touch);
     await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 17.2,
       'fire hazard east heading staging', touch);
-    await alignWorldCoordinate(page, 2, -10.1, 'fire hazard targeting lane Z', 0.15, touch);
+    await alignWorldCoordinate(page, 2, -9.1, 'fire hazard targeting lane Z', 0.15, touch);
     await driveAlongWorldAxis(page, 'negativeX', (state) => -state.vehicle.forward[0] >= 0.999,
       'fire hazard negative-X heading', touch);
     await alignWorldCoordinate(page, 0, 15.7, 'fire hazard head-on X', 0.15, touch);
@@ -1563,7 +1689,13 @@ async function verifyFireHazardLifecycle(browser, errors) {
     await touch.releaseStick();
     await brakeVehicle(page);
     const blocked = await readGameState(page);
-    assert(contactPositions.length >= 45, 'Vehicle did not reach and hold the fire hazard.');
+    assert(contactPositions.length >= 45, `Vehicle did not reach and hold the fire hazard: ${JSON.stringify({
+      before: before.vehicle,
+      blocked: blocked.vehicle,
+      contactFrames: contactPositions.length,
+      latestClearance: collisionClearance(blocked.vehicle, FIRE_HAZARD_BOX, 'x', 1),
+      minimumClearance,
+    })}`);
     const contactTravel = Math.max(...contactPositions) - Math.min(...contactPositions);
     assert(minimumClearance >= -0.09, `Vehicle penetrated the enabled fire hazard: ${JSON.stringify({
       before: before.vehicle,
@@ -1632,7 +1764,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
     await driveMissionToFire(page, touch);
     await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 17.2,
       'restored fire hazard east heading staging', touch);
-    await alignWorldCoordinate(page, 2, -10.1, 'restored fire hazard targeting lane Z', 0.15, touch);
+    await alignWorldCoordinate(page, 2, -9.1, 'restored fire hazard targeting lane Z', 0.15, touch);
     await driveAlongWorldAxis(page, 'negativeX', (state) => -state.vehicle.forward[0] >= 0.999,
       'restored fire hazard negative-X heading', touch);
     await alignWorldCoordinate(page, 0, 15.7, 'restored fire hazard head-on X', 0.15, touch);
@@ -2032,6 +2164,7 @@ async function verifyVoxelGame() {
     try {
       const canonicalRoot = await verifyCanonicalRoot(browser, errors);
       const directMovement = await verifyDirectMovement(browser, errors);
+      const forgivingSprayTargeting = await verifyForgivingSprayTargeting(browser, errors);
       const missions = {
         desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
         touch: await verifyCompleteMission(browser, errors, 'touch-mission', true),
@@ -2047,6 +2180,7 @@ async function verifyVoxelGame() {
         canonicalRoot,
         directMovement,
         errors,
+        forgivingSprayTargeting,
         missions,
         screenshotProofs,
         viewports,
@@ -2055,6 +2189,7 @@ async function verifyVoxelGame() {
       console.log(JSON.stringify({
         canonicalRoot,
         directMovement,
+        forgivingSprayTargeting,
         missions,
         viewports,
         waterTimeline,
@@ -2119,11 +2254,13 @@ async function verifyVoxelGame() {
   let canonicalRoot;
   let collisions;
   let directMovement;
+  let forgivingSprayTargeting;
   let missions;
   let waterTimeline;
   try {
     canonicalRoot = await verifyCanonicalRoot(browser, errors);
     directMovement = await verifyDirectMovement(browser, errors);
+    forgivingSprayTargeting = await verifyForgivingSprayTargeting(browser, errors);
     missions = {
       desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
       touch: await verifyCompleteMission(browser, errors, 'touch-mission', true),
@@ -2166,6 +2303,7 @@ async function verifyVoxelGame() {
     directMovement,
     environmentConcerns,
     errorCounts,
+    forgivingSprayTargeting,
     missions,
     performancePolicy: {
       certification: 'certified only when rendererClass is physical and measured fps meets the viewport target',
