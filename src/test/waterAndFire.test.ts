@@ -177,8 +177,9 @@ describe('WaterAndFire', () => {
     expect(CELEBRATION_STAR_CENTERS[4]).toEqual([17.25, 3, -8]);
   });
 
-  it('targetedな水はvisible fireで止め、非targeted時だけ最大6unit描く', () => {
-    expect(getWaterVisibleDistance(5.5, true)).toBeCloseTo(3.6, 9);
+  it('targetedな水は最大7unitで炎の0.55unit手前に止まり、非targetedは6unit描く', () => {
+    expect(getWaterVisibleDistance(7.1, true)).toBeCloseTo(6.55, 9);
+    expect(getWaterVisibleDistance(8, true)).toBe(7);
     expect(getWaterVisibleDistance(2, false)).toBe(6);
   });
 
@@ -258,13 +259,13 @@ describe('WaterAndFire', () => {
     expect(mesh.instanceMatrix.needsUpdate).toBe(true);
   });
 
-  it('前方6unit内へ放水したときだけtargetedな消火signalを作る', () => {
+  it('見える炎から水平7unit内でおおむね正面ならtargetedな消火signalを作る', () => {
     const command = { moveX: 0, moveY: 0, spray: true } as const;
-    const targeted = resolveWaterAndFireFrame(
+    const forgiving = resolveWaterAndFireFrame(
       {
         forward: [0, 0, -1],
         mass: 1.4,
-        position: [12, 0.8, -5],
+        position: [15.5, 0.8, -1.2],
         resetCount: 0,
         speed: 0,
       },
@@ -272,27 +273,37 @@ describe('WaterAndFire', () => {
       0.4,
       0.1,
     );
-    const behind = resolveWaterAndFireFrame(
+    const outside = resolveWaterAndFireFrame(
       {
         forward: [0, 0, -1],
         mass: 1.4,
-        position: [12, 0.8, -12],
+        position: [15.5, 0.8, 0],
         resetCount: 0,
         speed: 0,
       },
       command,
-      0.4,
-      0,
+    );
+    const behind = resolveWaterAndFireFrame(
+      {
+        forward: [0, 0, 1],
+        mass: 1.4,
+        position: [15.5, 0.8, -1.2],
+        resetCount: 0,
+        speed: 0,
+      },
+      command,
     );
 
-    expect(targeted).toMatchObject({
+    expect(forgiving).toMatchObject({
       sprayActive: true,
       sprayElapsedSeconds: 0.4,
       sprayOnFire: true,
       splashElapsedSeconds: 0.1,
       targeted: true,
     });
-    expect(behind).toMatchObject({ sprayActive: true, sprayOnFire: false, targeted: false });
+    expect(forgiving.distance).toBeGreaterThan(6);
+    expect(outside).toMatchObject({ sprayOnFire: false, targeted: false });
+    expect(behind).toMatchObject({ sprayOnFire: false, targeted: false });
   });
 
   it('targeted放水signalだけが2500msの消火chainを完了する', () => {

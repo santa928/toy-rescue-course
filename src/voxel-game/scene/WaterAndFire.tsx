@@ -26,7 +26,7 @@ import {
   type FireVoxelTransform,
 } from './fireVfx';
 import { scaleToHalfExtents } from './worldCollisionLayout';
-import { FIRE_POSITION } from './worldLayout';
+import { FIRE_SPRAY_TARGET_POSITION } from './worldLayout';
 
 export interface VoxelBox {
   readonly position: readonly [number, number, number];
@@ -94,7 +94,9 @@ export interface WaterVfxClock {
 
 const NOZZLE_FORWARD_OFFSET = 1.7;
 const NOZZLE_HEIGHT = 2.15;
-const WATER_TARGET_STOP_OFFSET = 1.9;
+const WATER_TARGET_STOP_OFFSET = 0.55;
+const WATER_TARGET_MAX_VISIBLE_DISTANCE = 7;
+const WATER_UNTARGETED_VISIBLE_DISTANCE = 6;
 const WATER_SPLASH_CYCLE_SECONDS = 0.22;
 const WATER_BLUE_INSTANCE_COUNT = 22;
 const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
@@ -306,7 +308,7 @@ export function resolveWaterAndFireFrame(
     telemetry.position[1] + NOZZLE_HEIGHT,
     telemetry.position[2] + forward[2] * NOZZLE_FORWARD_OFFSET,
   ];
-  const target = resolveSprayTarget(nozzleOrigin, forward, FIRE_POSITION);
+  const target = resolveSprayTarget(nozzleOrigin, forward, FIRE_SPRAY_TARGET_POSITION);
   return {
     direction: target.direction,
     distance: target.distance,
@@ -353,11 +355,14 @@ function selectMissionVisualState(snapshot: VoxelGameSnapshot): MissionVisualSta
   };
 }
 
-/** targeted時は奥の判定座標を越えず、camera側のvisible fireで水を止める。 */
+/** 対象時は見える炎の手前で止め、対象外の自由放水は従来の6unitを描く。 */
 export function getWaterVisibleDistance(distance: number, targeted: boolean): number {
   return targeted
-    ? Math.max(0, Math.min(6, distance - WATER_TARGET_STOP_OFFSET))
-    : 6;
+    ? Math.max(
+      0,
+      Math.min(WATER_TARGET_MAX_VISIBLE_DISTANCE, distance - WATER_TARGET_STOP_OFFSET),
+    )
+    : WATER_UNTARGETED_VISIBLE_DISTANCE;
 }
 
 /** 色別の固定poolへ、水流pure transformをslot順に反映する。 */

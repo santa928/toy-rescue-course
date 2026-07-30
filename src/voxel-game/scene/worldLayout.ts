@@ -20,6 +20,9 @@ export function isInsideGarageRestartArea(
 /** 火災建物の代表位置。 */
 export const FIRE_POSITION = [12, 1.2, -11] as const;
 
+/** 消火判定と水流補正に使う、画面に見える炎の中心位置。 */
+export const FIRE_SPRAY_TARGET_POSITION = [12.9, 1.45, -9.1] as const;
+
 /** 中央公園の基準位置。 */
 export const PARK_CENTER = [0, 0, 0] as const;
 

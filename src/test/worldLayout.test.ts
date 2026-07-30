@@ -3,6 +3,7 @@ import {
   BLOCK_PLAZA,
   BREAKABLE_BLOCKS,
   FIRE_POSITION,
+  FIRE_SPRAY_TARGET_POSITION,
   GARAGE_POSITION,
   isInsideGarageRestartArea,
   WORLD_BOUNDS,
@@ -15,6 +16,7 @@ describe('voxel world layout', () => {
     for (const [x, , z] of [
       GARAGE_POSITION,
       FIRE_POSITION,
+      FIRE_SPRAY_TARGET_POSITION,
       ...BREAKABLE_BLOCKS.map((block) => block.position),
     ]) {
       expect(x).toBeGreaterThanOrEqual(WORLD_BOUNDS.minX);
@@ -22,6 +24,12 @@ describe('voxel world layout', () => {
       expect(z).toBeGreaterThanOrEqual(WORLD_BOUNDS.minZ);
       expect(z).toBeLessThanOrEqual(WORLD_BOUNDS.maxZ);
     }
+  });
+
+  it('建物の代表位置と分離した見える炎の照準点を固定する', () => {
+    expect(FIRE_POSITION).toEqual([12, 1.2, -11]);
+    expect(FIRE_SPRAY_TARGET_POSITION).toEqual([12.9, 1.45, -9.1]);
+    expect(FIRE_SPRAY_TARGET_POSITION).not.toEqual(FIRE_POSITION);
   });
 
   it('壊せる積み木IDを重複させない', () => {
