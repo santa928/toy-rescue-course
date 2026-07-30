@@ -56,7 +56,7 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。立体ボクセル炎を含む最新fresh unit testは18 files / 149 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。立体ボクセル炎を含む最新fresh unit testは18 files / 153 testsです。
 
 ```bash
 docker compose run --rm web npm test

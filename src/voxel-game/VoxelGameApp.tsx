@@ -26,7 +26,6 @@ import {
   FIRE_LAYER_BOXES,
   ROUTE_BOXES,
   getFireLayerCount,
-  getWaterVisibleDistance,
   isFireHazardEnabled,
   type MissionTelemetry,
 } from './scene/WaterAndFire';
@@ -124,6 +123,11 @@ export function VoxelGameApp(): ReactElement {
     sprayOnFire: false,
     splashElapsedSeconds: 0,
     targeted: false,
+    waterPath: {
+      control: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 2.15, GARAGE_POSITION[2] + 4.7],
+      end: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 2.15, GARAGE_POSITION[2] + 7.7],
+      start: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 2.15, GARAGE_POSITION[2] + 1.7],
+    },
   });
   const renderTelemetryRef = useRef<VoxelGameRenderTelemetry>({
     renderedFrames: 0,
@@ -160,13 +164,11 @@ export function VoxelGameApp(): ReactElement {
       const command = controls.commandRef.current;
       const missionTelemetry = missionTelemetryRef.current;
       const waterFrame = createWaterFlowFrame({
-        direction: missionTelemetry.direction,
-        nozzleOrigin: missionTelemetry.nozzleOrigin,
+        path: missionTelemetry.waterPath,
         splashElapsedSeconds: missionTelemetry.splashElapsedSeconds,
         sprayActive: missionTelemetry.sprayActive,
         sprayElapsedSeconds: missionTelemetry.sprayElapsedSeconds,
         targeted: missionTelemetry.targeted,
-        visibleDistance: getWaterVisibleDistance(missionTelemetry.distance, missionTelemetry.targeted),
       });
       const vehicle = telemetryRef.current;
       const fireLayerCount = getFireLayerCount(runtime.fireIntensity);
@@ -199,6 +201,11 @@ export function VoxelGameApp(): ReactElement {
           ...missionTelemetry,
           direction: [...missionTelemetry.direction],
           nozzleOrigin: [...missionTelemetry.nozzleOrigin],
+          waterPath: {
+            control: [...missionTelemetry.waterPath.control],
+            end: [...missionTelemetry.waterPath.end],
+            start: [...missionTelemetry.waterPath.start],
+          },
           phase: runtime.missionPhase,
           routeVisible: runtime.routeVisible,
         },

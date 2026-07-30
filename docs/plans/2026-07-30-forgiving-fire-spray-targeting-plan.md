@@ -4,20 +4,20 @@
 
 **Goal:** 見えている炎の近くでおおむね正面を向いて放水すれば消火でき、背後や範囲外では成功しない寛容な照準判定へ変更する。
 
-**Architecture:** React・Three.js・Rapierへ依存しない`sprayTargeting`で、XZ水平距離7unitと前方60度の対象判定、55%の方向補正を行う。Sceneは建物の代表点とは別の見える炎用照準点を渡し、対象時だけ水流表示上限を7unitへ広げて炎の0.55unit手前で止める。既存の`VoxelGameRuntime`、消火時間2.5秒、車両物理、炎と水のpool構造は変更しない。
+**Architecture:** React・Three.js・Rapierへ依存しない`sprayTargeting`で、XZ水平距離7unitと前方60度の対象判定、55%の方向補正を行う。Sceneは建物の代表点とは別の見える炎用照準点を渡し、前方45%・炎方向55%の補正方向を初期接線とするquadratic Bézierで、炎中心の0.55unit手前の明示終点へ収束させる。対象外は既存6unit直線を維持する。既存の`VoxelGameRuntime`、消火時間2.5秒、車両物理、炎と水のpool構造は変更しない。
 
 **Tech Stack:** React 19、TypeScript、React Three Fiber、Three.js、Rapier、Vitest、Playwright、Docker Compose
 
 ## Global Constraints
 
 - `REQ-017`だけを変更し、見える炎を基準に水平7unit以内・前方60度以内を対象とする。
-- 対象内の水流方向は、正規化した車両前方45%と炎方向55%を混合して再正規化する。
+- 対象内の水流は、正規化した車両前方45%と炎方向55%を混合して再正規化した方向を初期接線とする。
 - `FIRE_SPRAY_TARGET_POSITION`は`[12.9, 1.45, -9.1]`とする。
 - `SprayTargetResult.distance`は見える炎の照準点までの3次元直線距離を維持する。
-- 対象時の水流は最大7unitを表示し、照準点の0.55unit手前で止める。
-- 対象外の自由放水は従来どおり最大6unitを維持する。
+- 対象時の水流はquadratic Bézierで、ノズルから照準点への直線上にある照準点の0.55unit手前へ正確に収束する。判定境界は水平7unitであり、3次元距離へ競合する7unit上限を追加しない。
+- 対象外の自由放水は従来どおり6unit直線を維持する。
 - `FIRE_POSITION`、有効放水2.5秒、成功演出、自由走行、帰庫再開を変更しない。
-- 炎・水の造形、色、instance数、animation、車両物理、collider、HUDを変更しない。
+- 炎・水の造形、色、instance数、時間変化するanimation、車両物理、collider、HUDを変更しない。対象時の空間経路だけを初期接線と正確な終点の両立に必要な範囲で曲げる。
 - キーボードとタッチは同じpureな照準結果を使う。
 - 毎frameのReact state更新、Three.js object、物理bodyを追加せず、照準計算のallocation回数を現行より増やさない。
 - 開発サーバ、Vitest、build、Playwright E2EはすべてDocker内で実行する。
@@ -301,8 +301,8 @@ git commit -m "消火放水の照準判定を寛容にする"
 - Produces:
   - `FIRE_SPRAY_TARGET_POSITION: readonly [12.9, 1.45, -9.1]`
   - `resolveWaterAndFireFrame(...).targeted`と`sprayOnFire`
-  - `getWaterVisibleDistance(distance, true)`: 最大7unit、0.55unit手前
-  - `getWaterVisibleDistance(distance, false)`: 従来の6unit
+  - `createWaterFlowPath(...)`: 対象時は45/55補正を初期接線とし、炎中心の0.55unit手前へ収束
+  - `createWaterFlowPath(...)`: 対象外は従来方向へ6unit直線
 
 - [ ] **Step 1: World layout照準点の失敗テストを書く**
 
@@ -317,15 +317,21 @@ it('建物の代表位置と分離した見える炎の照準点を固定する'
 });
 ```
 
-- [ ] **Step 2: Scene接続と水流距離の失敗テストを書く**
+- [ ] **Step 2: Scene接続と水流経路の失敗テストを書く**
 
-`src/test/waterAndFire.test.ts`の水流距離testを次へ置き換える。
+`src/test/waterFlow.test.ts`へ、45/55補正方向を初期接線として明示終点へ収束するpure numeric testと、
+対象外6unit直線のtestを追加する。
 
 ```ts
-it('targetedな水は最大7unitで炎の0.55unit手前に止まり、非targetedは6unit描く', () => {
-  expect(getWaterVisibleDistance(7.1, true)).toBeCloseTo(6.55, 9);
-  expect(getWaterVisibleDistance(8, true)).toBe(7);
-  expect(getWaterVisibleDistance(2, false)).toBe(6);
+it('targeted pathは45/55補正を初期接線に保ち、炎の0.55unit手前へ収束する', () => {
+  const path = createWaterFlowPath({
+    initialDirection: approvedCorrectedDirection,
+    nozzleOrigin,
+    targetPosition,
+    targeted: true,
+  });
+  expect(distance(path.end, targetPosition)).toBeCloseTo(0.55, 12);
+  expect(normalize(subtract(path.control, path.start))).toEqual(approvedCorrectedDirection);
 });
 ```
 
@@ -435,31 +441,22 @@ const target = resolveSprayTarget(nozzleOrigin, forward, FIRE_SPRAY_TARGET_POSIT
 
 このcomponent内で`FIRE_POSITION`をほかに使っていないことを`rg`で確認し、未使用importを残さない。
 
-- [ ] **Step 7: 対象時と対象外の水流表示距離を分離する**
+- [ ] **Step 7: 対象時曲線と対象外直線のpathを分離する**
 
-定数を次へ変更する。
-
-```ts
-const WATER_TARGET_STOP_OFFSET = 0.55;
-const WATER_TARGET_MAX_VISIBLE_DISTANCE = 7;
-const WATER_UNTARGETED_VISIBLE_DISTANCE = 6;
-```
-
-pure helperを次へ更新する。
+pure helperは次の契約にする。
 
 ```ts
-/** 対象時は見える炎の手前で止め、対象外の自由放水は従来の6unitを描く。 */
-export function getWaterVisibleDistance(distance: number, targeted: boolean): number {
-  return targeted
-    ? Math.max(
-      0,
-      Math.min(WATER_TARGET_MAX_VISIBLE_DISTANCE, distance - WATER_TARGET_STOP_OFFSET),
-    )
-    : WATER_UNTARGETED_VISIBLE_DISTANCE;
-}
+createWaterFlowPath({
+  initialDirection, // 45/55補正済み。control-startをこの方向へ置く
+  nozzleOrigin,
+  targetPosition,
+  targeted,
+});
 ```
 
-非有限な`distance`はTask 1でtargetedにならないため、対象外の6unitへ安全に倒れる。
+対象時の`end`はノズルから照準点への直線上で照準点の0.55unit手前へ置く。判定距離が水平
+7unitであるため、3次元距離へ別の7unit上限を加えない。対象外は既存方向への6unit直線とする。
+同じ`WaterFlowPath`を`WaterAndFire`描画と`render_game_to_text()`の両方へ渡す。
 
 - [ ] **Step 8: Scene関連testと既存消火chainを通す**
 
@@ -471,7 +468,7 @@ docker compose run --rm web npm test -- src/test/worldLayout.test.ts src/test/wa
 
 Expected:
 
-- 新照準点、対象内/外、対象7unit/自由放水6unitがPASSする。
+- 新照準点、対象内曲線の初期接線・正確な終点、対象外6unit直線がPASSする。
 - 有効放水2.5秒で`celebrating`へ遷移する既存testがPASSする。
 - 固定32 water slot、18 fire slot、hazard lifecycleが後退しない。
 
@@ -780,10 +777,10 @@ Expected:
 | --- | --- |
 | 水平7unit以内 | `sprayTargeting.ts` + range boundary unit + browser old-range exterior |
 | 前方60度以内 | dot boundary unit + browser backward negative |
-| 55%補正 | exact direction unit + water screenshot |
+| 55%補正 | exact direction unit + quadratic Bézier初期接線unit + water screenshot |
 | 見える炎の照準点 | `worldLayout.ts` exact coordinate unit + scene integration |
-| 対象時7unit・0.55unit手前 | `getWaterVisibleDistance` unit + screenshot |
-| 対象外6unit | `getWaterVisibleDistance` unit |
+| 対象時水平7unit・0.55unit手前 | `createWaterFlowPath` endpoint unit + browser水平距離 + screenshot |
+| 対象外6unit | `createWaterFlowPath` straight-path unit |
 | 消火2.5秒維持 | runtime integration + keyboard/touch full mission |
 | HUD・VFX・物理非回帰 | full E2E + 3 viewport screenshot目視 |
 | 性能契約 | O(1) pure logic、既存pool維持、物理GPUだけを性能認証 |

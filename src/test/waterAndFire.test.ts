@@ -17,7 +17,6 @@ import {
   advanceWaterVfxClock,
   createFireBatchScratch,
   getFireLayerCount,
-  getWaterVisibleDistance,
   isFireHazardEnabled,
   isWaterVfxResetEvent,
   resolveWaterAndFireFrame,
@@ -175,12 +174,6 @@ describe('WaterAndFire', () => {
     expect(CELEBRATION_STAR_CENTERS[2]?.[0]).toBeGreaterThanOrEqual(17);
     expect(CELEBRATION_STAR_CENTERS[3]?.[0]).toBeLessThanOrEqual(10);
     expect(CELEBRATION_STAR_CENTERS[4]).toEqual([17.25, 3, -8]);
-  });
-
-  it('targetedな水は最大7unitで炎の0.55unit手前に止まり、非targetedは6unit描く', () => {
-    expect(getWaterVisibleDistance(7.1, true)).toBeCloseTo(6.55, 9);
-    expect(getWaterVisibleDistance(8, true)).toBe(7);
-    expect(getWaterVisibleDistance(2, false)).toBe(6);
   });
 
   it.each([

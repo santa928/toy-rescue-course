@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createWaterFlowPath,
   createWaterFlowFrame,
   WATER_INSTANCE_COUNT,
   WATER_SPLASH_COUNT,
   WATER_STREAM_COUNT,
+  type WaterFlowPath,
 } from '../voxel-game/scene/waterFlow';
 
+const straightPath: WaterFlowPath = {
+  control: [3, 2, 1],
+  end: [3, 2, -2],
+  start: [3, 2, 4],
+};
+
 const baseInput = {
-  direction: [0, 0, -1] as const,
-  nozzleOrigin: [3, 2, 4] as const,
+  path: straightPath,
   splashElapsedSeconds: 0,
   sprayActive: true,
   sprayElapsedSeconds: 0.7,
   targeted: false,
-  visibleDistance: 6,
 };
 
 describe('waterFlow', () => {
@@ -41,7 +47,16 @@ describe('waterFlow', () => {
     const visibleDistance = 6;
     const directionLength = Math.hypot(...direction);
     const normalizedDirection = direction.map((value) => value / directionLength) as [number, number, number];
-    const frame = createWaterFlowFrame({ ...baseInput, direction, nozzleOrigin, visibleDistance });
+    const end = nozzleOrigin.map(
+      (value, axis) => value + normalizedDirection[axis] * visibleDistance,
+    ) as [number, number, number];
+    const control = nozzleOrigin.map(
+      (value, axis) => value + normalizedDirection[axis] * visibleDistance / 2,
+    ) as [number, number, number];
+    const frame = createWaterFlowFrame({
+      ...baseInput,
+      path: { control, end, start: nozzleOrigin },
+    });
 
     for (const instance of frame.instances.filter(({ active, kind }) => active && kind === 'stream')) {
       const offset = instance.position.map((value, axis) => value - nozzleOrigin[axis]) as [number, number, number];
@@ -74,5 +89,42 @@ describe('waterFlow', () => {
     expect(frame.instances.filter(({ kind }) => kind === 'splash').map(({ slot }) => slot)).toEqual([
       24, 25, 26, 27, 28, 29, 30, 31,
     ]);
+  });
+
+  it('targeted pathは45/55補正を初期接線に保ち、炎の0.55unit手前へ収束する', () => {
+    const target = [3, 0, -4] as const;
+    const initialDirection = [0.34765745321001684, 0, -0.9376216162330757] as const;
+    const path = createWaterFlowPath({
+      initialDirection,
+      nozzleOrigin: [0, 0, 0],
+      targetPosition: target,
+      targeted: true,
+    });
+    const endpointError = Math.hypot(
+      target[0] - path.end[0],
+      target[1] - path.end[1],
+      target[2] - path.end[2],
+    );
+    const tangent = path.control.map(
+      (value, axis) => value - path.start[axis],
+    ) as [number, number, number];
+    const tangentLength = Math.hypot(...tangent);
+
+    expect(endpointError).toBeCloseTo(0.55, 12);
+    tangent.forEach((value, axis) => {
+      expect(value / tangentLength).toBeCloseTo(initialDirection[axis], 12);
+    });
+    expect(path.end[0]).toBeCloseTo(2.67, 12);
+    expect(path.end[1]).toBe(0);
+    expect(path.end[2]).toBeCloseTo(-3.56, 12);
+  });
+
+  it('非targeted pathは既存方向へ6unitの直線を保つ', () => {
+    expect(createWaterFlowPath({
+      initialDirection: [0, 0, -1],
+      nozzleOrigin: [3, 2, 4],
+      targetPosition: [12.9, 1.45, -9.1],
+      targeted: false,
+    })).toEqual(straightPath);
   });
 });

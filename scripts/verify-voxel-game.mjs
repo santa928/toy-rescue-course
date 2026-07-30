@@ -910,23 +910,73 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= 0.5,
       'forgiving spray old-range exterior');
     const staged = await driveToForgivingSprayTarget(page);
+    const stagedGeometry = getTargetGeometry(staged);
+    const streamEndpoint = staged.mission.waterPath?.end;
+    const endpointError = Array.isArray(streamEndpoint)
+      ? Math.hypot(
+        FIRE_SPRAY_TARGET_POSITION[0] - streamEndpoint[0],
+        FIRE_SPRAY_TARGET_POSITION[1] - streamEndpoint[1],
+        FIRE_SPRAY_TARGET_POSITION[2] - streamEndpoint[2],
+      )
+      : Number.NaN;
     const stagedDiagnostics = {
+      dot: stagedGeometry.dot,
       direction: staged.mission.direction,
       distance: staged.mission.distance,
+      endpointError,
+      horizontalDistance: stagedGeometry.horizontalDistance,
+      streamEndpoint,
       vehiclePosition: staged.vehicle.position,
     };
     assert(staged.mission.targeted,
       `Forgiving spray did not acquire visible fire: ${JSON.stringify(stagedDiagnostics)}`);
-    assert(staged.mission.distance > 6,
-      `Forgiving spray did not exercise the old 6-unit exterior: ${JSON.stringify(stagedDiagnostics)}`);
+    assert(Number.isFinite(stagedGeometry.horizontalDistance)
+      && stagedGeometry.horizontalDistance > 6
+      && stagedGeometry.horizontalDistance <= 7,
+    `Forgiving spray horizontal distance is outside (6, 7]: ${JSON.stringify(stagedDiagnostics)}`);
+    assert(Number.isFinite(stagedGeometry.dot) && stagedGeometry.dot >= 0.5,
+      `Forgiving spray horizontal dot is below 0.5: ${JSON.stringify(stagedDiagnostics)}`);
+    assert(Number.isFinite(staged.mission.distance),
+      `Forgiving spray 3D mission distance is not finite: ${JSON.stringify(stagedDiagnostics)}`);
+    assert(Array.isArray(streamEndpoint) && streamEndpoint.every(Number.isFinite),
+      `Forgiving spray endpoint is not finite: ${JSON.stringify(stagedDiagnostics)}`);
+    assert(Math.abs(endpointError - 0.55) <= 1e-9,
+      `Forgiving spray endpoint is not 0.55 unit before the flame: ${JSON.stringify(stagedDiagnostics)}`);
 
     await page.keyboard.down('Space');
     const spraying = await waitForTargetedSpray(page, 'forgiving spray targeted');
     await page.evaluate(() => window.advanceTime?.(500));
     await waitForFrames(page, 2);
     const partiallyExtinguished = await readGameState(page);
-    assert(partiallyExtinguished.runtime.fireIntensity < 1,
-      'Forgiving spray did not reduce fire intensity.');
+    assert(partiallyExtinguished.runtime.fireIntensity > 0
+      && partiallyExtinguished.runtime.fireIntensity < 1,
+    `Forgiving spray did not remain partially extinguished: ${
+      partiallyExtinguished.runtime.fireIntensity
+    }.`);
+    assert(['assigned', 'active'].includes(partiallyExtinguished.runtime.missionPhase)
+      && partiallyExtinguished.runtime.routeVisible,
+    `Forgiving spray left the assigned mission lifecycle before 500ms: ${
+        partiallyExtinguished.runtime.missionPhase
+      }.`);
+    let closestStreamToEndpoint = Number.POSITIVE_INFINITY;
+    for (let frame = 0; frame < 90; frame += 1) {
+      const visualState = await readGameState(page);
+      closestStreamToEndpoint = Math.min(
+        ...visualState.visuals.waterInstances
+          .filter(({ active, kind }) => active && kind === 'stream')
+          .map(({ position }) => Math.hypot(
+            streamEndpoint[0] - position[0],
+            streamEndpoint[1] - position[1],
+            streamEndpoint[2] - position[2],
+          )),
+      );
+      if (closestStreamToEndpoint <= 0.7) break;
+      await waitForFrames(page, 1);
+    }
+    assert(closestStreamToEndpoint <= 0.7,
+      `Forgiving spray stream did not visibly reach the endpoint: ${
+        closestStreamToEndpoint
+      }.`);
     await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-forgiving-spray.png`);
     await page.keyboard.up('Space');
 
@@ -982,8 +1032,14 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       backwardTargeted: behind.mission.targeted,
       behindDot,
       behindHorizontalDistance,
+      dot: stagedGeometry.dot,
+      endpointError,
       fireIntensityAfterForwardSpray: partiallyExtinguished.runtime.fireIntensity,
+      horizontalDistance: stagedGeometry.horizontalDistance,
+      missionPhaseAfterForwardSpray: partiallyExtinguished.runtime.missionPhase,
+      closestStreamToEndpoint,
       stagedDistance: staged.mission.distance,
+      streamEndpoint,
       targeted: spraying.mission.targeted,
     };
   } finally {

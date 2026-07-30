@@ -24,20 +24,29 @@ export function resolveSprayTarget(
   forward: readonly [number, number, number],
   target: readonly [number, number, number],
 ): SprayTargetResult {
-  const forwardIsValid = isFiniteVector(forward) && Math.hypot(...forward) > 0;
+  const coordinatesAreValid = isFiniteVector(origin) && isFiniteVector(target);
+  const distance = coordinatesAreValid
+    ? Math.hypot(
+      target[0] - origin[0],
+      target[1] - origin[1],
+      target[2] - origin[2],
+    )
+    : 0;
+  const forwardHorizontalLength = Math.hypot(forward[0], forward[2]);
+  const forwardIsValid = isFiniteVector(forward)
+    && Number.isFinite(forwardHorizontalLength)
+    && forwardHorizontalLength > 0;
   const safeForward = forwardIsValid ? forward : SAFE_FORWARD;
-  if (!isFiniteVector(origin) || !isFiniteVector(target) || !forwardIsValid) {
-    return { direction: safeForward, distance: 0, targeted: false };
+  if (!coordinatesAreValid || !forwardIsValid) {
+    return { direction: safeForward, distance, targeted: false };
   }
 
   const deltaX = target[0] - origin[0];
   const deltaY = target[1] - origin[1];
   const deltaZ = target[2] - origin[2];
-  const distance = Math.hypot(deltaX, deltaY, deltaZ);
   const horizontalDistance = Math.hypot(deltaX, deltaZ);
-  const forwardHorizontalLength = Math.hypot(safeForward[0], safeForward[2]);
 
-  if (horizontalDistance === 0 || forwardHorizontalLength === 0) {
+  if (horizontalDistance === 0) {
     return { direction: safeForward, distance, targeted: false };
   }
 

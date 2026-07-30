@@ -73,4 +73,18 @@ describe('resolveSprayTarget', () => {
     expect(result.direction.every(Number.isFinite)).toBe(true);
     expect(Number.isFinite(result.distance)).toBe(true);
   });
+
+  it.each([
+    [[0, 1, 0]],
+    [[0, Number.POSITIVE_INFINITY, 0]],
+    [[Number.NaN, 0, 0]],
+  ] as const)('水平前方を決められない%jは既定方向へ安全に倒す', (forward) => {
+    const result = resolveSprayTarget([0, 0, 0], forward, [0, 0, -3]);
+
+    expect(result).toEqual({
+      direction: [0, 0, -1],
+      distance: 3,
+      targeted: false,
+    });
+  });
 });

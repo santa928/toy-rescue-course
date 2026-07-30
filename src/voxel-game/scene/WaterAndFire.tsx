@@ -12,8 +12,10 @@ import { resolveSprayTarget } from '../domain/sprayTargeting';
 import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetry, VehicleTelemetryRef } from './VehicleController';
 import {
+  createWaterFlowPath,
   createWaterFlowFrame,
   WATER_INSTANCE_COUNT,
+  type WaterFlowPath,
   type WaterInstanceTransform,
 } from './waterFlow';
 import {
@@ -64,6 +66,7 @@ export interface MissionTelemetry {
   readonly sprayOnFire: boolean;
   readonly splashElapsedSeconds: number;
   readonly targeted: boolean;
+  readonly waterPath: WaterFlowPath;
 }
 
 export type MissionTelemetryRef = React.MutableRefObject<MissionTelemetry>;
@@ -94,9 +97,6 @@ export interface WaterVfxClock {
 
 const NOZZLE_FORWARD_OFFSET = 1.7;
 const NOZZLE_HEIGHT = 2.15;
-const WATER_TARGET_STOP_OFFSET = 0.55;
-const WATER_TARGET_MAX_VISIBLE_DISTANCE = 7;
-const WATER_UNTARGETED_VISIBLE_DISTANCE = 6;
 const WATER_SPLASH_CYCLE_SECONDS = 0.22;
 const WATER_BLUE_INSTANCE_COUNT = 22;
 const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
@@ -309,6 +309,12 @@ export function resolveWaterAndFireFrame(
     telemetry.position[2] + forward[2] * NOZZLE_FORWARD_OFFSET,
   ];
   const target = resolveSprayTarget(nozzleOrigin, forward, FIRE_SPRAY_TARGET_POSITION);
+  const waterPath = createWaterFlowPath({
+    initialDirection: target.direction,
+    nozzleOrigin,
+    targetPosition: FIRE_SPRAY_TARGET_POSITION,
+    targeted: target.targeted,
+  });
   return {
     direction: target.direction,
     distance: target.distance,
@@ -318,6 +324,7 @@ export function resolveWaterAndFireFrame(
     sprayOnFire: command.spray && target.targeted,
     splashElapsedSeconds,
     targeted: target.targeted,
+    waterPath,
   };
 }
 
@@ -353,16 +360,6 @@ function selectMissionVisualState(snapshot: VoxelGameSnapshot): MissionVisualSta
     fireLayerCount: getFireLayerCount(snapshot.fireIntensity),
     routeVisible: snapshot.routeVisible,
   };
-}
-
-/** 対象時は見える炎の手前で止め、対象外の自由放水は従来の6unitを描く。 */
-export function getWaterVisibleDistance(distance: number, targeted: boolean): number {
-  return targeted
-    ? Math.max(
-      0,
-      Math.min(WATER_TARGET_MAX_VISIBLE_DISTANCE, distance - WATER_TARGET_STOP_OFFSET),
-    )
-    : WATER_UNTARGETED_VISIBLE_DISTANCE;
 }
 
 /** 色別の固定poolへ、水流pure transformをslot順に反映する。 */
@@ -490,13 +487,11 @@ export function WaterAndFire({
     splashElapsedRef.current = clock.splashElapsedSeconds;
     const missionTelemetry = { ...preview, ...clock };
     const frame = createWaterFlowFrame({
-      direction: missionTelemetry.direction,
-      nozzleOrigin: missionTelemetry.nozzleOrigin,
+      path: missionTelemetry.waterPath,
       splashElapsedSeconds: missionTelemetry.splashElapsedSeconds,
       sprayActive: missionTelemetry.sprayActive,
       sprayElapsedSeconds: missionTelemetry.sprayElapsedSeconds,
       targeted: missionTelemetry.targeted,
-      visibleDistance: getWaterVisibleDistance(missionTelemetry.distance, missionTelemetry.targeted),
     });
     missionTelemetryRef.current = missionTelemetry;
     runtime.setSignals({
