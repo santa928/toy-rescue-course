@@ -14,6 +14,14 @@ docker compose up --build web
 - 互換URL: <http://localhost:5180/voxel-game.html>
 - 消防車デザイン確認用Vehicle Lab: <http://localhost:5180/vehicle-lab.html>
 
+## 公開版
+
+- GitHub Pages: <https://santa928.github.io/toy-rescue-course/>
+
+`main`へのpushで`.github/workflows/deploy-pages.yml`がunit testとproduction buildを実行し、
+`dist/`をGitHub Pagesへ公開します。プロジェクトPages向けのasset baseは
+`/toy-rescue-course/`です。
+
 ## ゲームの操作
 
 - `W` / `↑`: 画面上へ移動
