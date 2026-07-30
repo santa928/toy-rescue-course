@@ -24,6 +24,7 @@ if (focusMode !== null) {
 const outputDirectory = focusMode === null
   ? canonicalOutputDirectory
   : `${canonicalOutputDirectory}/focus/${focusMode}`;
+const FIRE_SPRAY_TARGET_POSITION = [12.9, 1.45, -9.1];
 const screenshotProofs = {};
 const targets = [
   { hasTouch: false, height: 720, minimumFps: 60, name: 'desktop', width: 1_280 },
@@ -888,6 +889,19 @@ async function waitForTargetedSpray(page, description, maximumFrames = 60) {
 async function verifyForgivingSprayTargeting(browser, errors) {
   const target = { hasTouch: false, height: 720, name: 'forgiving-spray', width: 1_280 };
   const { context, page } = await openViewportPage(browser, target, errors);
+  const getTargetGeometry = (state) => {
+    const deltaX = FIRE_SPRAY_TARGET_POSITION[0] - state.mission.nozzleOrigin[0];
+    const deltaZ = FIRE_SPRAY_TARGET_POSITION[2] - state.mission.nozzleOrigin[2];
+    const horizontalDistance = Math.hypot(deltaX, deltaZ);
+    const forwardLength = Math.hypot(state.vehicle.forward[0], state.vehicle.forward[2]);
+    return {
+      dot: (
+        (state.vehicle.forward[0] / forwardLength) * (deltaX / horizontalDistance)
+        + (state.vehicle.forward[2] / forwardLength) * (deltaZ / horizontalDistance)
+      ),
+      horizontalDistance,
+    };
+  };
   try {
     await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
       'forgiving spray garage opening');
@@ -916,11 +930,27 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-forgiving-spray.png`);
     await page.keyboard.up('Space');
 
-    await driveAlongWorldAxis(page, 'positiveX', (state) => !state.mission.targeted,
+    await page.evaluate(() => window.reset_voxel_game_vehicle?.());
+    await waitForFrames(page, 2);
+    await driveMissionToFire(page);
+    await driveAlongWorldAxis(page, 'positiveX', (state) => {
+      const geometry = getTargetGeometry(state);
+      return !state.mission.targeted && geometry.horizontalDistance <= 7 && geometry.dot < 0;
+    },
       'forgiving spray backward facing');
     const behind = await readGameState(page);
+    const { dot: behindDot, horizontalDistance: behindHorizontalDistance } = getTargetGeometry(behind);
+    assert(Number.isFinite(behindDot) && behindHorizontalDistance <= 7 && behindDot < 0,
+      `Backward spray was not strictly behind the vehicle: ${JSON.stringify({
+        behindDot,
+        behindHorizontalDistance,
+        nozzleOrigin: behind.mission.nozzleOrigin,
+        vehicleForward: behind.vehicle.forward,
+      })}`);
     assert.equal(behind.mission.targeted, false,
       `Backward spray retained the fire target: ${JSON.stringify({
+        behindDot,
+        behindHorizontalDistance,
         direction: behind.mission.direction,
         distance: behind.mission.distance,
         vehiclePosition: behind.vehicle.position,
@@ -928,15 +958,30 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     const beforeBackwardSpray = behind.runtime.fireIntensity;
     await page.keyboard.down('Space');
     await waitForFrames(page, 2);
+    const backwardSprayStarted = await readGameState(page);
+    assert.equal(backwardSprayStarted.controls.spray, true,
+      'Backward spray control did not become active.');
+    assert.equal(backwardSprayStarted.mission.targeted, false,
+      'Backward spray reacquired the fire target before the negative interval.');
+    assert.equal(backwardSprayStarted.mission.sprayOnFire, false,
+      'Backward spray unexpectedly started on fire.');
     await page.evaluate(() => window.advanceTime?.(500));
     await waitForFrames(page, 2);
-    await page.keyboard.up('Space');
     const afterBackwardSpray = await readGameState(page);
+    assert.equal(afterBackwardSpray.controls.spray, true,
+      'Backward spray control did not remain active for 500ms.');
+    assert.equal(afterBackwardSpray.mission.targeted, false,
+      'Backward spray auto-targeted the fire during the negative interval.');
+    assert.equal(afterBackwardSpray.mission.sprayOnFire, false,
+      'Backward spray auto-targeted onto fire during the negative interval.');
+    await page.keyboard.up('Space');
     assert.equal(afterBackwardSpray.runtime.fireIntensity, beforeBackwardSpray,
       'Backward spray reduced fire intensity.');
 
     return {
       backwardTargeted: behind.mission.targeted,
+      behindDot,
+      behindHorizontalDistance,
       fireIntensityAfterForwardSpray: partiallyExtinguished.runtime.fireIntensity,
       stagedDistance: staged.mission.distance,
       targeted: spraying.mission.targeted,
