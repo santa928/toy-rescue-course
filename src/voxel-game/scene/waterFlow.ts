@@ -9,9 +9,15 @@ const UNTARGETED_VISIBLE_DISTANCE = 6;
 
 /** 描画とtext telemetryが共有するquadratic Bézier放水経路。 */
 export interface WaterFlowPath {
-  readonly control: readonly [number, number, number];
-  readonly end: readonly [number, number, number];
-  readonly start: readonly [number, number, number];
+  readonly controlX: number;
+  readonly controlY: number;
+  readonly controlZ: number;
+  readonly endX: number;
+  readonly endY: number;
+  readonly endZ: number;
+  readonly startX: number;
+  readonly startY: number;
+  readonly startZ: number;
 }
 
 /** 放水経路を作るpure helperの入力。 */
@@ -60,51 +66,45 @@ const SPLASH_DIRECTIONS = [
 /** 45/55補正を初期接線に保ち、対象時だけ炎中心の0.55unit手前へ曲線で収束させる。 */
 export function createWaterFlowPath(input: WaterFlowPathInput): WaterFlowPath {
   const directionLength = Math.hypot(...input.initialDirection) || 1;
-  const direction = input.initialDirection.map(
-    (value) => value / directionLength,
-  ) as [number, number, number];
+  const directionX = input.initialDirection[0] / directionLength;
+  const directionY = input.initialDirection[1] / directionLength;
+  const directionZ = input.initialDirection[2] / directionLength;
+  const startX = input.nozzleOrigin[0];
+  const startY = input.nozzleOrigin[1];
+  const startZ = input.nozzleOrigin[2];
 
   if (!input.targeted) {
     return {
-      control: input.nozzleOrigin.map(
-        (value, axis) => value + direction[axis] * UNTARGETED_VISIBLE_DISTANCE / 2,
-      ) as [number, number, number],
-      end: input.nozzleOrigin.map(
-        (value, axis) => value + direction[axis] * UNTARGETED_VISIBLE_DISTANCE,
-      ) as [number, number, number],
-      start: input.nozzleOrigin,
+      controlX: startX + directionX * UNTARGETED_VISIBLE_DISTANCE / 2,
+      controlY: startY + directionY * UNTARGETED_VISIBLE_DISTANCE / 2,
+      controlZ: startZ + directionZ * UNTARGETED_VISIBLE_DISTANCE / 2,
+      endX: startX + directionX * UNTARGETED_VISIBLE_DISTANCE,
+      endY: startY + directionY * UNTARGETED_VISIBLE_DISTANCE,
+      endZ: startZ + directionZ * UNTARGETED_VISIBLE_DISTANCE,
+      startX,
+      startY,
+      startZ,
     };
   }
 
-  const targetDelta = input.targetPosition.map(
-    (value, axis) => value - input.nozzleOrigin[axis],
-  ) as [number, number, number];
-  const targetDistance = Math.hypot(...targetDelta);
+  const targetDeltaX = input.targetPosition[0] - startX;
+  const targetDeltaY = input.targetPosition[1] - startY;
+  const targetDeltaZ = input.targetPosition[2] - startZ;
+  const targetDistance = Math.hypot(targetDeltaX, targetDeltaY, targetDeltaZ);
   const endpointDistance = Math.max(0, targetDistance - TARGET_STOP_OFFSET);
   const endpointRatio = targetDistance > 0 ? endpointDistance / targetDistance : 0;
 
   return {
-    control: input.nozzleOrigin.map(
-      (value, axis) => value + direction[axis] * endpointDistance / 2,
-    ) as [number, number, number],
-    end: input.nozzleOrigin.map(
-      (value, axis) => value + targetDelta[axis] * endpointRatio,
-    ) as [number, number, number],
-    start: input.nozzleOrigin,
+    controlX: startX + directionX * endpointDistance / 2,
+    controlY: startY + directionY * endpointDistance / 2,
+    controlZ: startZ + directionZ * endpointDistance / 2,
+    endX: startX + targetDeltaX * endpointRatio,
+    endY: startY + targetDeltaY * endpointRatio,
+    endZ: startZ + targetDeltaZ * endpointRatio,
+    startX,
+    startY,
+    startZ,
   };
-}
-
-/** quadratic Bézier放水経路上の0〜1位置をpureに返す。 */
-function sampleWaterFlowPath(
-  path: WaterFlowPath,
-  progress: number,
-): [number, number, number] {
-  const inverse = 1 - progress;
-  return path.start.map((start, axis) => (
-    inverse * inverse * start
-    + 2 * inverse * progress * path.control[axis]
-    + progress * progress * path.end[axis]
-  )) as [number, number, number];
 }
 
 /** 固定slotのstreamとtarget着弾飛沫を、指定時刻の決定的なtransformへ変換する。 */
@@ -116,15 +116,25 @@ export function createWaterFlowFrame(input: WaterFlowInput): WaterFlowFrame {
     const active = input.sprayActive && localTime >= 0;
     const age = active ? (localTime % STREAM_PERIOD_SECONDS) / STREAM_PERIOD_SECONDS : 0;
     const arc = -0.24 * age * age + Math.sin((age + slot * 0.13) * Math.PI * 2) * 0.035;
-    const pathPosition = sampleWaterFlowPath(input.path, age);
+    const inverse = 1 - age;
+    const startWeight = inverse * inverse;
+    const controlWeight = 2 * inverse * age;
+    const endWeight = age * age;
     instances.push({
       active,
       color: slot % 3 === 2 ? 'white' : 'blue',
       kind: 'stream',
       position: [
-        pathPosition[0],
-        pathPosition[1] + arc,
-        pathPosition[2],
+        startWeight * input.path.startX
+          + controlWeight * input.path.controlX
+          + endWeight * input.path.endX,
+        startWeight * input.path.startY
+          + controlWeight * input.path.controlY
+          + endWeight * input.path.endY
+          + arc,
+        startWeight * input.path.startZ
+          + controlWeight * input.path.controlZ
+          + endWeight * input.path.endZ,
       ],
       scale: active ? 0.12 + Math.sin(Math.PI * age) * 0.09 : 0,
       slot,
@@ -141,9 +151,9 @@ export function createWaterFlowFrame(input: WaterFlowInput): WaterFlowFrame {
       color: splashSlot % 3 === 2 ? 'white' : 'blue',
       kind: 'splash',
       position: [
-        input.path.end[0] + spread[0] * age * 0.65,
-        input.path.end[1] + spread[1] * age * 0.65 - age * age * 0.22,
-        input.path.end[2] + spread[2] * age * 0.65,
+        input.path.endX + spread[0] * age * 0.65,
+        input.path.endY + spread[1] * age * 0.65 - age * age * 0.22,
+        input.path.endZ + spread[2] * age * 0.65,
       ],
       scale: active ? 0.18 * (1 - age) : 0,
       slot,

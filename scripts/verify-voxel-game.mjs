@@ -953,11 +953,12 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     `Forgiving spray did not remain partially extinguished: ${
       partiallyExtinguished.runtime.fireIntensity
     }.`);
-    assert(['assigned', 'active'].includes(partiallyExtinguished.runtime.missionPhase)
-      && partiallyExtinguished.runtime.routeVisible,
-    `Forgiving spray left the assigned mission lifecycle before 500ms: ${
+    assert.equal(partiallyExtinguished.runtime.missionPhase, 'active',
+      `Forgiving spray was not active after 500ms: ${
         partiallyExtinguished.runtime.missionPhase
       }.`);
+    assert.equal(partiallyExtinguished.runtime.routeVisible, true,
+      'Forgiving spray hid the assigned route before completion.');
     let closestStreamToEndpoint = Number.POSITIVE_INFINITY;
     for (let frame = 0; frame < 90; frame += 1) {
       const visualState = await readGameState(page);

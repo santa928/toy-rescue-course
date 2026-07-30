@@ -124,9 +124,15 @@ export function VoxelGameApp(): ReactElement {
     splashElapsedSeconds: 0,
     targeted: false,
     waterPath: {
-      control: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 2.15, GARAGE_POSITION[2] + 4.7],
-      end: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 2.15, GARAGE_POSITION[2] + 7.7],
-      start: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 2.15, GARAGE_POSITION[2] + 1.7],
+      controlX: GARAGE_POSITION[0],
+      controlY: GARAGE_POSITION[1] + 2.15,
+      controlZ: GARAGE_POSITION[2] + 4.7,
+      endX: GARAGE_POSITION[0],
+      endY: GARAGE_POSITION[1] + 2.15,
+      endZ: GARAGE_POSITION[2] + 7.7,
+      startX: GARAGE_POSITION[0],
+      startY: GARAGE_POSITION[1] + 2.15,
+      startZ: GARAGE_POSITION[2] + 1.7,
     },
   });
   const renderTelemetryRef = useRef<VoxelGameRenderTelemetry>({
@@ -202,9 +208,21 @@ export function VoxelGameApp(): ReactElement {
           direction: [...missionTelemetry.direction],
           nozzleOrigin: [...missionTelemetry.nozzleOrigin],
           waterPath: {
-            control: [...missionTelemetry.waterPath.control],
-            end: [...missionTelemetry.waterPath.end],
-            start: [...missionTelemetry.waterPath.start],
+            control: [
+              missionTelemetry.waterPath.controlX,
+              missionTelemetry.waterPath.controlY,
+              missionTelemetry.waterPath.controlZ,
+            ],
+            end: [
+              missionTelemetry.waterPath.endX,
+              missionTelemetry.waterPath.endY,
+              missionTelemetry.waterPath.endZ,
+            ],
+            start: [
+              missionTelemetry.waterPath.startX,
+              missionTelemetry.waterPath.startY,
+              missionTelemetry.waterPath.startZ,
+            ],
           },
           phase: runtime.missionPhase,
           routeVisible: runtime.routeVisible,

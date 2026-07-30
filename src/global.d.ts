@@ -21,9 +21,17 @@ declare global {
       readonly fire: readonly [number, number, number];
       readonly garage: readonly [number, number, number];
     };
-    readonly mission: import('./voxel-game/scene/WaterAndFire').MissionTelemetry & {
+    readonly mission: Omit<
+      import('./voxel-game/scene/WaterAndFire').MissionTelemetry,
+      'waterPath'
+    > & {
       readonly phase: import('./voxel-game/domain/VoxelGameRuntime').MissionPhase;
       readonly routeVisible: boolean;
+      readonly waterPath: {
+        readonly control: readonly [number, number, number];
+        readonly end: readonly [number, number, number];
+        readonly start: readonly [number, number, number];
+      };
     };
     readonly mode: 'drive-ready';
     readonly renderer: import('./voxel-game/scene/VoxelGameScene').VoxelGameRenderTelemetry;

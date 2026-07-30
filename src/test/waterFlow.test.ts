@@ -9,9 +9,15 @@ import {
 } from '../voxel-game/scene/waterFlow';
 
 const straightPath: WaterFlowPath = {
-  control: [3, 2, 1],
-  end: [3, 2, -2],
-  start: [3, 2, 4],
+  controlX: 3,
+  controlY: 2,
+  controlZ: 1,
+  endX: 3,
+  endY: 2,
+  endZ: -2,
+  startX: 3,
+  startY: 2,
+  startZ: 4,
 };
 
 const baseInput = {
@@ -41,6 +47,39 @@ describe('waterFlow', () => {
     expect(moved.length).toBeGreaterThanOrEqual(4);
   });
 
+  it('quadratic Bézier上の複数stream slot位置を固定する', () => {
+    const frame = createWaterFlowFrame({
+      ...baseInput,
+      path: {
+        controlX: 1,
+        controlY: 2,
+        controlZ: -2,
+        endX: 3,
+        endY: 0,
+        endZ: -4,
+        startX: 0,
+        startY: 0,
+        startZ: 0,
+      },
+    });
+
+    expect(frame.instances[0]?.position).toEqual([
+      1.5879017013232515,
+      0.841730447468437,
+      -2.4347826086956523,
+    ]);
+    expect(frame.instances[7]?.position).toEqual([
+      0.9991500945179584,
+      0.9605314013427197,
+      -1.6556521739130434,
+    ]);
+    expect(frame.instances[20]?.position).toEqual([
+      0.10706994328922485,
+      0.16855992898092925,
+      -0.20869565217391287,
+    ]);
+  });
+
   it('全stream粒を斜めのnozzleからvisible endの間へ収め、横ずれを制限する', () => {
     const direction = [1, 1, -1] as const;
     const nozzleOrigin = [3, 2, 4] as const;
@@ -55,7 +94,17 @@ describe('waterFlow', () => {
     ) as [number, number, number];
     const frame = createWaterFlowFrame({
       ...baseInput,
-      path: { control, end, start: nozzleOrigin },
+      path: {
+        controlX: control[0],
+        controlY: control[1],
+        controlZ: control[2],
+        endX: end[0],
+        endY: end[1],
+        endZ: end[2],
+        startX: nozzleOrigin[0],
+        startY: nozzleOrigin[1],
+        startZ: nozzleOrigin[2],
+      },
     });
 
     for (const instance of frame.instances.filter(({ active, kind }) => active && kind === 'stream')) {
@@ -101,22 +150,24 @@ describe('waterFlow', () => {
       targeted: true,
     });
     const endpointError = Math.hypot(
-      target[0] - path.end[0],
-      target[1] - path.end[1],
-      target[2] - path.end[2],
+      target[0] - path.endX,
+      target[1] - path.endY,
+      target[2] - path.endZ,
     );
-    const tangent = path.control.map(
-      (value, axis) => value - path.start[axis],
-    ) as [number, number, number];
+    const tangent = [
+      path.controlX - path.startX,
+      path.controlY - path.startY,
+      path.controlZ - path.startZ,
+    ] as const;
     const tangentLength = Math.hypot(...tangent);
 
     expect(endpointError).toBeCloseTo(0.55, 12);
     tangent.forEach((value, axis) => {
       expect(value / tangentLength).toBeCloseTo(initialDirection[axis], 12);
     });
-    expect(path.end[0]).toBeCloseTo(2.67, 12);
-    expect(path.end[1]).toBe(0);
-    expect(path.end[2]).toBeCloseTo(-3.56, 12);
+    expect(path.endX).toBeCloseTo(2.67, 12);
+    expect(path.endY).toBe(0);
+    expect(path.endZ).toBeCloseTo(-3.56, 12);
   });
 
   it('非targeted pathは既存方向へ6unitの直線を保つ', () => {
