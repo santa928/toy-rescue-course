@@ -709,7 +709,11 @@ async function verifyProductionMap(browser, errors) {
         ),
       }),
     ));
-    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-production-park.png`);
+    const parkMissionLabel = await captureStableMissionScreenshot(
+      page,
+      `${outputDirectory}/desktop-production-park.png`,
+      'production-map park capture',
+    );
 
     journeys.push(await verifyDistrictJourney(
       page,
@@ -841,6 +845,9 @@ async function verifyProductionMap(browser, errors) {
         world: hubCaptureState.world,
       },
       journeys,
+      parkCapture: {
+        missionLabel: parkMissionLabel,
+      },
       southCapture: {
         missionLabel: southMissionLabel,
         signPost: {
@@ -3089,15 +3096,36 @@ async function verifyViewport(browser, target, errors) {
     if (target.hasTouch) {
       touch = await createTouchDriver(page);
       await touch.setStick(0.55, -0.82);
-      await waitForFrames(page, 30);
-      const driven = await readGameState(page);
-      assert(driven.controls.moveX > 0.45 && driven.controls.moveY > 0.45,
+      await waitForFrames(page, 2);
+      const diagonalInput = await readGameState(page);
+      assert(diagonalInput.controls.moveX > 0.45 && diagonalInput.controls.moveY > 0.45,
         `${target.name}: touch did not move toward screen upper-right.`);
-      await captureVerifiedScreenshot(page, `${outputDirectory}/${target.name}-driving.png`);
       await touch.releaseStick();
       const cancelled = await readGameState(page);
       assert(cancelled.controls.moveX === 0 && cancelled.controls.moveY === 0,
         `${target.name}: touch release did not center movement.`);
+      await brakeVehicle(page);
+      const driven = await driveAlongWorldAxis(
+        page,
+        'negativeZ',
+        (state) => state.vehicle.position[2] <= initial.landmarks.garage[2] - 5.5,
+        `${target.name} driving garage opening`,
+        touch,
+      );
+      assert.equal(driven.vehicle.resetCount, initial.vehicle.resetCount,
+        `${target.name}: driving capture reset the vehicle.`);
+      assert.equal(driven.world.currentDistrict, 'hub',
+        `${target.name}: driving capture left hub: ${JSON.stringify(driven.world)}`);
+      assert(initial.vehicle.position[2] - driven.vehicle.position[2] >= 5,
+        `${target.name}: driving capture did not leave the garage: ${JSON.stringify({
+          initial: initial.vehicle.position,
+          outside: driven.vehicle.position,
+        })}`);
+      await captureStableMissionScreenshot(
+        page,
+        `${outputDirectory}/${target.name}-driving.png`,
+        `${target.name} driving capture`,
+      );
     } else {
       const driven = await driveAlongWorldAxis(
         page,
