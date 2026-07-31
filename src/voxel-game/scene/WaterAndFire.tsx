@@ -102,9 +102,9 @@ const WATER_BLUE_INSTANCE_COUNT = 22;
 const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
 
 const ROUTE_POSITIONS: readonly (readonly [number, number, number])[] = [
-  [0, 0.26, 16.2], [3, 0.26, 16.2], [6, 0.26, 15], [9, 0.26, 15],
-  [12, 0.26, 15], [15, 0.26, 13], [15, 0.26, 10], [15, 0.26, 7],
-  [15, 0.26, 4], [15, 0.26, 1], [15, 0.26, -3], [14, 0.26, -8],
+  [0, 0.26, 3], [0, 0.26, 0], [4, 0.26, 0], [8, 0.26, 0],
+  [12, 0.26, 0], [16, 0.26, 0], [20, 0.26, 0], [24, 0.26, 0],
+  [28, 0.26, 0], [30, 0.26, -4], [30, 0.26, -8], [28, 0.26, -13],
 ] as const;
 
 export const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map(([x, , z]) => ({
@@ -113,14 +113,14 @@ export const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map(([x, , z]) =
 }));
 
 export const FIRE_HAZARD_BOX: VoxelBox = {
-  position: [12.9, 0.9, -9.1],
+  position: [26.9, 0.9, -16.1],
   scale: [1.2, 1.8, 1.2],
 };
 
 export const FIRE_LAYER_POSITIONS: readonly (readonly [number, number, number])[] = [
-  [12.9, 0.75, -9.1],
-  [12.95, 1.5, -9.02],
-  [12.9, 2.15, -9.1],
+  [26.9, 0.75, -16.1],
+  [26.95, 1.5, -16.02],
+  [26.9, 2.15, -16.1],
 ];
 
 export const FIRE_LAYER_BOXES: readonly VoxelBox[] = [
@@ -130,8 +130,8 @@ export const FIRE_LAYER_BOXES: readonly VoxelBox[] = [
 ];
 
 export const CELEBRATION_STAR_CENTERS: readonly (readonly [number, number, number])[] = [
-  [10.8, 1, -4], [8.5, 1.2, -4.4], [17, 1, -4.8],
-  [10, 1.8, -5.2], [17.25, 3, -8], [14.8, 1.7, -6],
+  [24.8, 1, -11], [22.5, 1.2, -11.4], [31, 1, -11.8],
+  [24, 1.8, -12.2], [31.25, 3, -15], [28.8, 1.7, -13],
 ];
 
 /** 5つのcubeで十字型の星を作る。 */

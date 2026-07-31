@@ -6,29 +6,42 @@ import {
   FIRE_SPRAY_TARGET_POSITION,
   GARAGE_POSITION,
   isInsideGarageRestartArea,
+  PARK_CENTER,
+  resolveVehicleDistrict,
   WORLD_BOUNDS,
 } from '../voxel-game/scene/worldLayout';
 
 describe('voxel world layout', () => {
-  it('36×36相当の境界内へ主要地点を置く', () => {
-    expect(WORLD_BOUNDS).toEqual({ maxX: 18, maxZ: 18, minX: -18, minZ: -18 });
+  it('72×72本番境界内へ中央ハブと既存遊びを置く', () => {
+    expect(WORLD_BOUNDS).toEqual({ maxX: 36, maxZ: 36, minX: -36, minZ: -36 });
+    expect(GARAGE_POSITION).toEqual([0, 0.8, 6]);
+    expect(PARK_CENTER).toEqual([0, 0, -24]);
+    expect(BLOCK_PLAZA).toEqual({
+      position: [-24, 0.18, 6],
+      scale: [14, 0.34, 16],
+    });
+    expect(FIRE_POSITION).toEqual([26, 1.2, -18]);
+    expect(FIRE_SPRAY_TARGET_POSITION).toEqual([26.9, 1.45, -16.1]);
+    expect(BREAKABLE_BLOCKS.map(({ position }) => position)).toEqual([
+      [-26.7, 0.75, 9.5],
+      [-21.5, 0.75, 0],
+      [-21.3, 0.75, 4.6],
+      [-26.7, 0.75, 2.5],
+    ]);
+  });
 
-    for (const [x, , z] of [
-      GARAGE_POSITION,
-      FIRE_POSITION,
-      FIRE_SPRAY_TARGET_POSITION,
-      ...BREAKABLE_BLOCKS.map((block) => block.position),
-    ]) {
-      expect(x).toBeGreaterThanOrEqual(WORLD_BOUNDS.minX);
-      expect(x).toBeLessThanOrEqual(WORLD_BOUNDS.maxX);
-      expect(z).toBeGreaterThanOrEqual(WORLD_BOUNDS.minZ);
-      expect(z).toBeLessThanOrEqual(WORLD_BOUNDS.maxZ);
-    }
+  it('車両位置を本番地区へ解決する', () => {
+    expect(resolveVehicleDistrict(GARAGE_POSITION)).toBe('hub');
+    expect(resolveVehicleDistrict(PARK_CENTER)).toBe('park');
+    expect(resolveVehicleDistrict(FIRE_POSITION)).toBe('fire');
+    expect(resolveVehicleDistrict(BLOCK_PLAZA.position)).toBe('blocks');
+    expect(resolveVehicleDistrict([0, 0, 24])).toBe('south');
+    expect(resolveVehicleDistrict([12, 0, 0])).toBe('road');
   });
 
   it('建物の代表位置と分離した見える炎の照準点を固定する', () => {
-    expect(FIRE_POSITION).toEqual([12, 1.2, -11]);
-    expect(FIRE_SPRAY_TARGET_POSITION).toEqual([12.9, 1.45, -9.1]);
+    expect(FIRE_POSITION).toEqual([26, 1.2, -18]);
+    expect(FIRE_SPRAY_TARGET_POSITION).toEqual([26.9, 1.45, -16.1]);
     expect(FIRE_SPRAY_TARGET_POSITION).not.toEqual(FIRE_POSITION);
   });
 
@@ -40,31 +53,31 @@ describe('voxel world layout', () => {
 
   it('車庫中心からXZ半径3以内だけを仕事の再開領域として扱う', () => {
     expect(isInsideGarageRestartArea(GARAGE_POSITION)).toBe(true);
-    expect(isInsideGarageRestartArea([3, -99, 14])).toBe(true);
-    expect(isInsideGarageRestartArea([0, 99, 17.001])).toBe(false);
+    expect(isInsideGarageRestartArea([3, -99, 6])).toBe(true);
+    expect(isInsideGarageRestartArea([0, 99, 9.001])).toBe(false);
     expect(isInsideGarageRestartArea([12, 0.8, -5])).toBe(false);
   });
 
-  it('積み木4個を道路と中央公園の外へ車体外形ぶん離して置く', () => {
+  it('積み木4個を積み木広場内へ車体外形ぶん離して置く', () => {
     const minimumBlockCenterClearance = 4.5;
     const blockHalfExtent = 0.75;
-    const westRoadEastEdge = -13;
-    const parkWestEdge = -6;
+    const districtWestEdge = -31;
+    const districtEastEdge = -17;
     const plazaMinX = BLOCK_PLAZA.position[0] - BLOCK_PLAZA.scale[0] / 2;
     const plazaMaxX = BLOCK_PLAZA.position[0] + BLOCK_PLAZA.scale[0] / 2;
     const plazaMinZ = BLOCK_PLAZA.position[2] - BLOCK_PLAZA.scale[2] / 2;
     const plazaMaxZ = BLOCK_PLAZA.position[2] + BLOCK_PLAZA.scale[2] / 2;
 
-    expect(plazaMinX).toBeGreaterThanOrEqual(westRoadEastEdge);
-    expect(plazaMaxX).toBeLessThanOrEqual(parkWestEdge);
+    expect(plazaMinX).toBeGreaterThanOrEqual(districtWestEdge);
+    expect(plazaMaxX).toBeLessThanOrEqual(districtEastEdge);
 
     for (const [index, block] of BREAKABLE_BLOCKS.entries()) {
       const [x, , z] = block.position;
-      expect(x - blockHalfExtent, `${block.id} enters the west road`).toBeGreaterThanOrEqual(
-        westRoadEastEdge,
+      expect(x - blockHalfExtent, `${block.id} leaves the district on the west`).toBeGreaterThanOrEqual(
+        districtWestEdge,
       );
-      expect(x + blockHalfExtent, `${block.id} enters the central park`).toBeLessThanOrEqual(
-        parkWestEdge,
+      expect(x + blockHalfExtent, `${block.id} leaves the district on the east`).toBeLessThanOrEqual(
+        districtEastEdge,
       );
       expect(x - blockHalfExtent, `${block.id} leaves the plaza on the west`).toBeGreaterThanOrEqual(
         plazaMinX,

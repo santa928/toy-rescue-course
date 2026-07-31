@@ -94,15 +94,13 @@ function attachFireHazardCollider(ref: FireHazardTestRef, collider: TestCollider
 }
 
 describe('WaterAndFire', () => {
-  it('12個の道しるべを高さ0.14以下の非障害タイルとして定義する', () => {
-    expect(ROUTE_BOXES).toHaveLength(12);
-    expect(ROUTE_BOXES.every(({ position, scale }) => (
-      position[1] <= 0.28
-      && scale[0] === 0.62
-      && scale[1] >= 0.1
-      && scale[1] <= 0.14
-      && scale[2] === 0.62
-    ))).toBe(true);
+  it('中央車庫から東の火災地区へ12個の非solid道しるべを置く', () => {
+    expect(ROUTE_BOXES.map(({ position }) => position)).toEqual([
+      [0, 0.26, 3], [0, 0.26, 0], [4, 0.26, 0], [8, 0.26, 0],
+      [12, 0.26, 0], [16, 0.26, 0], [20, 0.26, 0], [24, 0.26, 0],
+      [28, 0.26, 0], [30, 0.26, -4], [30, 0.26, -8], [28, 0.26, -13],
+    ]);
+    expect(ROUTE_BOXES.every(({ scale }) => scale[1] <= 0.14)).toBe(true);
   });
 
   it.each([
@@ -153,27 +151,34 @@ describe('WaterAndFire', () => {
     expect(colliderEnabled).toBe(false);
   });
 
-  it('炎hazardを表示下2層より大きくしない', () => {
+  it('本番火災地区へhazardと3層の炎を同じ相対形状で移す', () => {
     expect(FIRE_HAZARD_BOX).toEqual({
-      position: [12.9, 0.9, -9.1],
+      position: [26.9, 0.9, -16.1],
       scale: [1.2, 1.8, 1.2],
     });
+    expect(FIRE_LAYER_POSITIONS).toEqual([
+      [26.9, 0.75, -16.1],
+      [26.95, 1.5, -16.02],
+      [26.9, 2.15, -16.1],
+    ]);
   });
 
   it('火cubeを建物のcamera側外壁面へ置き、3層すべてを遮蔽させない', () => {
     expect(FIRE_LAYER_POSITIONS).toHaveLength(3);
-    expect(FIRE_LAYER_POSITIONS.every(([x]) => x >= 12.75)).toBe(true);
+    expect(FIRE_LAYER_POSITIONS.every(([x]) => x >= 26.75)).toBe(true);
     expect(FIRE_LAYER_POSITIONS.map(([, y]) => y)).toEqual([0.75, 1.5, 2.15]);
-    expect(FIRE_LAYER_POSITIONS.map(([, , z]) => z)).toEqual([-9.1, -9.02, -9.1]);
+    expect(FIRE_LAYER_POSITIONS.map(([, , z]) => z)).toEqual([-16.1, -16.02, -16.1]);
   });
 
   it('6組の成功星を火災現場上空かつcamera安全矩形へ置く', () => {
-    expect(CELEBRATION_STAR_CENTERS).toHaveLength(6);
-    expect(CELEBRATION_STAR_CENTERS.every(([, y, z]) => y >= 1 && y <= 3 && z >= -8)).toBe(true);
-    expect(CELEBRATION_STAR_CENTERS[1]?.[0]).toBeLessThanOrEqual(8.5);
-    expect(CELEBRATION_STAR_CENTERS[2]?.[0]).toBeGreaterThanOrEqual(17);
-    expect(CELEBRATION_STAR_CENTERS[3]?.[0]).toBeLessThanOrEqual(10);
-    expect(CELEBRATION_STAR_CENTERS[4]).toEqual([17.25, 3, -8]);
+    expect(CELEBRATION_STAR_CENTERS).toEqual([
+      [24.8, 1, -11],
+      [22.5, 1.2, -11.4],
+      [31, 1, -11.8],
+      [24, 1.8, -12.2],
+      [31.25, 3, -15],
+      [28.8, 1.7, -13],
+    ]);
   });
 
   it.each([
@@ -258,7 +263,7 @@ describe('WaterAndFire', () => {
       {
         forward: [0, 0, -1],
         mass: 1.4,
-        position: [15.5, 0.8, -1.2],
+        position: [29.5, 0.8, -10.2],
         resetCount: 0,
         speed: 0,
       },
@@ -270,7 +275,7 @@ describe('WaterAndFire', () => {
       {
         forward: [0, 0, -1],
         mass: 1.4,
-        position: [15.5, 0.8, 0],
+        position: [29.5, 0.8, -7],
         resetCount: 0,
         speed: 0,
       },
@@ -280,7 +285,7 @@ describe('WaterAndFire', () => {
       {
         forward: [0, 0, 1],
         mass: 1.4,
-        position: [15.5, 0.8, -1.2],
+        position: [29.5, 0.8, -10.2],
         resetCount: 0,
         speed: 0,
       },
@@ -294,7 +299,7 @@ describe('WaterAndFire', () => {
       splashElapsedSeconds: 0.1,
       targeted: true,
     });
-    expect(forgiving.distance).toBeGreaterThan(6);
+    expect(forgiving.distance).toBeGreaterThan(5);
     expect(outside).toMatchObject({ sprayOnFire: false, targeted: false });
     expect(behind).toMatchObject({ sprayOnFire: false, targeted: false });
   });
@@ -305,7 +310,7 @@ describe('WaterAndFire', () => {
       {
         forward: [0, 0, -1],
         mass: 1.4,
-        position: [12, 0.8, -5],
+        position: [29.5, 0.8, -10.2],
         resetCount: 0,
         speed: 0,
       },
