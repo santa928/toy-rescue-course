@@ -22,6 +22,12 @@ docker compose up --build web
 `dist/`をGitHub Pagesへ公開します。プロジェクトPages向けのasset baseは
 `/toy-rescue-course/`です。
 
+## 本番箱庭
+
+72×72相当の机上箱庭を、中央の消防車庫、北の公園、東の火災現場、
+西の積み木広場、南の自由走行地区で構成しています。中央の道路から
+各地区へ寄り道でき、消防車の消火と積み木破壊を同じ1枚続きの世界で遊べます。
+
 ## ゲームの操作
 
 - `W` / `↑`: 画面上へ移動
@@ -32,14 +38,15 @@ docker compose up --build web
 - `Space` / 「みず」: 放水
 - `F` / 右上ボタン: fullscreenの開始・終了
 
-放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。中央公園の木の幹と火災建物本体には消防車で進入できません。
+放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。北の公園の木の幹と火災建物本体には消防車で進入できません。
 
 炎から約7unit以内でおおむね正面を向いて放水すると、見えている炎へ照準が補助されます。真横・背後・範囲外からの放水では消火できません。
 
 ### 箱庭の物理対象
 
 - 車庫は正面開口から出入りし、背面壁・左右壁を通り抜けません。
-- 中央公園の赤い遊具と黄色い支柱はsolidです。
+- 北の公園の赤い遊具と黄色い支柱はsolidです。
+- 中央ハブのゲートpostと南の自由走行地区の標識postはsolidです。
 - 炎は燃えている間だけ進入できず、消火後は同じ場所を走れます。
 - 黄色い道しるべは道路へ埋め込まれた案内灯なので通過できます。
 - 樹冠、窓、屋根装飾、道路線、水、星は非solidです。
@@ -48,7 +55,8 @@ docker compose up --build web
 炎の舌はslotごとに非同期で揺れ、火の粉は上昇・縮小して循環します。消火では表示数が
 18→12→6→0へ減り、車庫へ帰って仕事を再開すると18へ戻ります。
 
-最終E2E、3 viewportの代表画像、renderer分類と性能実測はDocker内で生成します。
+最終E2E、3 viewportの代表画像、software renderer分類はDocker内で生成します。
+物理GPU性能は、同じ3 viewportをホストの物理GPU対応ブラウザで別途認証します。
 
 ```bash
 docker compose --profile e2e run --rm --build voxel-game-e2e
@@ -64,7 +72,7 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。立体ボクセル炎を含む最新fresh unit testは18 files / 154 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは20 files / 173 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -75,4 +83,4 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む28枚の代表画像は `output/voxel-game/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む33枚の代表画像は `output/voxel-game/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。2026-07-31の物理GPU再認証では、`ANGLE Metal Renderer: Apple M4`でDesktop 1280×720が平均60.1961fps、tablet landscape 1024×768が平均60.0702fps、mobile landscape 844×390が平均60.0678fpsとなり、各目標を満たしました。
