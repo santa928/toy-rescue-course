@@ -2482,22 +2482,144 @@ async function prepareWorldObstacleCollision(page, touch, obstacle, targetX = ob
   await alignWorldCoordinate(page, 2, approachZ, `${obstacle.id} collision staging Z`, 0.35, touch);
 }
 
-/** 任意world軸からsolidへ押し込み、非貫通・resetなし・離脱操作を数値検証する。 */
+/** world軸と符号を既存cardinal入力名へ変換する。 */
+function worldAxisInputName(axis, direction) {
+  assert(axis === 'x' || axis === 'z', `Unknown world input axis: ${axis}.`);
+  assert(direction === -1 || direction === 1, `Unknown world input direction: ${direction}.`);
+  return `${direction < 0 ? 'negative' : 'positive'}${axis.toUpperCase()}`;
+}
+
+/**
+ * telemetryのgarage wallと対象post AABBから、安全な車庫出口・正面runwayを算出してkeyboardで配置する。
+ */
+async function prepareTelemetryPostCollision(page, obstacle, approachAxis, approachDirection) {
+  const initial = await readGameState(page);
+  const garageSideWalls = [
+    requireWorldSolid(initial, 'garage-left-wall'),
+    requireWorldSolid(initial, 'garage-right-wall'),
+  ];
+  const hubGate = requireWorldSolid(initial, 'hub-gate-post');
+  const garageFrontFaceZ = Math.min(...garageSideWalls.map((wall) => (
+    wall.position[2] - wall.scale[2] / 2
+  )));
+  const safeSupport = Math.max(...VEHICLE_COLLIDER_HALF_EXTENTS);
+  const garageClearanceZ = garageFrontFaceZ - safeSupport - 0.75;
+  const hubGateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2
+    - VEHICLE_COLLIDER_HALF_EXTENTS[2] - 2;
+  const garageExitZ = Math.min(garageClearanceZ, hubGateBypassZ);
+  await driveAlongWorldAxis(
+    page,
+    'negativeZ',
+    (state) => state.vehicle.position[2] <= garageExitZ,
+    `${obstacle.id} telemetry garage exit`,
+  );
+  await alignWorldCoordinate(
+    page,
+    2,
+    garageExitZ,
+    `${obstacle.id} telemetry garage clearance Z`,
+    0.35,
+  );
+
+  const perpendicularAxis = approachAxis === 'x' ? 'z' : 'x';
+  const perpendicularIndex = AXIS_INDEX[perpendicularAxis];
+  const approachIndex = AXIS_INDEX[approachAxis];
+  const perpendicularTarget = obstacle.position[perpendicularIndex];
+  const runwayReserve = 2.5;
+  const stagingCoordinate = obstacle.position[approachIndex] - approachDirection * (
+    obstacle.scale[approachIndex] / 2 + safeSupport + runwayReserve
+  );
+  const garageCenterX = garageSideWalls.reduce((sum, wall) => sum + wall.position[0], 0)
+    / garageSideWalls.length;
+  const transitDirection = perpendicularTarget < garageCenterX ? -1 : 1;
+  const sameSideGarageWall = transitDirection < 0
+    ? garageSideWalls.reduce((west, wall) => (
+      wall.position[0] < west.position[0] ? wall : west
+    ))
+    : garageSideWalls.reduce((east, wall) => (
+      wall.position[0] > east.position[0] ? wall : east
+    ));
+  const transitReserve = 2;
+  const transitObstacles = [hubGate, sameSideGarageWall];
+  const transitClearanceCoordinates = transitObstacles.map((solid) => (
+    solid.position[0] + transitDirection * (
+      solid.scale[0] / 2 + VEHICLE_COLLIDER_HALF_EXTENTS[0] + transitReserve
+    )
+  ));
+  const transitTarget = approachAxis === 'z'
+    ? transitDirection < 0
+      ? Math.min(perpendicularTarget, ...transitClearanceCoordinates)
+      : Math.max(perpendicularTarget, ...transitClearanceCoordinates)
+    : perpendicularTarget;
+  await alignWorldCoordinate(
+    page,
+    perpendicularIndex,
+    transitTarget,
+    `${obstacle.id} telemetry gate bypass ${perpendicularAxis.toUpperCase()}`,
+    0.3,
+  );
+  await alignWorldCoordinate(
+    page,
+    approachIndex,
+    stagingCoordinate,
+    `${obstacle.id} telemetry runway ${approachAxis.toUpperCase()}`,
+    0.3,
+  );
+  await alignWorldCoordinate(
+    page,
+    perpendicularIndex,
+    perpendicularTarget,
+    `${obstacle.id} telemetry frontal alignment ${perpendicularAxis.toUpperCase()}`,
+    0.3,
+  );
+  const staged = await readGameState(page);
+  return {
+    garageExitZ,
+    garageClearanceZ,
+    garageFrontFaceZ,
+    garageSideWallIds: garageSideWalls.map(({ id }) => id),
+    hubGateBypassZ,
+    hubGateId: hubGate.id,
+    obstaclePosition: obstacle.position,
+    obstacleScale: obstacle.scale,
+    perpendicularTarget,
+    runwayReserve,
+    source: 'visualLayout.worldSolids position/scale',
+    stagedPosition: staged.vehicle.position,
+    stagingCoordinate,
+    transitClearanceCoordinates,
+    transitDirection,
+    transitObstacleIds: transitObstacles.map(({ id }) => id),
+    transitReserve,
+    transitTarget,
+  };
+}
+
+/** 任意world軸から実touch/keyboardでsolidへ押し込み、非貫通・resetなし・離脱操作を数値検証する。 */
 async function verifyWorldCollisionScenario(browser, errors, {
   approachAxis,
   approachDirection,
+  captureScreenshot = true,
+  inputMode = 'touch',
   obstacle,
   prepare,
   recoveryDirection,
 }) {
-  const target = { hasTouch: true, height: 720, name: `collision-${obstacle.id}`, width: 1_280 };
+  assert(inputMode === 'keyboard' || inputMode === 'touch', `${obstacle.id}: unknown input mode ${inputMode}.`);
+  const target = {
+    hasTouch: inputMode === 'touch',
+    height: 720,
+    name: `collision-${obstacle.id}`,
+    width: 1_280,
+  };
   const { context, page } = await openViewportPage(browser, target, errors);
-  const touch = await createTouchDriver(page);
+  const touch = inputMode === 'touch' ? await createTouchDriver(page) : null;
+  const heldKeys = new Set();
   try {
     const initial = await readGameState(page);
     assertInitialWorldPhysicsContract(initial);
     const initialResetCount = initial.vehicle.resetCount;
-    await prepare(page, touch);
+    const preparation = await prepare(page, touch);
     const aligned = await readGameState(page);
     assert.equal(aligned.vehicle.resetCount, initialResetCount, `${obstacle.id}: reset during approach.`);
 
@@ -2513,12 +2635,21 @@ async function verifyWorldCollisionScenario(browser, errors, {
     let minimumPerpendicularSeparation = Number.POSITIVE_INFINITY;
     let maximumApproachSpeed = 0;
     const contactPositions = [];
-    await touch.setStick(...worldDirectionToTouchStick(aligned.camera, ...approachVector));
+    const approachInputName = worldAxisInputName(approachAxis, approachDirection);
+    if (touch) await touch.setStick(...worldDirectionToTouchStick(aligned.camera, ...approachVector));
+    else await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS[approachInputName].keys);
     for (let frame = 0; frame < 600; frame += 1) {
       await waitForFrames(page, 1);
       const state = await readGameState(page);
+      const previousState = latestState;
       latestState = state;
-      assert.equal(state.vehicle.resetCount, initialResetCount, `${obstacle.id}: reset while pressing solid.`);
+      assert.equal(state.vehicle.resetCount, initialResetCount,
+        `${obstacle.id}: reset while pressing solid: ${JSON.stringify({
+          aligned: aligned.vehicle,
+          current: state.vehicle,
+          obstacle,
+          previous: previousState?.vehicle,
+        })}`);
       maximumApproachSpeed = Math.max(maximumApproachSpeed, state.vehicle.speed);
       const support = vehicleColliderSupport(state.vehicle);
       const headingAlongApproach = state.vehicle.forward[axisIndex] * approachDirection;
@@ -2574,18 +2705,24 @@ async function verifyWorldCollisionScenario(browser, errors, {
       && heldState.vehicle.position[2] >= heldState.worldBounds.minZ
       && heldState.vehicle.position[2] <= heldState.worldBounds.maxZ,
     `${obstacle.id}: collision left the vehicle outside world bounds.`);
-    await waitForFrames(page, 2);
-    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-collision-${obstacle.id}.png`);
+    if (captureScreenshot) {
+      await waitForFrames(page, 2);
+      await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-collision-${obstacle.id}.png`);
+    }
 
-    await touch.releaseStick();
+    await touch?.releaseStick();
+    await releaseKeyboardKeys(page, heldKeys);
     await brakeVehicle(page);
     const beforeRecovery = await readGameState(page);
     const recoveryVector = approachAxis === 'x'
       ? [recoveryDirection, 0]
       : [0, recoveryDirection];
-    await touch.setStick(...worldDirectionToTouchStick(beforeRecovery.camera, ...recoveryVector));
+    const recoveryInputName = worldAxisInputName(approachAxis, recoveryDirection);
+    if (touch) await touch.setStick(...worldDirectionToTouchStick(beforeRecovery.camera, ...recoveryVector));
+    else await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS[recoveryInputName].keys);
     await waitForFrames(page, 28);
-    await touch.releaseStick();
+    await touch?.releaseStick();
+    await releaseKeyboardKeys(page, heldKeys);
     await brakeVehicle(page);
     const recovered = await readGameState(page);
     const recoveredDistance = recoveryDirection * (
@@ -2595,21 +2732,32 @@ async function verifyWorldCollisionScenario(browser, errors, {
       `${obstacle.id}: vehicle did not respond after collision.`);
     assert.equal(recovered.vehicle.resetCount, initialResetCount, `${obstacle.id}: recovery triggered reset.`);
     return {
+      approach: {
+        alignedPosition: aligned.vehicle.position,
+        ...preparation,
+      },
       approachAxis,
       approachDirection,
+      contactFrames: contactPositions.length,
       contactClearance: contactSample.clearance,
       contactPosition: contactSample.state.vehicle.position,
       contactTravel,
+      finalClearance: collisionClearance(heldState.vehicle, obstacle, approachAxis, -approachDirection),
+      input: inputMode,
       maximumApproachSpeed,
       minimumClearance,
       obstacle,
+      passedThrough: false,
       recoveredDistance,
       recoveryDirection,
       resetCount: recovered.vehicle.resetCount,
+      resetCountAfter: recovered.vehicle.resetCount,
+      resetCountBefore: initialResetCount,
     };
   } finally {
-    await touch.releaseStick().catch(() => undefined);
-    await touch.close().catch(() => undefined);
+    await touch?.releaseStick().catch(() => undefined);
+    await releaseKeyboardKeys(page, heldKeys).catch(() => undefined);
+    await touch?.close().catch(() => undefined);
     await context.close();
   }
 }
@@ -2963,7 +3111,7 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
   }
 }
 
-/** 5代表solid、動的fire hazard、非solid route markerを実車検証する。 */
+/** 8代表solid、動的fire hazard、非solid route markerを実車検証する。 */
 async function verifyWorldCollisions(browser, errors) {
   const layoutPage = await openViewportPage(
     browser,
@@ -2977,6 +3125,30 @@ async function verifyWorldCollisions(browser, errors) {
     await layoutPage.context.close();
   }
   const testedScenarios = [
+    {
+      approachAxis: 'x',
+      approachDirection: -1,
+      captureScreenshot: false,
+      id: 'hub-gate-post',
+      inputMode: 'keyboard',
+      recoveryDirection: 1,
+    },
+    {
+      approachAxis: 'z',
+      approachDirection: 1,
+      captureScreenshot: false,
+      id: 'south-sign-post-west',
+      inputMode: 'keyboard',
+      recoveryDirection: -1,
+    },
+    {
+      approachAxis: 'z',
+      approachDirection: 1,
+      captureScreenshot: false,
+      id: 'south-sign-post-east',
+      inputMode: 'keyboard',
+      recoveryDirection: -1,
+    },
     {
       approachAxis: 'z',
       approachDirection: -1,
@@ -3050,6 +3222,17 @@ async function verifyWorldCollisions(browser, errors) {
       recoveryDirection: 1,
     },
   ];
+  const requiredKeyboardCollisionIds = [
+    'hub-gate-post',
+    'south-sign-post-west',
+    'south-sign-post-east',
+  ];
+  const testedIds = testedScenarios.map(({ id }) => id);
+  assert.deepEqual(
+    requiredKeyboardCollisionIds.filter((id) => !testedIds.includes(id)),
+    [],
+    'Required keyboard collision IDs are absent from real-input testedIds.',
+  );
   const fireHazard = await verifyFireHazardLifecycle(browser, errors);
   const routeMarkers = await verifyRouteMarkerPassThrough(browser, errors);
   const scenarios = {};
@@ -3061,18 +3244,40 @@ async function verifyWorldCollisions(browser, errors) {
       ...scenario,
       obstacle,
       prepare: scenario.prepare ?? (
-        async (page, touch) => prepareWorldObstacleCollision(page, touch, obstacle)
+        scenario.inputMode === 'keyboard'
+          ? async (page) => prepareTelemetryPostCollision(
+            page,
+            obstacle,
+            scenario.approachAxis,
+            scenario.approachDirection,
+          )
+          : async (page, touch) => prepareWorldObstacleCollision(page, touch, obstacle)
       ),
     });
   }
-  const testedIds = testedScenarios.map(({ id }) => id);
+  for (const id of requiredKeyboardCollisionIds) {
+    assert.equal(scenarios[id]?.input, 'keyboard', `${id}: real keyboard collision evidence is missing.`);
+  }
+  const sharedDefinitionOnlyReasons = {
+    'tree-trunk-1': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
+    'tree-trunk-2': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
+    'playground-support': 'the adjacent playground-plank assembly is covered through real input',
+    'garage-left-wall': 'garage-right-wall covers the symmetric side-wall collider and garage-back-wall covers the rear wall',
+  };
+  const sharedDefinitionOnly = worldSolids
+    .filter(({ id }) => !testedIds.includes(id))
+    .map(({ id }) => id);
+  assert.deepEqual(
+    sharedDefinitionOnly,
+    Object.keys(sharedDefinitionOnlyReasons),
+    'Definition-only collision coverage changed without a recorded reason.',
+  );
   return {
     fireHazard,
     routeMarkers,
     scenarios,
-    sharedDefinitionOnly: worldSolids
-      .filter(({ id }) => !testedIds.includes(id))
-      .map(({ id }) => id),
+    sharedDefinitionOnly,
+    sharedDefinitionOnlyReasons,
     testedIds,
     unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 12 production solids share one definition',
   };
