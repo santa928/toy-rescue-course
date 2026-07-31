@@ -204,6 +204,15 @@ function isOrderedBounds(bounds: WorldBounds2D): boolean {
   return bounds.minX < bounds.maxX && bounds.minZ < bounds.maxZ;
 }
 
+/** 2つの有効なX-Z境界が、正の面積を持って重なるかを判定する。 */
+function doBoundsOverlapWithPositiveArea(
+  first: WorldBounds2D,
+  second: WorldBounds2D,
+): boolean {
+  return Math.max(first.minX, second.minX) < Math.min(first.maxX, second.maxX)
+    && Math.max(first.minZ, second.minZ) < Math.min(first.maxZ, second.maxZ);
+}
+
 /** 内側のX-Z境界が外側のX-Z境界を越えないかを判定する。 */
 function isBoundsInsideBounds(inner: WorldBounds2D, outer: WorldBounds2D): boolean {
   return inner.minX >= outer.minX && inner.maxX <= outer.maxX
@@ -249,6 +258,16 @@ export function validateProductionWorldMap(
     }
     if (worldBoundsAreOrdered && !isBoundsInsideBounds(district.bounds, map.bounds)) {
       errors.push(`district outside world bounds: ${district.id}`);
+    }
+  }
+
+  for (const [firstIndex, first] of map.districts.entries()) {
+    if (!isFiniteBounds(first.bounds) || !isOrderedBounds(first.bounds)) continue;
+    for (const second of map.districts.slice(firstIndex + 1)) {
+      if (!isFiniteBounds(second.bounds) || !isOrderedBounds(second.bounds)) continue;
+      if (doBoundsOverlapWithPositiveArea(first.bounds, second.bounds)) {
+        errors.push(`overlapping districts: ${first.id}, ${second.id}`);
+      }
     }
   }
 

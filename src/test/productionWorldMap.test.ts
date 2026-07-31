@@ -167,6 +167,60 @@ describe('PRODUCTION_WORLD_MAP', () => {
     expect(validateProductionWorldMap(map)).toContain(expectedError);
   });
 
+  it('正の面積で重なるdistrictを定義順のIDペアで拒否する', () => {
+    const overlapping = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      districts: MAP_WITH_LANDMARK_FIXTURE.districts.map((district) => (
+        district.id === 'hub'
+          ? { ...district, bounds: { ...district.bounds, maxX: 20 } }
+          : district
+      )),
+    };
+
+    expect(validateProductionWorldMap(overlapping)).toContain(
+      'overlapping districts: hub, fire',
+    );
+  });
+
+  it('districtの境界が接するだけなら重複として拒否しない', () => {
+    const touching = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      districts: MAP_WITH_LANDMARK_FIXTURE.districts.map((district) => (
+        district.id === 'fire'
+          ? { ...district, bounds: { ...district.bounds, minX: 10 } }
+          : district
+      )),
+    };
+
+    expect(validateProductionWorldMap(touching)).not.toContain(
+      'overlapping districts: hub, fire',
+    );
+  });
+
+  it.each([
+    [
+      '非有限bounds',
+      { maxX: Number.NaN, maxZ: 10, minX: -10, minZ: -10 },
+      'non-finite district bounds: hub',
+    ],
+    [
+      '逆転bounds',
+      { maxX: 10, maxZ: 10, minX: 11, minZ: -10 },
+      'invalid district bounds: hub',
+    ],
+  ])('%sのdistrictへ重複の二次エラーを追加しない', (_description, hubBounds, primaryError) => {
+    const invalid = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      districts: MAP_WITH_LANDMARK_FIXTURE.districts.map((district) => (
+        district.id === 'hub' ? { ...district, bounds: hubBounds } : district
+      )),
+    };
+    const errors = validateProductionWorldMap(invalid);
+
+    expect(errors).toContain(primaryError);
+    expect(errors.some((error) => error.startsWith('overlapping districts:'))).toBe(false);
+  });
+
   it.each([
     [
       'road',
