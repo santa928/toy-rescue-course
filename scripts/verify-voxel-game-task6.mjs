@@ -6,7 +6,6 @@ import * as THREE from 'three';
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const additionalBlocksOnly = process.env.TASK6_ADDITIONAL_BLOCKS_ONLY === '1';
 const outputDirectory = 'output/voxel-game';
-const BLOCK_PLAZA_BOUNDS = { maxX: -6, maxZ: 7, minX: -13, minZ: -7 };
 fs.mkdirSync(outputDirectory, { recursive: true });
 
 /** R3FとRapierを指定frame数だけ通常clockで進める。 */
@@ -26,6 +25,146 @@ async function waitForFrames(page, frameCount) {
     }),
     frameCount,
   );
+}
+
+const WORLD_AXIS_KEYS = {
+  negativeX: ['KeyA', 'KeyW'],
+  negativeZ: ['KeyD', 'KeyW'],
+  positiveX: ['KeyD', 'KeyS'],
+  positiveZ: ['KeyA', 'KeyS'],
+};
+
+const BLOCK_IMPACT_PROFILES = {
+  'plaza-red': { keys: ['KeyW'], runwayDistance: 14, screenDirection: [0, 1] },
+  'plaza-yellow': { keys: ['KeyA'], runwayDistance: 14, screenDirection: [-1, 0] },
+  'plaza-blue': { keys: ['KeyW'], runwayDistance: 14, screenDirection: [0, 1] },
+  'plaza-green': { keys: ['KeyA', 'KeyS'], runwayDistance: 8, screenDirection: [-1, -1] },
+};
+
+/** block別の旧斜めimpact入力とtelemetry相対runwayを取得する。 */
+function readBlockImpactProfile(blockId) {
+  const profile = BLOCK_IMPACT_PROFILES[blockId];
+  assert(profile, `Missing Task6 impact profile: ${blockId}.`);
+  return profile;
+}
+
+/** camera telemetryとscreen入力から正規化済みworld XZ移動方向を求める。 */
+function resolveImpactWorldDirection(state, profile) {
+  const cameraX = state.camera.lookTarget[0] - state.camera.position[0];
+  const cameraZ = state.camera.lookTarget[2] - state.camera.position[2];
+  const cameraLength = Math.hypot(cameraX, cameraZ);
+  assert(cameraLength > 0, 'Task6 camera forward direction is unavailable.');
+  const forwardX = cameraX / cameraLength;
+  const forwardZ = cameraZ / cameraLength;
+  const rightX = -forwardZ;
+  const rightZ = forwardX;
+  const [screenX, screenY] = profile.screenDirection;
+  const worldX = rightX * screenX + forwardX * screenY;
+  const worldZ = rightZ * screenX + forwardZ * screenY;
+  const worldLength = Math.hypot(worldX, worldZ);
+  assert(worldLength > 0, 'Task6 impact world direction is unavailable.');
+  return [worldX / worldLength, worldZ / worldLength];
+}
+
+/** 指定キー集合を同時押下する。 */
+async function pressKeys(page, keys) {
+  for (const key of keys) await page.keyboard.down(key);
+}
+
+/** 指定キー集合を全解除する。 */
+async function releaseKeys(page, keys) {
+  for (const key of keys) await page.keyboard.up(key);
+}
+
+/** world cardinal入力の2キーを同時に押す。 */
+async function pressWorldAxis(page, axis) {
+  const keys = WORLD_AXIS_KEYS[axis];
+  assert(keys, `Unknown Task6 world axis: ${axis}.`);
+  await pressKeys(page, keys);
+  return keys;
+}
+
+/** world cardinal入力に使った全キーを解除する。 */
+async function releaseWorldAxis(page, keys) {
+  await releaseKeys(page, keys);
+}
+
+/** canonical E2Eと同じworld cardinal実入力で座標条件まで走る。 */
+async function driveAlongWorldAxis(page, axis, predicate, description, maxBursts = 360) {
+  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
+  const keys = await pressWorldAxis(page, axis);
+  try {
+    for (let burst = 0; burst < maxBursts; burst += 1) {
+      await waitForFrames(page, 2);
+      const state = await readGameState(page);
+      if (predicate(state)) {
+        await releaseWorldAxis(page, keys);
+        await brakeVehicle(page);
+        return readGameState(page);
+      }
+      assert.equal(state.vehicle.resetCount, initialResetCount,
+        `${description}: vehicle reset unexpectedly.`);
+    }
+    throw new Error(`${description}: world-axis destination was not reached.`);
+  } finally {
+    await releaseWorldAxis(page, keys);
+  }
+}
+
+/** 短いworld cardinal入力で衝突前のheadingを揃える。 */
+async function pulseWorldAxis(page, axis, frameCount = 3) {
+  const keys = await pressWorldAxis(page, axis);
+  try {
+    await waitForFrames(page, frameCount);
+  } finally {
+    await releaseWorldAxis(page, keys);
+  }
+  await brakeVehicle(page);
+}
+
+/** 短いcardinal pulseを反復し、world X/Zをtelemetry由来のrunway座標へ揃える。 */
+async function alignWorldCoordinate(
+  page,
+  coordinateIndex,
+  targetValue,
+  description,
+  tolerance = 0.32,
+) {
+  assert(coordinateIndex === 0 || coordinateIndex === 2, `${description}: only X/Z can be aligned.`);
+  const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
+  const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
+  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
+  let latest = null;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    latest = await readGameState(page);
+    const delta = targetValue - latest.vehicle.position[coordinateIndex];
+    if (Math.abs(delta) <= tolerance) return latest;
+    assert.equal(latest.vehicle.resetCount, initialResetCount, `${description}: vehicle reset unexpectedly.`);
+    const frameCount = Math.max(1, Math.min(7, Math.ceil(Math.abs(delta) * 1.5)));
+    await pulseWorldAxis(page, delta > 0 ? positiveAxis : negativeAxis, frameCount);
+  }
+  throw new Error(`${description}: coordinate did not align: ${JSON.stringify({
+    actual: latest?.vehicle.position[coordinateIndex],
+    targetValue,
+  })}`);
+}
+
+/** 安全な直線上で粗移動してから、指定world X/Z座標へ短いpulseで揃える。 */
+async function driveToWorldCoordinate(page, coordinateIndex, targetValue, description) {
+  const current = await readGameState(page);
+  const delta = targetValue - current.vehicle.position[coordinateIndex];
+  if (Math.abs(delta) <= 0.32) return current;
+  const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
+  const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
+  await driveAlongWorldAxis(
+    page,
+    delta > 0 ? positiveAxis : negativeAxis,
+    (state) => delta > 0
+      ? state.vehicle.position[coordinateIndex] >= targetValue
+      : state.vehicle.position[coordinateIndex] <= targetValue,
+    description,
+  );
+  return alignWorldCoordinate(page, coordinateIndex, targetValue, `${description} precise`);
 }
 
 /** 公開text hookから車両・runtime・Rapier破片telemetryを読む。 */
@@ -92,8 +231,31 @@ function getScreenRectDistance(first, second) {
   return Math.hypot(horizontalGap, verticalGap);
 }
 
-/** actual body位置から指定block6片の画面分離、他block距離、viewport/広場内包を測る。 */
-function measureFragmentVisualSeparation(state, blockId = 'plaza-red', requireViewport = true) {
+/** blockPlaza telemetryの中心とfull scaleからXZ境界を導出する。 */
+function readBlockPlazaBounds(state) {
+  const { position, scale } = state.landmarks.blockPlaza;
+  return {
+    maxX: position[0] + scale[0] / 2,
+    maxZ: position[2] + scale[2] / 2,
+    minX: position[0] - scale[0] / 2,
+    minZ: position[2] - scale[2] / 2,
+  };
+}
+
+/** block別のvehicle impact累積数を比較用recordへ変換する。 */
+function readVehicleImpactCounts(state) {
+  return Object.fromEntries(state.breakables.blocks.map(
+    ({ id, vehicleImpactCount }) => [id, vehicleImpactCount],
+  ));
+}
+
+/** actual body位置から指定block6片の投影spread、他block距離、viewport/広場内包を測る。 */
+function measureFragmentVisualSeparation(
+  state,
+  blockId,
+  requireViewport,
+  beforeVehicleImpactCounts,
+) {
   const fragments = state.breakables.activeFragments
     ?.filter(({ id }) => id.startsWith(`${blockId}:`));
   if (!Array.isArray(fragments) || fragments.length !== 6) {
@@ -115,34 +277,56 @@ function measureFragmentVisualSeparation(state, blockId = 'plaza-red', requireVi
   const intactGaps = fragmentRects.flatMap((fragmentRect) => (
     intactRects.map((intactRect) => getScreenRectDistance(fragmentRect, intactRect))
   ));
-  const bounds = {
+  const projectedBounds = {
     bottom: Math.max(...fragmentRects.map(({ bottom }) => bottom)),
     left: Math.min(...fragmentRects.map(({ left }) => left)),
     right: Math.max(...fragmentRects.map(({ right }) => right)),
     top: Math.min(...fragmentRects.map(({ top }) => top)),
   };
+  const bounds = {
+    ...projectedBounds,
+    height: projectedBounds.bottom - projectedBounds.top,
+    width: projectedBounds.right - projectedBounds.left,
+  };
   const minFragmentGap = Math.min(...fragmentGaps);
   const minIntactGap = Math.min(...intactGaps);
+  const maximumFragmentHeight = Math.max(...fragmentRects.map(({ height }) => height));
+  const maximumFragmentWidth = Math.max(...fragmentRects.map(({ width }) => width));
+  const projectedSpread = {
+    heightRatio: bounds.height / maximumFragmentHeight,
+    sufficient: bounds.width >= maximumFragmentWidth * 2.5
+      && bounds.height >= maximumFragmentHeight * 2,
+    widthRatio: bounds.width / maximumFragmentWidth,
+  };
+  const blockPlazaBounds = readBlockPlazaBounds(state);
   const allInsidePlaza = fragments.every(({ position, scale }) => (
-    position[0] - scale[0] / 2 >= BLOCK_PLAZA_BOUNDS.minX
-    && position[0] + scale[0] / 2 <= BLOCK_PLAZA_BOUNDS.maxX
-    && position[2] - scale[2] / 2 >= BLOCK_PLAZA_BOUNDS.minZ
-    && position[2] + scale[2] / 2 <= BLOCK_PLAZA_BOUNDS.maxZ
+    position[0] - scale[0] / 2 >= blockPlazaBounds.minX
+    && position[0] + scale[0] / 2 <= blockPlazaBounds.maxX
+    && position[2] - scale[2] / 2 >= blockPlazaBounds.minZ
+    && position[2] + scale[2] / 2 <= blockPlazaBounds.maxZ
   ));
   const otherBlockPhases = state.runtime.blocks
     .filter(({ id }) => id !== blockId)
     .map(({ id, phase }) => ({ id, phase }));
   const otherBlockImpacts = state.breakables.blocks
     .filter(({ id }) => id !== blockId)
-    .map(({ id, impactCount }) => ({ id, impactCount }));
+    .map(({ id, impactCount, vehicleImpactCount }) => ({
+      beforeVehicleImpactCount: beforeVehicleImpactCounts[id],
+      id,
+      impactCount,
+      vehicleImpactCount,
+    }));
   const otherBlocksUntouched = otherBlockPhases.every(({ phase }) => phase === 'intact')
-    && otherBlockImpacts.every(({ impactCount }) => impactCount === 0);
+    && otherBlockImpacts.every(({ beforeVehicleImpactCount, vehicleImpactCount }) => (
+      vehicleImpactCount === beforeVehicleImpactCount
+    ));
   const viewport = state.camera.viewport;
   const allInsideViewport = bounds.left >= 0 && bounds.top >= 0
     && bounds.right <= viewport.width && bounds.bottom <= viewport.height;
   return {
     allInsideViewport,
     allInsidePlaza,
+    blockPlazaBounds,
     bounds,
     camera: state.camera,
     fragmentRects,
@@ -152,13 +336,19 @@ function measureFragmentVisualSeparation(state, blockId = 'plaza-red', requireVi
     otherBlockPhases,
     otherBlocksUntouched,
     positions: fragments.map(({ id, position }) => ({ id, position })),
-    ready: (!requireViewport || allInsideViewport) && allInsidePlaza && minFragmentGap >= 2 && minIntactGap >= 2
-      && otherBlocksUntouched,
+    projectedSpread,
+    ready: (!requireViewport || allInsideViewport) && allInsidePlaza && projectedSpread.sufficient
+      && minIntactGap >= 2 && otherBlocksUntouched,
   };
 }
 
-/** 1.2秒の表示窓内で、actual 6片すべてが視覚分離する最初のframeを返す。 */
-async function waitForFragmentVisualSeparation(page, blockId = 'plaza-red', requireViewport = true) {
+/** 1.2秒の表示窓内で、actual 6片の投影spreadが成立する最初のframeを返す。 */
+async function waitForFragmentVisualSeparation(
+  page,
+  blockId,
+  requireViewport,
+  beforeVehicleImpactCounts,
+) {
   let latestMeasurement = { ready: false, reason: 'No fragment frame observed.' };
   for (let frame = 0; frame < 65; frame += 1) {
     await waitForFrames(page, 1);
@@ -166,10 +356,15 @@ async function waitForFragmentVisualSeparation(page, blockId = 'plaza-red', requ
     const activeRedFragments = state.breakables.activeFragments
       ?.filter(({ id }) => id.startsWith(`${blockId}:`));
     if (activeRedFragments?.length !== 6) continue;
-    latestMeasurement = measureFragmentVisualSeparation(state, blockId, requireViewport);
+    latestMeasurement = measureFragmentVisualSeparation(
+      state,
+      blockId,
+      requireViewport,
+      beforeVehicleImpactCounts,
+    );
     if (latestMeasurement.ready) return { measurement: latestMeasurement, state };
   }
-  throw new Error(`${blockId} fragments never became visually separated: ${JSON.stringify(latestMeasurement)}`);
+  throw new Error(`${blockId} fragments never reached the required projected spread: ${JSON.stringify(latestMeasurement)}`);
 }
 
 /** scene ready、公開hook、24-slot pool準備まで待つ。 */
@@ -216,19 +411,46 @@ async function openGamePage(
   return page;
 }
 
+/** garage・blockPlaza・hub gate telemetryから西地区への安全waypointを読む。 */
+function readBlockRouteAnchors(state) {
+  const hubGate = state.visualLayout.worldSolids.find(({ id }) => id === 'hub-gate-post');
+  assert(hubGate, 'Hub gate solid telemetry is unavailable.');
+  const plaza = state.landmarks.blockPlaza;
+  return {
+    gateBypassZ: hubGate.position[2] - hubGate.scale[2] / 2 - 4,
+    garage: state.landmarks.garage,
+    plaza,
+  };
+}
+
+/** 車庫正面からhub gate北側を抜け、積み木地区へ西進できる位置まで実走する。 */
+async function driveToHubGateBypass(page, description) {
+  const initial = await readGameState(page);
+  const anchors = readBlockRouteAnchors(initial);
+  await driveAlongWorldAxis(
+    page,
+    'negativeZ',
+    (state) => state.vehicle.position[2] <= anchors.gateBypassZ,
+    `${description} garage exit and gate bypass`,
+  );
+  return anchors;
+}
+
 /** 西側道路の中央まで実走し、積み木広場4個を同時に見渡せる視点を作る。 */
 async function driveToBlockPlazaOverview(page) {
-  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'plaza overview garage exit');
-  await brakeVehicle(page);
-  await turnVehicleToward(page, -1, 0);
-  await driveUntil(page, (state) => state.vehicle.position[0] <= -16.1, 'plaza overview west road');
-  await brakeVehicle(page);
-  await turnVehicleToward(page, 0, -1);
-  await driveUntil(page, (state) => state.vehicle.position[2] <= 1.2, 'plaza overview northbound');
-  await brakeVehicle(page);
-  await turnVehicleToward(page, 1, 0);
-  await driveUntil(page, (state) => state.vehicle.position[0] >= -12.4, 'plaza overview eastbound');
-  await brakeVehicle(page);
+  const initial = await readGameState(page);
+  const overviewX = Math.min(...initial.landmarks.breakableBlocks.map(({ position }) => position[0]));
+  const { plaza } = await driveToHubGateBypass(page, 'plaza overview');
+  const westTransitX = plaza.position[0] - plaza.scale[0] / 2 - 2;
+  const [positiveX, positiveXDriftZ] = resolveImpactWorldDirection(initial, {
+    screenDirection: [1, -1],
+  });
+  const corridorEntryZ = plaza.position[2]
+    - (overviewX - westTransitX) * positiveXDriftZ / positiveX;
+  await driveToWorldCoordinate(page, 0, westTransitX, 'plaza overview west transit X');
+  await driveToWorldCoordinate(page, 2, corridorEntryZ, 'plaza overview corridor entry Z');
+  await alignWorldCoordinate(page, 0, overviewX, 'plaza overview west-column X');
+  await alignWorldCoordinate(page, 2, plaza.position[2], 'plaza overview center Z');
   await waitForFrames(page, 15);
 }
 
@@ -310,57 +532,64 @@ async function driveUntil(page, predicate, description, maxBursts = 180) {
   }
 }
 
-/** 車庫から外周西端を実走し、他blockを避けて赤block西側へ東向きで出る。 */
-async function driveToRedBlockApproach(page) {
-  const initialState = await readGameState(page);
-  const redPosition = initialState.landmarks.breakableBlocks
-    .find(({ id }) => id === 'plaza-red')?.position;
-  assert(redPosition, 'Red block landmark is unavailable.');
-  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, 'garage exit');
-  await brakeVehicle(page);
-  await turnVehicleToward(page, -1, 0);
-  await driveUntil(page, (state) => state.vehicle.position[0] <= -16.1, 'west road outer edge');
-  await brakeVehicle(page);
-  await turnVehicleToward(page, 0, -1);
-  await driveUntil(
-    page,
-    (state) => state.vehicle.position[2] <= redPosition[2] + 1.7,
-    'red block west side',
-  );
-  await brakeVehicle(page);
-  await turnVehicleToward(page, 1, 0);
-  return readGameState(page);
+/** 車庫からhub gateを避け、赤blockのtelemetry相対runwayへ出る。 */
+async function driveToRedBlockApproach(page, runwayDistance) {
+  return driveToBlockApproach(page, 'plaza-red', runwayDistance);
 }
 
-/** 車庫から他blockを避け、指定blockへ東西いずれかの開けた側から接近する。 */
-async function driveToBlockApproach(page, blockId) {
-  if (blockId === 'plaza-red') return driveToRedBlockApproach(page);
+/** 車庫からhub gateと他blockを避け、指定blockへ東西の開けた側から接近する。 */
+async function driveToBlockApproach(page, blockId, runwayDistanceOverride) {
   const initialState = await readGameState(page);
   const target = initialState.landmarks.breakableBlocks.find(({ id }) => id === blockId)?.position;
   assert(target, `${blockId} landmark is unavailable.`);
-  await driveUntil(page, (state) => state.vehicle.position[2] >= 15.2, `${blockId} garage exit`);
-  await brakeVehicle(page);
-
+  const beforeVehicleImpactCounts = Object.fromEntries(initialState.breakables.blocks.map(
+    ({ id, vehicleImpactCount }) => [id, vehicleImpactCount],
+  ));
+  const { plaza } = await driveToHubGateBypass(page, blockId);
+  const profile = readBlockImpactProfile(blockId);
+  const [impactX, impactZ] = resolveImpactWorldDirection(initialState, profile);
+  const runwayDistance = runwayDistanceOverride ?? profile.runwayDistance;
+  const stageX = target[0] - impactX * runwayDistance;
+  const stageZ = target[2] - impactZ * runwayDistance;
   if (blockId === 'plaza-green') {
-    await turnVehicleToward(page, -1, 0);
-    await driveUntil(page, (state) => state.vehicle.position[0] <= -16.1, `${blockId} west road`);
-    await brakeVehicle(page);
-    await turnVehicleToward(page, 0, -1);
-    await driveUntil(page, (state) => state.vehicle.position[2] <= target[2] + 1.7, `${blockId} west side`);
-    await brakeVehicle(page);
-    await turnVehicleToward(page, 1, 0);
+    const westTransitX = plaza.position[0] - plaza.scale[0] / 2 - 2;
+    await driveToWorldCoordinate(page, 0, westTransitX, `${blockId} west transit X`);
+    await alignWorldCoordinate(page, 0, stageX, `${blockId} west runway X`);
+    await driveToWorldCoordinate(page, 2, stageZ, `${blockId} west runway Z`);
   } else {
-    await turnVehicleToward(page, 0, -1);
-    await driveUntil(page, (state) => state.vehicle.position[2] <= target[2], `${blockId} east side latitude`);
-    await brakeVehicle(page);
-    await turnVehicleToward(page, -1, 0);
+    const eastTransitX = Math.max(
+      stageX,
+      plaza.position[0] + plaza.scale[0] / 2 + 2,
+    );
+    await driveToWorldCoordinate(page, 0, eastTransitX, `${blockId} east transit X`);
+    await driveToWorldCoordinate(page, 2, stageZ, `${blockId} outside-block-row Z`);
+    if (runwayDistanceOverride === undefined) {
+      await driveToWorldCoordinate(page, 0, stageX, `${blockId} diagonal runway X`);
+    } else {
+      await alignWorldCoordinate(page, 0, stageX, `${blockId} short runway X`);
+    }
   }
-  return readGameState(page);
+  const approached = await readGameState(page);
+  for (const block of approached.breakables.blocks) {
+    assert.equal(
+      block.vehicleImpactCount,
+      beforeVehicleImpactCounts[block.id],
+      `${blockId} approach touched ${block.id}: ${JSON.stringify({
+      approach: approached.vehicle,
+      camera: initialState.camera,
+      impactDirection: [impactX, impactZ],
+      stage: [stageX, stageZ],
+      target,
+      })}`,
+    );
+  }
+  return approached;
 }
 
 /** 公開keyboard経路の有効速度衝突で指定blockだけがbrokenになるまで待つ。 */
 async function collideBlockAtEffectiveSpeed(page, blockId) {
-  await page.keyboard.down('KeyW');
+  const { keys } = readBlockImpactProfile(blockId);
+  await pressKeys(page, keys);
   try {
     return await page.evaluate((targetBlockId) => new Promise((resolve, reject) => {
       let frameCount = 0;
@@ -392,7 +621,7 @@ async function collideBlockAtEffectiveSpeed(page, blockId) {
       requestAnimationFrame(tick);
     }), blockId);
   } finally {
-    await page.keyboard.up('KeyW');
+    await releaseKeys(page, keys);
   }
 }
 
@@ -400,7 +629,8 @@ async function collideBlockAtEffectiveSpeed(page, blockId) {
 async function collideAtEffectiveSpeed(page) {
   let lastState = await readGameState(page);
   const startVehicle = lastState.vehicle;
-  await page.keyboard.down('KeyW');
+  const { keys } = readBlockImpactProfile('plaza-red');
+  await pressKeys(page, keys);
   try {
     for (let burst = 0; burst < 100; burst += 1) {
       await waitForFrames(page, 2);
@@ -416,13 +646,14 @@ async function collideAtEffectiveSpeed(page) {
       vehicle: lastState.vehicle,
     })}`);
   } finally {
-    await page.keyboard.up('KeyW');
+    await releaseKeys(page, keys);
   }
 }
 
 /** page内rAFで実車破壊を待ち、3810→3800msのtimerとscene frameを決定的に観測する。 */
 async function collideAtEffectiveSpeedThroughTimer(page) {
-  await page.keyboard.down('KeyW');
+  const { keys } = readBlockImpactProfile('plaza-red');
+  await pressKeys(page, keys);
   try {
     return await page.evaluate(() => new Promise((resolve, reject) => {
       let frameCount = 0;
@@ -434,7 +665,11 @@ async function collideAtEffectiveSpeedThroughTimer(page) {
       const tick = () => {
         frameCount += 1;
         if (frameCount > 600) {
-          reject(new Error('Effective real-vehicle collision did not break plaza-red within 600 frames.'));
+          const latest = read();
+          reject(new Error(`Effective real-vehicle collision did not break plaza-red within 600 frames: ${JSON.stringify({
+            red: latest.breakables.blocks.find(({ id }) => id === 'plaza-red'),
+            vehicle: latest.vehicle,
+          })}`));
           return;
         }
         const broken = read();
@@ -463,7 +698,7 @@ async function collideAtEffectiveSpeedThroughTimer(page) {
       requestAnimationFrame(tick);
     }));
   } finally {
-    await page.keyboard.up('KeyW');
+    await releaseKeys(page, keys);
   }
 }
 
@@ -480,7 +715,8 @@ function distanceFromRedBlock(state) {
 
 /** clear側で期限直前まで進めてから実keyboardで半径3内へ入り、0msでbroken維持後に離れる。 */
 async function verifySafeRestoreBoundary(page) {
-  await page.keyboard.down('KeyS');
+  let keys = ['KeyS'];
+  await pressKeys(page, keys);
   try {
     for (let frame = 0; frame < 180; frame += 1) {
       await waitForFrames(page, 1);
@@ -488,7 +724,7 @@ async function verifySafeRestoreBoundary(page) {
       if (frame === 179) throw new Error('Vehicle did not leave red respawn radius before deadline setup.');
     }
   } finally {
-    await page.keyboard.up('KeyS');
+    await releaseKeys(page, keys);
   }
   await brakeVehicle(page);
   const outside = await readGameState(page);
@@ -499,7 +735,8 @@ async function verifySafeRestoreBoundary(page) {
   assert.equal(justBeforeDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase, 'broken');
   assert(distanceFromRedBlock(justBeforeDeadline) > 3, 'Vehicle is not clear immediately before keyboard entry.');
 
-  await page.keyboard.down('KeyW');
+  keys = ['KeyW'];
+  await pressKeys(page, keys);
   let inside;
   try {
     for (let frame = 0; frame < 90; frame += 1) {
@@ -508,7 +745,7 @@ async function verifySafeRestoreBoundary(page) {
       if (distanceFromRedBlock(inside) <= 3) break;
     }
   } finally {
-    await page.keyboard.up('KeyW');
+    await releaseKeys(page, keys);
   }
   assert(inside && distanceFromRedBlock(inside) <= 3, 'Keyboard drive did not enter red respawn radius.');
   const insideBlock = inside.runtime.blocks.find(({ id }) => id === 'plaza-red');
@@ -519,7 +756,8 @@ async function verifySafeRestoreBoundary(page) {
   assert.equal(atDeadline.runtime.blocks.find(({ id }) => id === 'plaza-red')?.phase, 'broken',
     'Red block restored at deadline while vehicle was inside three units.');
 
-  await page.keyboard.down('KeyS');
+  keys = ['KeyS'];
+  await pressKeys(page, keys);
   try {
     await page.waitForFunction(() => {
       const rendered = window.render_game_to_text?.();
@@ -529,7 +767,7 @@ async function verifySafeRestoreBoundary(page) {
         && state.visuals.intactBlockCount === 4;
     }, undefined, { timeout: 5_000 });
   } finally {
-    await page.keyboard.up('KeyS');
+    await releaseKeys(page, keys);
   }
   return { atDeadline, inside, justBeforeDeadline };
 }
@@ -541,10 +779,14 @@ async function windowAdvance(page, milliseconds) {
 
 /** 3frameの短い加速と完全減速を繰り返し、4未満の実衝突を起こす。 */
 async function collideBelowThreshold(page) {
-  for (let pulse = 0; pulse < 12; pulse += 1) {
-    await page.keyboard.down('KeyW');
-    await waitForFrames(page, 3);
-    await page.keyboard.up('KeyW');
+  for (let pulse = 0; pulse < 24; pulse += 1) {
+    const { keys } = readBlockImpactProfile('plaza-red');
+    await pressKeys(page, keys);
+    try {
+      await waitForFrames(page, 3);
+    } finally {
+      await releaseKeys(page, keys);
+    }
     await brakeVehicle(page);
     const state = await readGameState(page);
     const redTelemetry = state.breakables.blocks.find(({ id }) => id === 'plaza-red');
@@ -584,7 +826,12 @@ try {
     assert.equal(brokenRed?.intactBodyEnabledCount, 0, 'Old intact body remains enabled after break.');
     assert.equal(brokenRed?.intactColliderEnabledCount, 0, 'Old intact collider remains enabled after break.');
     for (const block of brokenRendered.breakables.blocks.filter(({ id }) => id !== 'plaza-red')) {
-      assert.equal(block.impactCount, 0, `${block.id} received an impact during red break.`);
+      assert.equal(block.vehicleImpactCount, 0, `${block.id} received a vehicle impact during red break.`);
+      assert.equal(
+        brokenRendered.runtime.blocks.find(({ id }) => id === block.id)?.phase,
+        'intact',
+        `${block.id} broke from red-block debris.`,
+      );
     }
     const originalSlotIds = brokenRed.slotIds;
     const originalBodyHandles = brokenRendered.breakables.bodyHandles;
@@ -632,9 +879,14 @@ try {
 
     await chainPage.evaluate(() => window.reset_voxel_game_vehicle?.());
     await waitForFrames(chainPage, 2);
-    await driveToRedBlockApproach(chainPage);
+    const rebreakApproach = await driveToRedBlockApproach(chainPage);
     const rebroken = await collideAtEffectiveSpeed(chainPage);
-    const visualSeparation = await waitForFragmentVisualSeparation(chainPage);
+    const visualSeparation = await waitForFragmentVisualSeparation(
+      chainPage,
+      'plaza-red',
+      true,
+      readVehicleImpactCounts(rebreakApproach),
+    );
     const rebrokenRendered = visualSeparation.state;
     const rebrokenRed = rebrokenRendered.breakables.blocks.find(({ id }) => id === 'plaza-red');
     assert.equal(rebrokenRed?.fragmentVisibleCount, 6, 'Re-break did not reactivate six slots.');
@@ -695,7 +947,12 @@ try {
       }
       // brokenを読んだframeで退避済みのため、車体の二次接触なしで破片配置を観測する。
       await waitForFrames(blockPage, 1);
-      const visual = await waitForFragmentVisualSeparation(blockPage, blockId, false);
+      const visual = await waitForFragmentVisualSeparation(
+        blockPage,
+        blockId,
+        false,
+        readVehicleImpactCounts(approach),
+      );
       results.allBlockBreaks[blockId] = {
         approach: approach.vehicle,
         block: visual.state.runtime.blocks.find(({ id }) => id === blockId),
@@ -711,7 +968,7 @@ try {
   if (!additionalBlocksOnly) {
   const belowThresholdPage = await openGamePage(browser, 'below-threshold', errors);
   try {
-    const approach = await driveToRedBlockApproach(belowThresholdPage);
+    const approach = await driveToRedBlockApproach(belowThresholdPage, 5.5);
     assert(approach.vehicle.position[0] < -15,
       `Low-speed approach lacks west-side runway: ${approach.vehicle.position[0]}`);
     const afterImpact = await collideBelowThreshold(belowThresholdPage);

@@ -39,11 +39,16 @@ import {
   type BreakableTelemetry,
 } from './scene/BreakableBlockPlaza';
 import { CHIP_POOL_SIZE } from './scene/breakableVfx';
+import { PRODUCTION_WORLD_MAP } from './scene/productionWorldMap';
+import { WORLD_SOLID_BOXES } from './scene/worldCollisionLayout';
 import {
+  BLOCK_PLAZA,
   BREAKABLE_BLOCKS,
   FIRE_POSITION,
+  FIRE_SPRAY_TARGET_POSITION,
   GARAGE_POSITION,
   WORLD_BOUNDS,
+  resolveVehicleDistrict,
 } from './scene/worldLayout';
 import { VoxelGameHud } from './ui/VoxelGameHud';
 
@@ -52,6 +57,18 @@ const VEHICLE_VISUAL_BOUNDS = {
   offset: [0, 0.84, 0] as const,
   scale: [2.88, 1.92, 3.36] as const,
 };
+
+/** 車両位置と静的map定義からE2E向けの簡潔なworld状態を返す。 */
+export function buildWorldTelemetry(
+  vehiclePosition: readonly [number, number, number],
+): VoxelGameTextState['world'] {
+  return {
+    bounds: PRODUCTION_WORLD_MAP.bounds,
+    currentDistrict: resolveVehicleDistrict(vehiclePosition),
+    destinationDistrict: 'fire',
+    districts: PRODUCTION_WORLD_MAP.districts.map(({ id, label }) => ({ id, label })),
+  };
+}
 
 /** 運転可能な箱庭Canvas、入力、段階的な自動検証hookを構成する。 */
 export function VoxelGameApp(): ReactElement {
@@ -182,7 +199,7 @@ export function VoxelGameApp(): ReactElement {
         ?? breakableTelemetryRef.current;
       const payload: VoxelGameTextState = {
         blocks: runtime.blocks.map((block) => ({ ...block })),
-        coordinateSystem: 'origin=center, +x=right, +y=up, +z=toward-garage',
+        coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south',
         controls: { ...command },
         fire: {
           intensity: runtime.fireIntensity,
@@ -191,7 +208,9 @@ export function VoxelGameApp(): ReactElement {
         },
         landmarks: {
           breakableBlocks: BREAKABLE_BLOCKS.map(({ id, position }) => ({ id, position })),
+          blockPlaza: BLOCK_PLAZA,
           fire: FIRE_POSITION,
+          fireSprayTarget: FIRE_SPRAY_TARGET_POSITION,
           garage: GARAGE_POSITION,
         },
         mode: 'drive-ready',
@@ -239,6 +258,12 @@ export function VoxelGameApp(): ReactElement {
           routeMarkers: ROUTE_BOXES,
           starGroups: CELEBRATION_STAR_GROUPS,
           vehicleBounds: VEHICLE_VISUAL_BOUNDS,
+          worldSolids: WORLD_SOLID_BOXES.map(({ id, position, rotation, scale }) => ({
+            id,
+            position,
+            rotation,
+            scale,
+          })),
         },
         visuals: {
           fireHazardEnabled: isFireHazardEnabled(runtime.fireIntensity),
@@ -259,6 +284,7 @@ export function VoxelGameApp(): ReactElement {
           fragmentCollisionEnabledCount: breakables.collisionEnabledFragmentCount,
           fragmentPoolSlotCount: breakables.poolSlotCount,
         },
+        world: buildWorldTelemetry(vehicle.position),
         worldBounds: WORLD_BOUNDS,
       };
       return JSON.stringify(payload);

@@ -16,7 +16,15 @@ import {
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const canonicalOutputDirectory = 'output/voxel-game';
-const supportedFocusModes = ['nonbreak', 'collision', 'break-red', 'break-yellow', 'break-blue', 'break-green'];
+const supportedFocusModes = [
+  'nonbreak',
+  'collision',
+  'break-red',
+  'break-yellow',
+  'break-blue',
+  'break-green',
+  'production-map',
+];
 const focusMode = process.env.VOXEL_GAME_FOCUS ?? null;
 if (focusMode !== null) {
   assert(supportedFocusModes.includes(focusMode), `Unsupported VOXEL_GAME_FOCUS: ${focusMode}`);
@@ -24,7 +32,6 @@ if (focusMode !== null) {
 const outputDirectory = focusMode === null
   ? canonicalOutputDirectory
   : `${canonicalOutputDirectory}/focus/${focusMode}`;
-const FIRE_SPRAY_TARGET_POSITION = [12.9, 1.45, -9.1];
 const screenshotProofs = {};
 const targets = [
   { hasTouch: false, height: 720, minimumFps: 60, name: 'desktop', width: 1_280 },
@@ -61,26 +68,13 @@ const collisionScreenshots = [
   'desktop-fire-hazard-after.png',
   'desktop-route-marker-pass-through.png',
 ];
-const COLLISION_OBSTACLES = [
-  { id: 'tree-trunk-1', position: [-4, 1.25, -2], scale: [0.7, 2.2, 0.7] },
-  { id: 'tree-trunk-2', position: [-4.5, 1.25, 2], scale: [0.7, 2.2, 0.7] },
-  { id: 'tree-trunk-3', position: [4.4, 1.25, 2.1], scale: [0.7, 2.2, 0.7] },
-  { id: 'fire-building-body', position: [9.5, 1.8, -9.5], scale: [6, 3.4, 5] },
-  { id: 'garage-back-wall', position: [0, 1.8, 11.6], scale: [8.8, 3.4, 0.8] },
-  { id: 'garage-left-wall', position: [-4, 1.8, 13], scale: [0.8, 3.4, 3] },
-  { id: 'garage-right-wall', position: [4, 1.8, 13], scale: [0.8, 3.4, 3] },
-  {
-    id: 'playground-plank',
-    position: [2.9, 0.75, 2.4],
-    rotation: [0, 0, -0.2],
-    scale: [3.4, 0.28, 0.7],
-  },
-  { id: 'playground-support', position: [2.9, 0.45, 2.4], scale: [0.36, 0.8, 0.36] },
+const productionMapScreenshots = [
+  'desktop-production-hub.png',
+  'desktop-production-park.png',
+  'desktop-production-fire.png',
+  'desktop-production-blocks.png',
+  'desktop-production-south.png',
 ];
-const FIRE_HAZARD_BOX = {
-  position: [12.9, 0.9, -9.1],
-  scale: [1.2, 1.8, 1.2],
-};
 const VEHICLE_COLLIDER_HALF_EXTENTS = [1.45, 0.95, 1.7];
 const ACTIVATION_TRANSITION_DELAY_LIMIT_MS = 50;
 
@@ -210,21 +204,36 @@ async function readGameState(page) {
   const rendered = await page.evaluate(() => window.render_game_to_text?.());
   assert(rendered, 'Voxel Game text state is unavailable.');
   const state = JSON.parse(rendered);
-  assert(state.renderer && state.vehicle && state.runtime && state.breakables,
+  assert(state.renderer && state.vehicle && state.runtime && state.breakables && state.world,
     `Final telemetry is incomplete: ${rendered}`);
   return state;
 }
 
+/** worldSolids telemetryから一意なsolidを取得し、欠落時はscenarioを停止する。 */
+function requireWorldSolid(state, id) {
+  const solid = state.visualLayout.worldSolids.find((candidate) => candidate.id === id);
+  assert(solid, `World solid telemetry lacks ${id}.`);
+  return solid;
+}
+
 /** 初期sceneがfire hazard、18個の火炎slot、非障害物route markerの公開契約を満たすことを確認する。 */
 function assertInitialWorldPhysicsContract(initial) {
+  const fireHazard = initial.visualLayout.fireHazard;
+  const fireSprayTarget = initial.landmarks.fireSprayTarget;
   assert.equal(initial.visuals.fireHazardEnabled, true, 'Initial fire hazard is disabled.');
   assert.equal(initial.visuals.fireVoxelCount, 18, 'Initial voxel fire pool is incomplete.');
   assert.equal(initial.visuals.fireLayerCount, 3, 'Initial fire layer compatibility changed.');
-  assert.deepEqual(initial.visualLayout.fireHazard, FIRE_HAZARD_BOX,
-    'Fire hazard telemetry differs from the E2E clearance contract.');
+  assert.deepEqual(
+    [fireHazard.position[0], fireHazard.position[2]],
+    [fireSprayTarget[0], fireSprayTarget[2]],
+    'Fire hazard does not share the visible spray target XZ position.',
+  );
+  assert.deepEqual(fireHazard.scale, [1.2, 1.8, 1.2],
+    'Fire hazard telemetry differs from the gameplay clearance contract.');
   assert.equal(initial.visualLayout.routeMarkers.length, 12, 'Route marker layout is incomplete.');
   assert(initial.visualLayout.routeMarkers.every(({ scale }) => scale[1] <= 0.14),
     'Route marker is still obstacle-height.');
+  assert.equal(initial.visualLayout.worldSolids.length, 12, 'Production world solids are incomplete.');
 }
 
 /** 実camera telemetryを使ってworld座標を現在viewportのscreen座標へ投影する。 */
@@ -245,18 +254,28 @@ function writeJsonArtifact(name, payload) {
   fs.writeFileSync(`${outputDirectory}/${name}`, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
-/** HUDの安定DOM状態と保存bufferの実画素を検証してからPNGを成果物へ書き込む。 */
+/** HUDの安定DOM状態と保存bufferの実画素を検証し、compositor遅延だけ再取得してPNGへ書く。 */
 async function captureVerifiedScreenshot(page, path) {
-  const readiness = await waitForHudCaptureReadiness(page);
-  const buffer = await page.screenshot();
-  const pixels = await readHudPixelProof(page, buffer, readiness);
-  assertHudPixelProof(pixels);
-  fs.writeFileSync(path, buffer);
-  screenshotProofs[path.split('/').at(-1)] = {
-    controls: readiness.controls,
-    pixels: pixels.controls,
-    stableSamples: readiness.stableSamples,
-  };
+  let latestError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const readiness = await waitForHudCaptureReadiness(page);
+    const buffer = await page.screenshot();
+    const pixels = await readHudPixelProof(page, buffer, readiness);
+    try {
+      assertHudPixelProof(pixels);
+      fs.writeFileSync(path, buffer);
+      screenshotProofs[path.split('/').at(-1)] = {
+        controls: readiness.controls,
+        pixels: pixels.controls,
+        stableSamples: readiness.stableSamples,
+      };
+      return;
+    } catch (error) {
+      latestError = error;
+      if (attempt < 2) await waitForFrames(page, 2);
+    }
+  }
+  throw latestError;
 }
 
 /** 検証済みPNGを代表名へ複製し、元画像の画素証跡も同時に引き継ぐ。 */
@@ -538,10 +557,14 @@ async function verifyCanonicalRoot(browser, errors) {
     try {
       const state = await readGameState(page);
       const layout = await measureLayout(page, target);
+      const garage = state.landmarks.garage;
       assert.equal(state.mode, 'drive-ready');
       assert.equal(state.runtime.missionPhase, 'assigned');
-      assert(Math.abs(state.vehicle.position[0]) <= 0.5);
-      assert(Math.abs(state.vehicle.position[2] - 14) <= 0.5);
+      assert(Math.hypot(
+        state.vehicle.position[0] - garage[0],
+        state.vehicle.position[2] - garage[2],
+      ) <= 0.5);
+      assert.equal(state.world.currentDistrict, 'hub');
       assert(state.vehicle.mass >= 1.3);
       results[target.name] = {
         layout,
@@ -554,6 +577,139 @@ async function verifyCanonicalRoot(browser, errors) {
     }
   }
   return results;
+}
+
+/** XZ waypoint列の道路上移動距離を合計する。 */
+function measureRoadDistance(positions) {
+  return positions.slice(1).reduce((distance, position, index) => (
+    distance + Math.hypot(
+      position[0] - positions[index][0],
+      position[2] - positions[index][2],
+    )
+  ), 0);
+}
+
+/** 実入力の地区移動を計時し、到着地区と35秒上限を検証する。 */
+async function verifyDistrictJourney(page, destinationDistrict, description, drive) {
+  const started = await readGameState(page);
+  const startedAt = Date.now();
+  const { state: arrived, waypoints = [] } = await drive(started);
+  const durationSeconds = (Date.now() - startedAt) / 1_000;
+  assert.equal(arrived.world.currentDistrict, destinationDistrict,
+    `${description}: arrived in ${arrived.world.currentDistrict}.`);
+  assert(durationSeconds <= 35,
+    `${description}: district journey exceeded 35 seconds (${durationSeconds}).`);
+  return {
+    destinationDistrict,
+    durationSeconds,
+    from: started.vehicle.position,
+    roadDistanceUnits: measureRoadDistance([
+      started.vehicle.position,
+      ...waypoints,
+      arrived.vehicle.position,
+    ]),
+    to: arrived.vehicle.position,
+  };
+}
+
+/** 本番mapの初期world契約とhub→park→hub→south→hubの実入力移動を検証する。 */
+async function verifyProductionMap(browser, errors) {
+  const { context, page } = await openViewportPage(
+    browser,
+    { hasTouch: false, height: 720, name: 'production-map', width: 1_280 },
+    errors,
+  );
+  try {
+    const initial = await readGameState(page);
+    assert.deepEqual(initial.world.bounds, {
+      maxX: 36, maxZ: 36, minX: -36, minZ: -36,
+    });
+    assert.equal(initial.world.currentDistrict, 'hub');
+    assert.equal(initial.world.destinationDistrict, 'fire');
+    assert.equal(initial.visualLayout.worldSolids.length, 12);
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-production-hub.png`);
+
+    const journeys = [];
+    journeys.push(await verifyDistrictJourney(
+      page,
+      'park',
+      'production-map hub to park',
+      async () => ({
+        state: await driveAlongWorldAxis(
+          page,
+          'negativeZ',
+          (state) => state.world.currentDistrict === 'park',
+          'production-map hub to park',
+        ),
+      }),
+    ));
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-production-park.png`);
+
+    journeys.push(await verifyDistrictJourney(
+      page,
+      'hub',
+      'production-map park to hub',
+      async () => ({
+        state: await driveAlongWorldAxis(
+          page,
+          'positiveZ',
+          (state) => state.world.currentDistrict === 'hub',
+          'production-map park to hub',
+        ),
+      }),
+    ));
+    await alignWorldCoordinate(page, 0, initial.landmarks.garage[0], 'production-map hub X');
+    await alignWorldCoordinate(page, 2, 0, 'production-map central crossing Z');
+
+    journeys.push(await verifyDistrictJourney(
+      page,
+      'south',
+      'production-map hub to south',
+      async () => {
+        const eastStage = await driveAlongWorldAxis(
+          page,
+          'positiveX',
+          (state) => state.vehicle.position[0] >= initial.landmarks.garage[0] + 6.5,
+          'production-map south garage bypass',
+        );
+        const state = await driveAlongWorldAxis(
+          page,
+          'positiveZ',
+          (candidate) => candidate.world.currentDistrict === 'south',
+          'production-map hub to south',
+        );
+        return { state, waypoints: [eastStage.vehicle.position] };
+      },
+    ));
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-production-south.png`);
+
+    journeys.push(await verifyDistrictJourney(
+      page,
+      'hub',
+      'production-map south to hub',
+      async () => ({
+        state: await driveAlongWorldAxis(
+          page,
+          'negativeZ',
+          (state) => state.world.currentDistrict === 'hub',
+          'production-map south to hub',
+        ),
+      }),
+    ));
+
+    return {
+      density: {
+        districtCount: initial.world.districts.length,
+        landmarkCount: initial.landmarks.breakableBlocks.length + 4,
+        routeMarkerCount: initial.visualLayout.routeMarkers.length,
+        worldSolidCount: initial.visualLayout.worldSolids.length,
+      },
+      initial: initial.world,
+      journeys,
+    };
+  } finally {
+    await context.close();
+  }
 }
 
 /** Canvasが公開するWebGL renderer情報を取得する。 */
@@ -706,7 +862,15 @@ const WORLD_AXIS_INPUTS = {
 };
 
 /** 直接操作のscreen対角入力でworld cardinal方向へ走り、座標条件で停止する。 */
-async function driveAlongWorldAxis(page, axis, predicate, description, touchDriver, maxBursts = 360) {
+async function driveAlongWorldAxis(
+  page,
+  axis,
+  predicate,
+  description,
+  touchDriver,
+  maxBursts = 360,
+  brakeAfterArrival = true,
+) {
   const input = WORLD_AXIS_INPUTS[axis];
   assert(input, `${description}: unknown world axis ${axis}.`);
   const initialResetCount = (await readGameState(page)).vehicle.resetCount;
@@ -722,7 +886,7 @@ async function driveAlongWorldAxis(page, axis, predicate, description, touchDriv
       if (predicate(state)) {
         await touchDriver?.releaseStick();
         await releaseKeyboardKeys(page, heldKeys);
-        await brakeVehicle(page);
+        if (brakeAfterArrival) await brakeVehicle(page);
         return readGameState(page);
       }
       assert.equal(state.vehicle.resetCount, initialResetCount,
@@ -743,66 +907,49 @@ async function driveAlongWorldAxis(page, axis, predicate, description, touchDriv
   }
 }
 
-/** 実キーボードの北西入力で、旧6unit外かつ照準済みの炎位置へ有界走行する。 */
+/** telemetryの照準点から旧6unit外かつ照準済みになる東側道路位置へ微調整する。 */
 async function driveToForgivingSprayTarget(page) {
-  const heldKeys = new Set();
   const initialResetCount = (await readGameState(page)).vehicle.resetCount;
   const initialState = await readGameState(page);
+  const target = initialState.landmarks.fireSprayTarget;
   let latestState = null;
-  try {
-    if (initialState.mission.distance <= 6) {
-      await syncKeyboardKeys(page, heldKeys, ['KeyS']);
-      for (let burst = 0; burst < 120; burst += 1) {
-        const state = await readGameState(page);
-        if (state.mission.distance > 7.2) {
-          await releaseKeyboardKeys(page, heldKeys);
-          await brakeVehicle(page);
-          break;
-        }
-        assert.equal(state.vehicle.resetCount, initialResetCount,
-          `forgiving spray exterior correction reset unexpectedly: ${JSON.stringify({
-            direction: state.mission.direction,
-            distance: state.mission.distance,
-            vehiclePosition: state.vehicle.position,
-          })}`);
-        await waitForFrames(page, 2);
-      }
-      assert((await readGameState(page)).mission.distance > 6,
-        'forgiving spray exterior correction did not leave the old 6-unit range.');
+  await alignWorldCoordinate(page, 0, target[0] + 2.1, 'forgiving spray east X', 0.2);
+  await alignWorldCoordinate(page, 2, target[2] + 8.1, 'forgiving spray exterior Z', 0.2);
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    const state = await readGameState(page);
+    latestState = state;
+    const horizontalDistance = Math.hypot(
+      target[0] - state.mission.nozzleOrigin[0],
+      target[2] - state.mission.nozzleOrigin[2],
+    );
+    if (state.mission.targeted && horizontalDistance > 6 && horizontalDistance <= 7) {
+      return state;
     }
-    await syncKeyboardKeys(page, heldKeys, ['KeyW']);
-    // 進行前に消防車のyawを北西へ寄せ、距離境界を横切る時点で正面判定を安定させる。
-    await waitForFrames(page, 4);
-    for (let burst = 0; burst < 120; burst += 1) {
-      const state = await readGameState(page);
-      latestState = state;
-      if (state.mission.targeted && state.mission.distance > 6) {
-        await releaseKeyboardKeys(page, heldKeys);
-        return state;
-      }
-      assert.equal(state.vehicle.resetCount, initialResetCount,
-        `forgiving spray target acquisition reset unexpectedly: ${JSON.stringify({
-          direction: state.mission.direction,
-          distance: state.mission.distance,
-          vehiclePosition: state.vehicle.position,
-        })}`);
-      await waitForFrames(page, 2);
-    }
-    throw new Error(`forgiving spray target acquisition did not reach the old-range exterior: ${JSON.stringify({
-      initial: {
-        direction: initialState.mission.direction,
-        distance: initialState.mission.distance,
-        nozzleOrigin: initialState.mission.nozzleOrigin,
-        targeted: initialState.mission.targeted,
-        vehiclePosition: initialState.vehicle.position,
-      },
-      direction: latestState?.mission.direction,
-      distance: latestState?.mission.distance,
-      vehiclePosition: latestState?.vehicle.position,
-    })}`);
-  } finally {
-    await releaseKeyboardKeys(page, heldKeys);
+    assert.equal(state.vehicle.resetCount, initialResetCount,
+      `forgiving spray target acquisition reset unexpectedly: ${JSON.stringify({
+        direction: state.mission.direction,
+        distance: state.mission.distance,
+        horizontalDistance,
+        vehiclePosition: state.vehicle.position,
+      })}`);
+    await pulseAlongWorldAxis(
+      page,
+      horizontalDistance <= 6 ? 'positiveZ' : 'negativeZ',
+      1,
+    );
   }
+  throw new Error(`forgiving spray target acquisition did not reach the old-range exterior: ${JSON.stringify({
+    initial: {
+      direction: initialState.mission.direction,
+      distance: initialState.mission.distance,
+      nozzleOrigin: initialState.mission.nozzleOrigin,
+      targeted: initialState.mission.targeted,
+      vehiclePosition: initialState.vehicle.position,
+    },
+    direction: latestState?.mission.direction,
+    distance: latestState?.mission.distance,
+    vehiclePosition: latestState?.vehicle.position,
+  })}`);
 }
 
 /** world cardinal方向へ短く入力し、停止後のheadingを同方向へ揃える。 */
@@ -848,20 +995,41 @@ async function alignWorldCoordinate(
   })}`);
 }
 
-/** 車庫から外周東側道路を通って火の照準距離へ進む。 */
+/** 中央車庫から東幹線と火災地区道路を通って炎の照準距離へ進む。 */
 async function driveMissionToFire(page, touchDriver) {
-  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+  const initial = await readGameState(page);
+  const garage = initial.landmarks.garage;
+  const target = initial.landmarks.fireSprayTarget;
+  await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= garage[2] - 3,
     'fire route garage opening', touchDriver);
-  await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 11.5,
-    'fire route south road', touchDriver);
-  // Keyboardの対角入力は北上中に+Xへ寄るため、world境界へ達しない内側から開始する。
-  const safeEastX = touchDriver ? 15.5 : 11.5;
-  await alignWorldCoordinate(page, 0, safeEastX, 'fire route safe east X', 0.5, touchDriver);
-  await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -7,
-    'fire route north road', touchDriver);
-  await driveAlongWorldAxis(page, 'negativeX', (state) => state.mission.targeted,
-    'fire route east-wall targeting', touchDriver);
-  const state = await readGameState(page);
+  await alignWorldCoordinate(page, 2, 0, 'fire route central crossing Z', 0.5, touchDriver);
+  await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= target[0] + 2,
+    'fire route east trunk road', touchDriver);
+  await alignWorldCoordinate(page, 0, target[0] + 2.6, 'fire route east road X', 0.4, touchDriver);
+  await driveAlongWorldAxis(page, 'negativeZ', (state) => (
+    state.vehicle.position[2] <= target[2] + 3.1
+  ), 'fire route north road', touchDriver);
+  await alignWorldCoordinate(
+    page,
+    2,
+    target[2] + 3.1,
+    'fire route target latitude',
+    0.35,
+    touchDriver,
+  );
+  await alignWorldCoordinate(
+    page,
+    0,
+    target[0] + 4.5,
+    'fire route target east X',
+    0.35,
+    touchDriver,
+  );
+  let state = await readGameState(page);
+  for (let attempt = 0; !state.mission.targeted && attempt < 12; attempt += 1) {
+    await pulseAlongWorldAxis(page, 'negativeX', 1, touchDriver);
+    state = await readGameState(page);
+  }
   assert(Number.isFinite(state.mission.distance) && state.mission.targeted,
     `Fire route did not end targeted: ${JSON.stringify(state.mission)}`);
   return state;
@@ -890,8 +1058,9 @@ async function verifyForgivingSprayTargeting(browser, errors) {
   const target = { hasTouch: false, height: 720, name: 'forgiving-spray', width: 1_280 };
   const { context, page } = await openViewportPage(browser, target, errors);
   const getTargetGeometry = (state) => {
-    const deltaX = FIRE_SPRAY_TARGET_POSITION[0] - state.mission.nozzleOrigin[0];
-    const deltaZ = FIRE_SPRAY_TARGET_POSITION[2] - state.mission.nozzleOrigin[2];
+    const [targetX, , targetZ] = state.landmarks.fireSprayTarget;
+    const deltaX = targetX - state.mission.nozzleOrigin[0];
+    const deltaZ = targetZ - state.mission.nozzleOrigin[2];
     const horizontalDistance = Math.hypot(deltaX, deltaZ);
     const forwardLength = Math.hypot(state.vehicle.forward[0], state.vehicle.forward[2]);
     return {
@@ -903,20 +1072,22 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     };
   };
   try {
-    await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+    const initial = await readGameState(page);
+    const garage = initial.landmarks.garage;
+    const targetPosition = initial.landmarks.fireSprayTarget;
+    await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= garage[2] - 3,
       'forgiving spray garage opening');
-    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 11.5,
+    await alignWorldCoordinate(page, 2, 0, 'forgiving spray central crossing Z', 0.5);
+    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= targetPosition[0] + 2,
       'forgiving spray east road');
-    await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= 0.5,
-      'forgiving spray old-range exterior');
     const staged = await driveToForgivingSprayTarget(page);
     const stagedGeometry = getTargetGeometry(staged);
     const streamEndpoint = staged.mission.waterPath?.end;
     const endpointError = Array.isArray(streamEndpoint)
       ? Math.hypot(
-        FIRE_SPRAY_TARGET_POSITION[0] - streamEndpoint[0],
-        FIRE_SPRAY_TARGET_POSITION[1] - streamEndpoint[1],
-        FIRE_SPRAY_TARGET_POSITION[2] - streamEndpoint[2],
+        targetPosition[0] - streamEndpoint[0],
+        targetPosition[1] - streamEndpoint[1],
+        targetPosition[2] - streamEndpoint[2],
       )
       : Number.NaN;
     const stagedDiagnostics = {
@@ -984,11 +1155,26 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     await page.evaluate(() => window.reset_voxel_game_vehicle?.());
     await waitForFrames(page, 2);
     await driveMissionToFire(page);
+    await alignWorldCoordinate(
+      page,
+      2,
+      targetPosition[2] + 2.4,
+      'forgiving spray backward turn-in Z',
+      0.2,
+    );
+    await alignWorldCoordinate(
+      page,
+      0,
+      targetPosition[0] + 2.6,
+      'forgiving spray backward turn-in X',
+      0.2,
+    );
     await driveAlongWorldAxis(page, 'positiveX', (state) => {
       const geometry = getTargetGeometry(state);
-      return !state.mission.targeted && geometry.horizontalDistance <= 7 && geometry.dot < 0;
-    },
-      'forgiving spray backward facing');
+      return !state.mission.targeted
+        && geometry.horizontalDistance <= 4.3
+        && geometry.dot < 0;
+    }, 'forgiving spray backward facing', null, 360, false);
     const behind = await readGameState(page);
     const { dot: behindDot, horizontalDistance: behindHorizontalDistance } = getTargetGeometry(behind);
     assert(Number.isFinite(behindDot) && behindHorizontalDistance <= 7 && behindDot < 0,
@@ -1049,24 +1235,26 @@ async function verifyForgivingSprayTargeting(browser, errors) {
   }
 }
 
-/** 火災現場から外周東側道路を戻り、車庫でassigned再開まで走る。 */
+/** 火災現場から東幹線と中央交差点を戻り、車庫でassigned再開まで走る。 */
 async function driveMissionBackToGarage(page, touchDriver) {
-  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
-    'garage route south opening', touchDriver);
-  await alignWorldCoordinate(page, 2, 17.8, 'garage outside south safe Z', 0.15, touchDriver);
-  await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= 2.5,
-    'garage outside west road', touchDriver);
-  await alignWorldCoordinate(page, 0, 0, 'garage outside X', 0.7, touchDriver);
-  await alignWorldCoordinate(page, 2, 14, 'garage inside Z', 0.7, touchDriver);
+  const initial = await readGameState(page);
+  const garage = initial.landmarks.garage;
+  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 0,
+    'garage route east road', touchDriver);
+  await alignWorldCoordinate(page, 2, 0, 'garage central crossing Z', 0.2, touchDriver);
+  await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= garage[0] + 2,
+    'garage central west road', touchDriver);
+  await alignWorldCoordinate(page, 0, garage[0], 'garage center X', 0.7, touchDriver);
+  await alignWorldCoordinate(page, 2, garage[2], 'garage center Z', 0.7, touchDriver);
   let latestState = await readGameState(page);
   for (let correction = 0; correction < 4; correction += 1) {
     if (latestState.runtime.missionPhase === 'assigned') return latestState;
-    await alignWorldCoordinate(page, 0, 0, 'garage final X', 0.7, touchDriver);
-    await alignWorldCoordinate(page, 2, 14, 'garage final Z', 0.7, touchDriver);
+    await alignWorldCoordinate(page, 0, garage[0], 'garage final X', 0.7, touchDriver);
+    await alignWorldCoordinate(page, 2, garage[2], 'garage final Z', 0.7, touchDriver);
     latestState = await readGameState(page);
     const garageDistance = Math.hypot(
-      latestState.vehicle.position[0],
-      latestState.vehicle.position[2] - 14,
+      latestState.vehicle.position[0] - garage[0],
+      latestState.vehicle.position[2] - garage[2],
     );
     assert(garageDistance <= 3.1,
       `Garage final alignment exceeds restart radius: ${garageDistance}.`);
@@ -1130,7 +1318,13 @@ async function verifyDirectMovement(browser, errors) {
 }
 
 /** keyboardまたは実touchで消火、freeRoam、実走帰庫、仕事再開まで完走する。 */
-async function verifyCompleteMission(browser, errors, name, hasTouch) {
+async function verifyCompleteMission(
+  browser,
+  errors,
+  name,
+  hasTouch,
+  { targetedScreenshot = null } = {},
+) {
   const target = { hasTouch, height: hasTouch ? 390 : 720, name, width: hasTouch ? 844 : 1_280 };
   const { context, page } = await openViewportPage(browser, target, errors);
   const touch = hasTouch ? await createTouchDriver(page) : null;
@@ -1140,6 +1334,7 @@ async function verifyCompleteMission(browser, errors, name, hasTouch) {
     const initialResetCount = initial.vehicle.resetCount;
     readPoolIdentity(initial, `${name} initial`);
     const targeted = await driveMissionToFire(page, touch);
+    if (targetedScreenshot) await captureVerifiedScreenshot(page, targetedScreenshot);
     if (touch) await touch.pressSpray();
     else await page.keyboard.down('Space');
     await waitForTargetedSpray(page, `${name}: targeted spray`);
@@ -1283,7 +1478,12 @@ async function verifyWaterTimeline(browser, errors) {
  */
 async function driveToBlockApproach(page, block) {
   const garageExitBefore = await readGameState(page);
-  const garageExitAfter = await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+  const garage = garageExitBefore.landmarks.garage;
+  const plaza = garageExitBefore.landmarks.blockPlaza;
+  const hubGate = requireWorldSolid(garageExitBefore, 'hub-gate-post');
+  const garageExitAfter = await driveAlongWorldAxis(page, 'negativeZ', (state) => (
+    state.vehicle.position[2] <= garage[2] - 3
+  ),
     `${block.id} garage exit`);
   const garageExit = {
     after: {
@@ -1297,38 +1497,36 @@ async function driveToBlockApproach(page, block) {
       resetCount: garageExitBefore.vehicle.resetCount,
     },
   };
-  if (block.id === 'plaza-blue') {
-    const westOuterX = -17.2;
-    const approachZ = -1;
-    await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= westOuterX + 2.5,
-      `${block.id} west outer road`);
-    await alignWorldCoordinate(page, 0, westOuterX, `${block.id} west outer X`);
-    await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= 10,
-      `${block.id} west upper corridor`);
-    await alignWorldCoordinate(page, 0, westOuterX, `${block.id} west upper correction X`);
-    const staged = await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= 1.5,
-      `${block.id} west lower corridor`);
-    assert(staged.vehicle.position[0] <= -14.8,
-      `${block.id}: west corridor drifted into the red-block support envelope: ${JSON.stringify(staged.vehicle.position)}.`);
-    await alignWorldCoordinate(page, 0, westOuterX, `${block.id} west lower correction X`);
-    await alignWorldCoordinate(page, 2, approachZ, `${block.id} west approach Z`);
-    return { axis: 'positiveX', approach: 'west-corrected-corridor', garageExit };
+  const gateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2
+    - VEHICLE_COLLIDER_HALF_EXTENTS[2] - 2;
+  await alignWorldCoordinate(page, 2, gateBypassZ, `${block.id} hub gate bypass Z`);
+
+  if (block.id === 'plaza-green') {
+    const safeNorthZ = Math.min(
+      gateBypassZ,
+      plaza.position[2] - plaza.scale[2] / 2 - 3,
+    );
+    const westStageX = plaza.position[0] - plaza.scale[0] / 2 - 2;
+    await alignWorldCoordinate(page, 2, safeNorthZ, `${block.id} north bypass Z`);
+    await driveAlongWorldAxis(page, 'negativeX', (state) => (
+      state.vehicle.position[0] <= westStageX
+    ), `${block.id} west trunk road`);
+    await alignWorldCoordinate(page, 0, westStageX, `${block.id} west stage X`);
+    await alignWorldCoordinate(page, 2, block.position[2], `${block.id} west approach Z`);
+    return { axis: 'positiveX', approach: 'west-via-north-bypass', garageExit };
   }
-  if (block.id === 'plaza-red') {
-    await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= block.position[0] + 2.5,
-      `${block.id} north-road longitude`);
-    await alignWorldCoordinate(page, 0, block.position[0], `${block.id} north approach X`);
-    return { axis: 'negativeZ', approach: 'north-road', garageExit };
-  }
-  if (block.id === 'plaza-yellow' || block.id === 'plaza-green') {
-    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 12,
-      `${block.id} east outer road`);
-    await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -12.8,
-      `${block.id} south outer road`);
-    await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= block.position[0] + 2.5,
-      `${block.id} south-road longitude`);
-    await alignWorldCoordinate(page, 0, block.position[0], `${block.id} south approach X`);
-    return { axis: 'positiveZ', approach: 'south-outer-road', garageExit };
+
+  const eastStageX = Math.max(
+    block.position[0] + 6,
+    plaza.position[0] + plaza.scale[0] / 2 + 2,
+  );
+  await driveAlongWorldAxis(page, 'negativeX', (state) => (
+    state.vehicle.position[0] <= eastStageX
+  ), `${block.id} central west road`);
+  await alignWorldCoordinate(page, 0, eastStageX, `${block.id} east stage X`);
+  await alignWorldCoordinate(page, 2, block.position[2], `${block.id} east approach Z`);
+  if (block.id === 'plaza-red' || block.id === 'plaza-blue' || block.id === 'plaza-yellow') {
+    return { axis: 'negativeX', approach: 'east-via-central-road', garageExit };
   }
   throw new Error(`${block.id}: no collider-safe block approach is defined.`);
 }
@@ -1604,17 +1802,24 @@ function worldDirectionToTouchStick(camera, worldX, worldZ) {
 
 /** 車庫外の東側安全路から指定solidの+Z側へ車両を配置する。 */
 async function prepareWorldObstacleCollision(page, touch, obstacle, targetX = obstacle.position[0]) {
-  await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
+  const initial = await readGameState(page);
+  const garage = initial.landmarks.garage;
+  await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= garage[2] - 3,
     `${obstacle.id} collision garage opening`, touch);
-  await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 13,
-    `${obstacle.id} collision east road`, touch);
-  await alignWorldCoordinate(page, 0, 15.5, `${obstacle.id} collision east safe X`, 0.5, touch);
+  await alignWorldCoordinate(page, 2, 0, `${obstacle.id} collision central crossing Z`, 0.3, touch);
+  const current = await readGameState(page);
+  if (targetX >= current.vehicle.position[0]) {
+    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= targetX,
+      `${obstacle.id} collision east road`, touch);
+  } else {
+    await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= targetX,
+      `${obstacle.id} collision west road`, touch);
+  }
+  await alignWorldCoordinate(page, 0, targetX, `${obstacle.id} collision target X`, 0.35, touch);
   const approachZ = obstacle.position[2] + obstacle.scale[2] / 2
     + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 2.5;
-  const turnZ = approachZ + 2.5;
-  await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= turnZ,
+  await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= approachZ,
     `${obstacle.id} collision north staging`, touch);
-  await alignWorldCoordinate(page, 0, targetX, `${obstacle.id} collision X`, 0.35, touch);
   await alignWorldCoordinate(page, 2, approachZ, `${obstacle.id} collision staging Z`, 0.35, touch);
 }
 
@@ -1761,13 +1966,23 @@ async function verifyFireHazardLifecycle(browser, errors) {
   try {
     const initial = await readGameState(page);
     assertInitialWorldPhysicsContract(initial);
+    const fireHazard = initial.visualLayout.fireHazard;
+    const easternRunupX = fireHazard.position[0] + fireHazard.scale[0] / 2
+      + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 2.5;
     await driveMissionToFire(page, touch);
-    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 17.2,
+    await driveAlongWorldAxis(page, 'positiveX', (state) => (
+      state.vehicle.position[0] >= easternRunupX
+    ),
       'fire hazard east heading staging', touch);
-    await alignWorldCoordinate(page, 2, -9.1, 'fire hazard targeting lane Z', 0.15, touch);
-    await driveAlongWorldAxis(page, 'negativeX', (state) => -state.vehicle.forward[0] >= 0.999,
-      'fire hazard negative-X heading', touch);
-    await alignWorldCoordinate(page, 0, 15.7, 'fire hazard head-on X', 0.15, touch);
+    await alignWorldCoordinate(
+      page,
+      2,
+      fireHazard.position[2],
+      'fire hazard targeting lane Z',
+      0.15,
+      touch,
+    );
+    await alignWorldCoordinate(page, 0, easternRunupX, 'fire hazard head-on X', 0.15, touch);
     const before = await readGameState(page);
     assert.equal(before.visuals.fireHazardEnabled, true);
 
@@ -1778,7 +1993,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
       await waitForFrames(page, 1);
       const state = await readGameState(page);
       assert.equal(state.vehicle.resetCount, before.vehicle.resetCount);
-      const clearance = collisionClearance(state.vehicle, FIRE_HAZARD_BOX, 'x', 1);
+      const clearance = collisionClearance(state.vehicle, fireHazard, 'x', 1);
       const headingAlongApproach = -state.vehicle.forward[0];
       if (headingAlongApproach >= 0.999) {
         minimumClearance = Math.min(minimumClearance, clearance);
@@ -1795,7 +2010,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
       before: before.vehicle,
       blocked: blocked.vehicle,
       contactFrames: contactPositions.length,
-      latestClearance: collisionClearance(blocked.vehicle, FIRE_HAZARD_BOX, 'x', 1),
+      latestClearance: collisionClearance(blocked.vehicle, fireHazard, 'x', 1),
       minimumClearance,
     })}`);
     const contactTravel = Math.max(...contactPositions) - Math.min(...contactPositions);
@@ -1864,12 +2079,19 @@ async function verifyFireHazardLifecycle(browser, errors) {
       'Fire-hazard lifecycle garage return used a vehicle reset.');
 
     await driveMissionToFire(page, touch);
-    await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 17.2,
+    await driveAlongWorldAxis(page, 'positiveX', (state) => (
+      state.vehicle.position[0] >= easternRunupX
+    ),
       'restored fire hazard east heading staging', touch);
-    await alignWorldCoordinate(page, 2, -9.1, 'restored fire hazard targeting lane Z', 0.15, touch);
-    await driveAlongWorldAxis(page, 'negativeX', (state) => -state.vehicle.forward[0] >= 0.999,
-      'restored fire hazard negative-X heading', touch);
-    await alignWorldCoordinate(page, 0, 15.7, 'restored fire hazard head-on X', 0.15, touch);
+    await alignWorldCoordinate(
+      page,
+      2,
+      fireHazard.position[2],
+      'restored fire hazard targeting lane Z',
+      0.15,
+      touch,
+    );
+    await alignWorldCoordinate(page, 0, easternRunupX, 'restored fire hazard head-on X', 0.15, touch);
     const reblockStart = await readGameState(page);
     assert.equal(reblockStart.runtime.fireIntensity, 1,
       'Restored fire intensity changed before second collider contact.');
@@ -1887,7 +2109,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
       const state = await readGameState(page);
       assert.equal(state.vehicle.resetCount, before.vehicle.resetCount,
         'Vehicle reset while pressing the restored fire hazard.');
-      const clearance = collisionClearance(state.vehicle, FIRE_HAZARD_BOX, 'x', 1);
+      const clearance = collisionClearance(state.vehicle, fireHazard, 'x', 1);
       const headingAlongApproach = -state.vehicle.forward[0];
       if (headingAlongApproach >= 0.999) {
         reblockMinimumClearance = Math.min(reblockMinimumClearance, clearance);
@@ -1915,7 +2137,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
     assert(reblockContactTravel <= 0.18,
       `Vehicle traversed the restored fire hazard while input was held (${reblockContactTravel}).`);
     const reblockCenterClearance = reblockedState.vehicle.position[0]
-      - (FIRE_HAZARD_BOX.position[0] + FIRE_HAZARD_BOX.scale[0] / 2);
+      - (fireHazard.position[0] + fireHazard.scale[0] / 2);
     assert(reblockCenterClearance > 0,
       `Vehicle center crossed the restored fire hazard: ${JSON.stringify({
         centerClearance: reblockCenterClearance,
@@ -1991,29 +2213,34 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
   try {
     const initial = await readGameState(page);
     assertInitialWorldPhysicsContract(initial);
-    await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
-      'route marker garage opening');
-    await alignWorldCoordinate(page, 0, -2.5, 'route marker run-up X', 0.35);
-    await alignWorldCoordinate(page, 2, 16.2, 'route marker lane Z', 0.35);
-    const before = await readGameState(page);
+    const markers = initial.visualLayout.routeMarkers.slice(0, 2);
+    assert.equal(markers.length, 2, 'Route-marker telemetry lacks the first two markers.');
+    assert(markers.every(({ position }) => Math.abs(position[0] - initial.landmarks.garage[0]) <= 0.01),
+      'The first two route markers are not on the garage exit lane.');
+    const before = initial;
     const impactCountsBefore = before.breakables.blocks.map(({ impactCount }) => impactCount);
     const heldKeys = new Set();
-    const markerSpeeds = new Map([[0, []], [3, []]]);
+    const markerSpeeds = new Map(markers.map(({ position }, index) => [`route-marker-${index}`, {
+      position,
+      speeds: [],
+    }]));
     const routeCorridorSamples = [];
     let maximumConsecutiveStalledFrames = 0;
     let consecutiveStalledFrames = 0;
-    let previousCorridorX = null;
+    let previousCorridorZ = null;
+    const minimumMarkerZ = Math.min(...markers.map(({ position }) => position[2]));
     try {
-      await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS.positiveX.keys);
+      await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS.negativeZ.keys);
       for (let frame = 0; frame < 360; frame += 1) {
         const state = await readGameState(page);
         assert.equal(state.vehicle.resetCount, initial.vehicle.resetCount);
-        if (state.vehicle.position[0] >= -0.6 && state.vehicle.position[0] <= 3.6) {
-          const progress = previousCorridorX === null
+        if (state.vehicle.position[2] <= markers[0].position[2] + 0.6
+          && state.vehicle.position[2] >= minimumMarkerZ - 0.6) {
+          const progress = previousCorridorZ === null
             ? null
-            : state.vehicle.position[0] - previousCorridorX;
+            : previousCorridorZ - state.vehicle.position[2];
           routeCorridorSamples.push({
-            positionX: state.vehicle.position[0],
+            positionZ: state.vehicle.position[2],
             progress,
             speed: state.vehicle.speed,
           });
@@ -2026,14 +2253,14 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
           } else {
             consecutiveStalledFrames = 0;
           }
-          previousCorridorX = state.vehicle.position[0];
+          previousCorridorZ = state.vehicle.position[2];
         }
-        for (const markerX of markerSpeeds.keys()) {
-          if (Math.abs(state.vehicle.position[0] - markerX) <= 0.45) {
-            markerSpeeds.get(markerX).push(state.vehicle.speed);
+        for (const marker of markerSpeeds.values()) {
+          if (Math.abs(state.vehicle.position[2] - marker.position[2]) <= 0.45) {
+            marker.speeds.push(state.vehicle.speed);
           }
         }
-        if (state.vehicle.position[0] >= 4) break;
+        if (state.vehicle.position[2] <= minimumMarkerZ - 1) break;
         await waitForFrames(page, 1);
       }
     } finally {
@@ -2042,7 +2269,7 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
     await brakeVehicle(page);
     const after = await readGameState(page);
     assert.equal(after.vehicle.resetCount, initial.vehicle.resetCount);
-    const travel = after.vehicle.position[0] - before.vehicle.position[0];
+    const travel = before.vehicle.position[2] - after.vehicle.position[2];
     assert(travel >= 6, `Route-marker run was too short: ${travel}.`);
     assert(routeCorridorSamples.length >= 2,
       `Route-marker corridor was not sampled: ${JSON.stringify(routeCorridorSamples)}.`);
@@ -2050,9 +2277,9 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
       `Route-marker corridor stopped forward progress for ${maximumConsecutiveStalledFrames} frames: ${
         JSON.stringify(routeCorridorSamples)
       }.`);
-    for (const [markerX, speeds] of markerSpeeds) {
-      assert(speeds.length > 0, `Route marker ${markerX} was not crossed.`);
-      assert(Math.max(...speeds) >= 2.5, `Route marker ${markerX} caused a sustained stop.`);
+    for (const [markerId, { speeds }] of markerSpeeds) {
+      assert(speeds.length > 0, `Route marker ${markerId} was not crossed.`);
+      assert(Math.max(...speeds) >= 2.5, `Route marker ${markerId} caused a sustained stop.`);
     }
     assert.deepEqual(
       after.breakables.blocks.map(({ impactCount }) => impactCount),
@@ -2067,7 +2294,9 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
       routeMarkerCount: after.visuals.routeCubeCount,
       maximumConsecutiveStalledFrames,
       minimumCorridorSpeed: Math.min(...routeCorridorSamples.map(({ speed }) => speed)),
-      sampledSpeeds: Object.fromEntries(markerSpeeds),
+      sampledSpeeds: Object.fromEntries(
+        [...markerSpeeds].map(([id, marker]) => [id, marker.speeds]),
+      ),
       travel,
     };
   } finally {
@@ -2077,25 +2306,23 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
 
 /** 5代表solid、動的fire hazard、非solid route markerを実車検証する。 */
 async function verifyWorldCollisions(browser, errors) {
+  const layoutPage = await openViewportPage(
+    browser,
+    { hasTouch: false, height: 720, name: 'collision-layout', width: 1_280 },
+    errors,
+  );
+  let worldSolids;
+  try {
+    worldSolids = (await readGameState(layoutPage.page)).visualLayout.worldSolids;
+  } finally {
+    await layoutPage.context.close();
+  }
   const testedScenarios = [
     {
       approachAxis: 'z',
-      approachDirection: 1,
+      approachDirection: -1,
       id: 'tree-trunk-3',
-      prepare: async (page, touch) => {
-        const obstacle = COLLISION_OBSTACLES.find(({ id }) => id === 'tree-trunk-3');
-        assert(obstacle, 'tree-trunk-3 collision obstacle definition is unavailable.');
-        await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
-          'tree-trunk-3 collision garage opening', touch);
-        await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= 13,
-          'tree-trunk-3 collision east road', touch);
-        await alignWorldCoordinate(page, 0, 15.5, 'tree-trunk-3 collision east safe X', 0.5, touch);
-        await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= -3.5,
-          'tree-trunk-3 collision north staging', touch);
-        await alignWorldCoordinate(page, 0, obstacle.position[0], 'tree-trunk-3 collision X', 0.15, touch);
-        await alignWorldCoordinate(page, 2, -2.5, 'tree-trunk-3 collision run-up Z', 0.35, touch);
-      },
-      recoveryDirection: -1,
+      recoveryDirection: 1,
     },
     {
       approachAxis: 'z',
@@ -2105,21 +2332,55 @@ async function verifyWorldCollisions(browser, errors) {
     },
     {
       approachAxis: 'z',
-      approachDirection: -1,
+      approachDirection: 1,
       id: 'garage-back-wall',
       prepare: async (page, touch) => {
-        await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 16.3,
-          'garage back-wall opening', touch);
-        await alignWorldCoordinate(page, 0, 0, 'garage back-wall X', 0.35, touch);
+        const state = await readGameState(page);
+        const obstacle = requireWorldSolid(state, 'garage-back-wall');
+        await alignWorldCoordinate(
+          page,
+          0,
+          state.landmarks.garage[0],
+          'garage back-wall X',
+          0.35,
+          touch,
+        );
+        await alignWorldCoordinate(
+          page,
+          2,
+          obstacle.position[2] - obstacle.scale[2] / 2
+            - VEHICLE_COLLIDER_HALF_EXTENTS[2] - 2.5,
+          'garage back-wall runway Z',
+          0.35,
+          touch,
+        );
       },
-      recoveryDirection: 1,
+      recoveryDirection: -1,
     },
     {
       approachAxis: 'x',
       approachDirection: 1,
       id: 'garage-right-wall',
       prepare: async (page, touch) => {
-        await alignWorldCoordinate(page, 2, 14, 'garage right-wall Z', 0.35, touch);
+        const state = await readGameState(page);
+        const obstacle = requireWorldSolid(state, 'garage-right-wall');
+        await alignWorldCoordinate(
+          page,
+          2,
+          state.landmarks.garage[2],
+          'garage right-wall Z',
+          0.35,
+          touch,
+        );
+        await alignWorldCoordinate(
+          page,
+          0,
+          obstacle.position[0] - obstacle.scale[0] / 2
+            - Math.max(...VEHICLE_COLLIDER_HALF_EXTENTS) - 2.5,
+          'garage right-wall runway X',
+          0.35,
+          touch,
+        );
       },
       recoveryDirection: -1,
     },
@@ -2135,7 +2396,7 @@ async function verifyWorldCollisions(browser, errors) {
   const scenarios = {};
   for (const scenario of testedScenarios) {
     const { id } = scenario;
-    const obstacle = COLLISION_OBSTACLES.find((candidate) => candidate.id === id);
+    const obstacle = worldSolids.find((candidate) => candidate.id === id);
     assert(obstacle, `${id}: collision obstacle definition is unavailable.`);
     scenarios[id] = await verifyWorldCollisionScenario(browser, errors, {
       ...scenario,
@@ -2150,11 +2411,11 @@ async function verifyWorldCollisions(browser, errors) {
     fireHazard,
     routeMarkers,
     scenarios,
-    sharedDefinitionOnly: COLLISION_OBSTACLES
+    sharedDefinitionOnly: worldSolids
       .filter(({ id }) => !testedIds.includes(id))
       .map(({ id }) => id),
     testedIds,
-    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all nine visuals and colliders share one definition',
+    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 12 production solids share one definition',
   };
 }
 
@@ -2253,12 +2514,72 @@ function assembleRepresentativeScreenshots() {
   for (const screenshot of collisionScreenshots) {
     assert(fs.existsSync(`${outputDirectory}/${screenshot}`), `Missing collision screenshot: ${screenshot}`);
   }
+  for (const screenshot of productionMapScreenshots) {
+    assert(fs.existsSync(`${outputDirectory}/${screenshot}`), `Missing production-map screenshot: ${screenshot}`);
+  }
 }
 
 /** 新操作・完全mission・時系列VFX・3 viewportを1回のrelease runとして検証する。 */
 async function verifyVoxelGame() {
   verifyPerformancePolicySelfCheck();
   await waitForServer();
+  if (focusMode === 'production-map') {
+    const browser = await chromium.launch({ headless: true });
+    const errors = [];
+    const contractFailures = [];
+    try {
+      const productionMap = await verifyProductionMap(browser, errors);
+      const fire = await verifyCompleteMission(
+        browser,
+        errors,
+        'production-fire',
+        false,
+        { targetedScreenshot: `${outputDirectory}/desktop-production-fire.png` },
+      );
+      const blocks = await verifyBreakTimeline(
+        browser,
+        errors,
+        contractFailures,
+        'plaza-red',
+        'red',
+      );
+      copyVerifiedScreenshot(
+        `${outputDirectory}/desktop-break-red-first-observed.png`,
+        `${outputDirectory}/desktop-production-blocks.png`,
+      );
+      const errorCounts = {
+        console: errors.filter((error) => error.includes(': console:')).length,
+        page: errors.filter((error) => error.includes(': pageerror:')).length,
+        request: errors.filter((error) => error.includes(': requestfailed:')).length,
+      };
+      writeJsonArtifact('production-map.json', {
+        blocks,
+        contractFailures,
+        errorCounts,
+        errors,
+        fire,
+        productionMap,
+        screenshotProofs,
+      });
+      for (const screenshot of productionMapScreenshots) {
+        assert(fs.existsSync(`${outputDirectory}/${screenshot}`),
+          `Missing production-map screenshot: ${screenshot}`);
+      }
+      assert.equal(errors.length, 0, `Focused production-map browser/request errors: ${errors.join(' | ')}`);
+      assert.equal(contractFailures.length, 0,
+        `Focused production-map contract failures: ${contractFailures.join(' | ')}`);
+      console.log(JSON.stringify({
+        artifacts: productionMapScreenshots,
+        blocks,
+        errorCounts,
+        fire,
+        productionMap,
+      }));
+      return;
+    } finally {
+      await browser.close();
+    }
+  }
   if (focusMode === 'nonbreak') {
     const browser = await chromium.launch({ headless: true });
     const errors = [];
@@ -2358,13 +2679,21 @@ async function verifyVoxelGame() {
   let directMovement;
   let forgivingSprayTargeting;
   let missions;
+  let productionMap;
   let waterTimeline;
   try {
+    productionMap = await verifyProductionMap(browser, errors);
     canonicalRoot = await verifyCanonicalRoot(browser, errors);
     directMovement = await verifyDirectMovement(browser, errors);
     forgivingSprayTargeting = await verifyForgivingSprayTargeting(browser, errors);
     missions = {
-      desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
+      desktop: await verifyCompleteMission(
+        browser,
+        errors,
+        'desktop-mission',
+        false,
+        { targetedScreenshot: `${outputDirectory}/desktop-production-fire.png` },
+      ),
       touch: await verifyCompleteMission(browser, errors, 'touch-mission', true),
     };
     waterTimeline = await verifyWaterTimeline(browser, errors);
@@ -2377,6 +2706,10 @@ async function verifyVoxelGame() {
     ]) {
       breakTimelines[blockId] = await verifyBreakTimeline(browser, errors, contractFailures, blockId, colorName);
     }
+    copyVerifiedScreenshot(
+      `${outputDirectory}/desktop-break-red-first-observed.png`,
+      `${outputDirectory}/desktop-production-blocks.png`,
+    );
     for (const target of targets) {
       viewports[target.name] = await verifyViewport(browser, target, errors);
     }
@@ -2397,7 +2730,12 @@ async function verifyVoxelGame() {
       `${name}: ${result.policy.rendererClass} renderer; thresholdMet=${result.policy.thresholdMet}; physical-GPU revalidation required`
     ));
   const report = {
-    artifacts: [...expectedScreenshots, ...timelineScreenshots, ...collisionScreenshots],
+    artifacts: [
+      ...expectedScreenshots,
+      ...timelineScreenshots,
+      ...collisionScreenshots,
+      ...productionMapScreenshots,
+    ],
     breakTimelines,
     canonicalRoot,
     collisions,
@@ -2412,6 +2750,7 @@ async function verifyVoxelGame() {
       rendererClasses: ['software', 'physical', 'unknown'],
       targets: Object.fromEntries(targets.map(({ minimumFps, name }) => [name, minimumFps])),
     },
+    productionMap,
     regressions,
     screenshotProofs,
     task7,

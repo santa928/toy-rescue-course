@@ -7,7 +7,7 @@ declare global {
     readonly breakables: import('./voxel-game/scene/BreakableBlockPlaza').BreakableTelemetry;
     readonly camera: import('./voxel-game/scene/WorldFixedCamera').WorldCameraTelemetry;
     readonly controls: import('./voxel-game/input/controlState').DriveCommand;
-    readonly coordinateSystem: 'origin=center, +x=right, +y=up, +z=toward-garage';
+    readonly coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south';
     readonly fire: {
       readonly intensity: number;
       readonly position: readonly [number, number, number];
@@ -18,7 +18,12 @@ declare global {
         readonly id: string;
         readonly position: readonly [number, number, number];
       }[];
+      readonly blockPlaza: {
+        readonly position: readonly [number, number, number];
+        readonly scale: readonly [number, number, number];
+      };
       readonly fire: readonly [number, number, number];
+      readonly fireSprayTarget: readonly [number, number, number];
       readonly garage: readonly [number, number, number];
     };
     readonly mission: Omit<
@@ -46,6 +51,12 @@ declare global {
         readonly offset: readonly [number, number, number];
         readonly scale: readonly [number, number, number];
       };
+      readonly worldSolids: readonly {
+        readonly id: string;
+        readonly position: readonly [number, number, number];
+        readonly rotation?: readonly [number, number, number];
+        readonly scale: readonly [number, number, number];
+      }[];
     };
     readonly visuals: {
       readonly fireHazardEnabled: boolean;
@@ -71,6 +82,16 @@ declare global {
       readonly maxZ: number;
       readonly minX: number;
       readonly minZ: number;
+    };
+    readonly world: {
+      readonly bounds: import('./voxel-game/scene/productionWorldMap').WorldBounds2D;
+      readonly currentDistrict:
+        import('./voxel-game/scene/productionWorldMap').ResolvedWorldDistrictId;
+      readonly destinationDistrict: 'fire';
+      readonly districts: readonly {
+        readonly id: import('./voxel-game/scene/productionWorldMap').WorldDistrictId;
+        readonly label: string;
+      }[];
     };
   }
 

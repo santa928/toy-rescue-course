@@ -98,7 +98,7 @@ async function readGameState(page) {
   const rendered = await page.evaluate(() => window.render_game_to_text?.());
   assert(rendered, 'render_game_to_text is unavailable.');
   const state = JSON.parse(rendered);
-  for (const key of ['coordinateSystem', 'fire', 'mission', 'blocks', 'controls', 'vehicle']) {
+  for (const key of ['coordinateSystem', 'fire', 'mission', 'blocks', 'controls', 'vehicle', 'world']) {
     assert(Object.hasOwn(state, key), `Final text state lacks ${key}: ${rendered}`);
   }
   for (const compatibilityKey of ['camera', 'runtime', 'breakables', 'visualLayout', 'visuals', 'landmarks', 'mode']) {
@@ -198,8 +198,10 @@ async function verifyDesktop(browser, errors, results) {
   const { context, page } = opened;
   try {
     const initial = await readGameState(page);
-    assert(initial.coordinateSystem === 'origin=center, +x=right, +y=up, +z=toward-garage',
+    assert(initial.coordinateSystem === 'origin=world-center, +x=east, +y=up, +z=south',
       `Unexpected coordinate system: ${initial.coordinateSystem}`);
+    assert(initial.world.currentDistrict === 'hub',
+      `Initial world district is not hub: ${JSON.stringify(initial.world)}`);
     assert(initial.mission.phase === 'assigned' && initial.mission.routeVisible,
       `Initial final mission contract is wrong: ${JSON.stringify(initial.mission)}`);
     assert(initial.fire.intensity === 1 && !initial.fire.targeted,
