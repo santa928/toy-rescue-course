@@ -106,8 +106,8 @@ export const PRODUCTION_WORLD_MAP = {
 /** world座標を地区、道路、またはworld外として解決する。 */
 export function resolveWorldDistrict(position: WorldPoint): ResolvedWorldDistrictId {
   const [x, , z] = position;
-  const { bounds, districts, roads } = PRODUCTION_WORLD_MAP;
-  if (!Number.isFinite(x) || !Number.isFinite(z)
+  const { bounds, districts } = PRODUCTION_WORLD_MAP;
+  if (!position.every(Number.isFinite)
     || x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) {
     return 'outside';
   }
@@ -118,11 +118,7 @@ export function resolveWorldDistrict(position: WorldPoint): ResolvedWorldDistric
   ));
   if (district) return district.id;
 
-  const road = roads.find(({ position: roadPosition, scale }) => (
-    x >= roadPosition[0] - scale[0] / 2 && x <= roadPosition[0] + scale[0] / 2
-    && z >= roadPosition[2] - scale[2] / 2 && z <= roadPosition[2] + scale[2] / 2
-  ));
-  return road ? 'road' : 'road';
+  return 'road';
 }
 
 /** map内のID重複、数値、world境界違反を定義順で検証する。 */

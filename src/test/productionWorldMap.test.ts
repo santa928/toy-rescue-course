@@ -62,6 +62,8 @@ describe('PRODUCTION_WORLD_MAP', () => {
     [[12, 0, 0], 'road'],
     [[40, 0, 0], 'outside'],
     [[Number.NaN, 0, 0], 'outside'],
+    [[0, Number.NaN, 0], 'outside'],
+    [[0, Number.POSITIVE_INFINITY, 0], 'outside'],
   ] as const)('%jを%s地区として解決する', (position, expected) => {
     expect(resolveWorldDistrict(position)).toBe(expected);
   });
