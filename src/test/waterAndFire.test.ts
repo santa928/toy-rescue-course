@@ -23,6 +23,7 @@ import {
   syncColliderEnabled,
   updateFireBatch,
 } from '../voxel-game/scene/WaterAndFire';
+import { FIRE_SPRAY_TARGET_POSITION } from '../voxel-game/scene/worldLayout';
 
 const fireHazardLifecycle = vi.hoisted(() => ({
   effects: [] as (() => void)[],
@@ -65,6 +66,13 @@ type FireHazardTestRef = ((collider: TestCollider | null) => void) | {
 };
 
 type FireFrameUpdateMode = 'skip' | 'update' | 'zero';
+
+type FireAnchorLayoutFactory = (
+  sprayTarget: readonly [number, number, number],
+) => {
+  readonly hazardBox: typeof FIRE_HAZARD_BOX;
+  readonly layerPositions: typeof FIRE_LAYER_POSITIONS;
+};
 
 /** componentを再renderし、ref再attachなしで低頻度effectだけを進める。 */
 function renderFireHazardCollider(enabled: boolean): FireHazardTestRef {
@@ -161,6 +169,32 @@ describe('WaterAndFire', () => {
       [26.95, 1.5, -16.02],
       [26.9, 2.15, -16.1],
     ]);
+  });
+
+  it('spray target変更へhazardと3層の相対配置を追従させる', () => {
+    const createLayout = (
+      WaterAndFireModule as typeof WaterAndFireModule & {
+        readonly createFireAnchorLayout?: FireAnchorLayoutFactory;
+      }
+    ).createFireAnchorLayout;
+    expect(createLayout).toBeTypeOf('function');
+    if (!createLayout) return;
+
+    expect(createLayout(FIRE_SPRAY_TARGET_POSITION)).toEqual({
+      hazardBox: FIRE_HAZARD_BOX,
+      layerPositions: FIRE_LAYER_POSITIONS,
+    });
+    expect(createLayout([10, 4, 20])).toEqual({
+      hazardBox: {
+        position: [10, 3.45, 20],
+        scale: [1.2, 1.8, 1.2],
+      },
+      layerPositions: [
+        [10, 3.3, 20],
+        [10.05, 4.05, 20.08],
+        [10, 4.7, 20],
+      ],
+    });
   });
 
   it('火cubeを建物のcamera側外壁面へ置き、3層すべてを遮蔽させない', () => {

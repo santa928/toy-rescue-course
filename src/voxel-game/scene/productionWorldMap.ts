@@ -34,11 +34,35 @@ export interface WorldBoxDefinition {
   readonly solid: boolean;
 }
 
+/** 積み木広場へ置く壊せる積み木の座標定義。 */
+export interface BreakableBlockLandmarkDefinition {
+  readonly color: string;
+  readonly id: string;
+  readonly position: WorldPoint;
+}
+
+/** 積み木広場の土台となるboxの座標定義。 */
+export interface BlockPlazaLandmarkDefinition {
+  readonly position: WorldPoint;
+  readonly scale: WorldPoint;
+}
+
+/** gameplayが参照する代表地点と積み木配置の不変定義。 */
+export interface WorldLandmarksDefinition {
+  readonly blockPlaza: BlockPlazaLandmarkDefinition;
+  readonly breakableBlocks: readonly BreakableBlockLandmarkDefinition[];
+  readonly fire: WorldPoint;
+  readonly fireSprayTarget: WorldPoint;
+  readonly garage: WorldPoint;
+  readonly park: WorldPoint;
+}
+
 /** 地区をつなぐ、描画可能な道路boxの定義。 */
 export interface WorldRoadDefinition {
   readonly connects: readonly WorldDistrictId[];
   readonly id: string;
   readonly position: WorldPoint;
+  readonly rotation?: WorldPoint;
   readonly scale: WorldPoint;
 }
 
@@ -46,6 +70,7 @@ export interface WorldRoadDefinition {
 export interface ProductionWorldMapDefinition {
   readonly bounds: WorldBounds2D;
   readonly districts: readonly WorldDistrictDefinition[];
+  readonly landmarks: WorldLandmarksDefinition;
   readonly roads: readonly WorldRoadDefinition[];
   readonly visualBoxes: readonly WorldBoxDefinition[];
 }
@@ -60,6 +85,22 @@ export const PRODUCTION_WORLD_MAP = {
     { bounds: { maxX: -14, maxZ: 16, minX: -34, minZ: -10 }, id: 'blocks', label: 'つみきひろば' },
     { bounds: { maxX: 12, maxZ: 34, minX: -12, minZ: 14 }, id: 'south', label: 'じゆうそうこう' },
   ],
+  landmarks: {
+    blockPlaza: {
+      position: [-24, 0.18, 6],
+      scale: [14, 0.34, 16],
+    },
+    breakableBlocks: [
+      { color: '#ef4444', id: 'plaza-red', position: [-26.7, 0.75, 9.5] },
+      { color: '#facc15', id: 'plaza-yellow', position: [-21.5, 0.75, 0] },
+      { color: '#3b82f6', id: 'plaza-blue', position: [-21.3, 0.75, 4.6] },
+      { color: '#65a30d', id: 'plaza-green', position: [-26.7, 0.75, 2.5] },
+    ],
+    fire: [26, 1.2, -18],
+    fireSprayTarget: [26.9, 1.45, -16.1],
+    garage: [0, 0.8, 6],
+    park: [0, 0, -24],
+  },
   roads: [
     { connects: ['blocks', 'hub', 'fire'], id: 'road-hub-east-west', position: [0, 0.08, 0], scale: [68, 0.18, 5] },
     { connects: ['park', 'hub', 'south'], id: 'road-hub-north-south', position: [0, 0.08, 0], scale: [5, 0.18, 68] },
@@ -103,10 +144,13 @@ export const PRODUCTION_WORLD_MAP = {
   ],
 } as const satisfies ProductionWorldMapDefinition;
 
-/** world座標を地区、道路、またはworld外として解決する。 */
-export function resolveWorldDistrict(position: WorldPoint): ResolvedWorldDistrictId {
+/** 指定map内のworld座標を地区、道路、またはworld外として解決する。 */
+function resolveWorldDistrictInMap(
+  map: Pick<ProductionWorldMapDefinition, 'bounds' | 'districts'>,
+  position: WorldPoint,
+): ResolvedWorldDistrictId {
   const [x, , z] = position;
-  const { bounds, districts } = PRODUCTION_WORLD_MAP;
+  const { bounds, districts } = map;
   if (!position.every(Number.isFinite)
     || x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) {
     return 'outside';
@@ -121,15 +165,74 @@ export function resolveWorldDistrict(position: WorldPoint): ResolvedWorldDistric
   return 'road';
 }
 
-/** map内のID重複、数値、world境界違反を定義順で検証する。 */
+/** 本番map内のworld座標を地区、道路、またはworld外として解決する。 */
+export function resolveWorldDistrict(position: WorldPoint): ResolvedWorldDistrictId {
+  return resolveWorldDistrictInMap(PRODUCTION_WORLD_MAP, position);
+}
+
+/** X-Z境界の4成分がすべて有限かを判定する。 */
+function isFiniteBounds(bounds: WorldBounds2D): boolean {
+  return [bounds.maxX, bounds.maxZ, bounds.minX, bounds.minZ].every(Number.isFinite);
+}
+
+/** X-Z境界の最小値が最大値を下回る有効な範囲かを判定する。 */
+function isOrderedBounds(bounds: WorldBounds2D): boolean {
+  return bounds.minX < bounds.maxX && bounds.minZ < bounds.maxZ;
+}
+
+/** 内側のX-Z境界が外側のX-Z境界を越えないかを判定する。 */
+function isBoundsInsideBounds(inner: WorldBounds2D, outer: WorldBounds2D): boolean {
+  return inner.minX >= outer.minX && inner.maxX <= outer.maxX
+    && inner.minZ >= outer.minZ && inner.maxZ <= outer.maxZ;
+}
+
+/** 3次元座標のX-Z成分が指定境界内にあるかを判定する。 */
+function isPointInsideBounds(position: WorldPoint, bounds: WorldBounds2D): boolean {
+  return position[0] >= bounds.minX && position[0] <= bounds.maxX
+    && position[2] >= bounds.minZ && position[2] <= bounds.maxZ;
+}
+
+/** 軸揃えboxのX-Z外形が指定境界内に収まるかを判定する。 */
+function isBoxInsideBounds(
+  position: WorldPoint,
+  scale: WorldPoint,
+  bounds: WorldBounds2D,
+): boolean {
+  return position[0] - scale[0] / 2 >= bounds.minX
+    && position[0] + scale[0] / 2 <= bounds.maxX
+    && position[2] - scale[2] / 2 >= bounds.minZ
+    && position[2] + scale[2] / 2 <= bounds.maxZ;
+}
+
+/** map内のID、数値、world境界、代表地点の地区契約を定義順で検証する。 */
 export function validateProductionWorldMap(
   map: ProductionWorldMapDefinition,
 ): readonly string[] {
   const errors: string[] = [];
+  const worldBoundsAreFinite = isFiniteBounds(map.bounds);
+  const worldBoundsAreOrdered = worldBoundsAreFinite && isOrderedBounds(map.bounds);
+  if (!worldBoundsAreFinite) errors.push('non-finite world bounds');
+  else if (!worldBoundsAreOrdered) errors.push('invalid world bounds');
+
+  for (const district of map.districts) {
+    if (!isFiniteBounds(district.bounds)) {
+      errors.push(`non-finite district bounds: ${district.id}`);
+      continue;
+    }
+    if (!isOrderedBounds(district.bounds)) {
+      errors.push(`invalid district bounds: ${district.id}`);
+      continue;
+    }
+    if (worldBoundsAreOrdered && !isBoundsInsideBounds(district.bounds, map.bounds)) {
+      errors.push(`district outside world bounds: ${district.id}`);
+    }
+  }
+
   const ids = [
     ...map.districts.map(({ id }) => id),
     ...map.roads.map(({ id }) => id),
     ...map.visualBoxes.map(({ id }) => id),
+    ...map.landmarks.breakableBlocks.map(({ id }) => id),
   ];
   const seen = new Set<string>();
   for (const id of ids) {
@@ -141,14 +244,85 @@ export function validateProductionWorldMap(
     if (!box.scale.every((value) => Number.isFinite(value) && value > 0)) {
       errors.push(`invalid scale: ${box.id}`);
     }
-    if (
-      box.position[0] - box.scale[0] / 2 < map.bounds.minX
-      || box.position[0] + box.scale[0] / 2 > map.bounds.maxX
-      || box.position[2] - box.scale[2] / 2 < map.bounds.minZ
-      || box.position[2] + box.scale[2] / 2 > map.bounds.maxZ
-    ) {
+    if (box.rotation && !box.rotation.every(Number.isFinite)) {
+      errors.push(`non-finite rotation: ${box.id}`);
+    }
+    if (worldBoundsAreOrdered && !isBoxInsideBounds(box.position, box.scale, map.bounds)) {
       errors.push(`outside world bounds: ${box.id}`);
     }
   }
+
+  const landmarkPoints: readonly {
+    readonly name: string;
+    readonly position: WorldPoint;
+  }[] = [
+    { name: 'garage', position: map.landmarks.garage },
+    { name: 'park', position: map.landmarks.park },
+    { name: 'fire', position: map.landmarks.fire },
+    { name: 'fireSprayTarget', position: map.landmarks.fireSprayTarget },
+    { name: 'blockPlaza', position: map.landmarks.blockPlaza.position },
+    ...map.landmarks.breakableBlocks.map(({ id, position }) => ({
+      name: `breakableBlock:${id}`,
+      position,
+    })),
+  ];
+  for (const landmark of landmarkPoints) {
+    if (!landmark.position.every(Number.isFinite)) {
+      errors.push(`non-finite landmark: ${landmark.name}`);
+    } else if (worldBoundsAreOrdered && !isPointInsideBounds(landmark.position, map.bounds)) {
+      errors.push(`landmark outside world bounds: ${landmark.name}`);
+    }
+  }
+
+  const { blockPlaza } = map.landmarks;
+  const blockPlazaScaleIsValid = blockPlaza.scale.every(
+    (value) => Number.isFinite(value) && value > 0,
+  );
+  if (!blockPlazaScaleIsValid) {
+    errors.push('invalid landmark scale: blockPlaza');
+  } else if (
+    blockPlaza.position.every(Number.isFinite)
+    && worldBoundsAreOrdered
+    && !isBoxInsideBounds(blockPlaza.position, blockPlaza.scale, map.bounds)
+  ) {
+    errors.push('landmark outside world bounds: blockPlaza');
+  }
+
+  const breakableBlockHalfExtent = 0.75;
+  const plazaBounds = {
+    maxX: blockPlaza.position[0] + blockPlaza.scale[0] / 2,
+    maxZ: blockPlaza.position[2] + blockPlaza.scale[2] / 2,
+    minX: blockPlaza.position[0] - blockPlaza.scale[0] / 2,
+    minZ: blockPlaza.position[2] - blockPlaza.scale[2] / 2,
+  };
+  for (const block of map.landmarks.breakableBlocks) {
+    if (
+      block.position[0] - breakableBlockHalfExtent < plazaBounds.minX
+      || block.position[0] + breakableBlockHalfExtent > plazaBounds.maxX
+      || block.position[2] - breakableBlockHalfExtent < plazaBounds.minZ
+      || block.position[2] + breakableBlockHalfExtent > plazaBounds.maxZ
+    ) {
+      errors.push(`breakable outside block plaza: ${block.id}`);
+    }
+  }
+
+  const expectedDistricts: readonly {
+    readonly expected: WorldDistrictId;
+    readonly name: string;
+    readonly position: WorldPoint;
+  }[] = [
+    { expected: 'hub', name: 'garage', position: map.landmarks.garage },
+    { expected: 'park', name: 'park', position: map.landmarks.park },
+    { expected: 'fire', name: 'fire', position: map.landmarks.fire },
+    { expected: 'fire', name: 'fireSprayTarget', position: map.landmarks.fireSprayTarget },
+    { expected: 'blocks', name: 'blockPlaza', position: map.landmarks.blockPlaza.position },
+  ];
+  for (const landmark of expectedDistricts) {
+    const received = resolveWorldDistrictInMap(map, landmark.position);
+    if (received !== landmark.expected) {
+      errors.push(`landmark ${landmark.name} expected ${landmark.expected}, received ${received}`);
+    }
+  }
+
   return errors;
 }

@@ -11,7 +11,7 @@ export const WORLD_BOUNDS = PRODUCTION_WORLD_MAP.bounds;
 export const WORLD_DISTRICTS = PRODUCTION_WORLD_MAP.districts;
 
 /** 消防車庫前に置く消防車の初期位置。 */
-export const GARAGE_POSITION = [0, 0.8, 6] as const;
+export const GARAGE_POSITION = PRODUCTION_WORLD_MAP.landmarks.garage;
 
 /** 車庫へ戻ったとみなして次の仕事を再開するXZ半径。 */
 export const GARAGE_RESTART_RADIUS = 3;
@@ -34,24 +34,16 @@ export function resolveVehicleDistrict(
 }
 
 /** 火災建物の代表位置。 */
-export const FIRE_POSITION = [26, 1.2, -18] as const;
+export const FIRE_POSITION = PRODUCTION_WORLD_MAP.landmarks.fire;
 
 /** 消火判定と水流補正に使う、画面に見える炎の中心位置。 */
-export const FIRE_SPRAY_TARGET_POSITION = [26.9, 1.45, -16.1] as const;
+export const FIRE_SPRAY_TARGET_POSITION = PRODUCTION_WORLD_MAP.landmarks.fireSprayTarget;
 
 /** 中央公園の基準位置。 */
-export const PARK_CENTER = [0, 0, -24] as const;
+export const PARK_CENTER = PRODUCTION_WORLD_MAP.landmarks.park;
 
 /** 西側の積み木地区へ収める木製積み木広場の土台。 */
-export const BLOCK_PLAZA = {
-  position: [-24, 0.18, 6] as const,
-  scale: [14, 0.34, 16] as const,
-} as const;
+export const BLOCK_PLAZA = PRODUCTION_WORLD_MAP.landmarks.blockPlaza;
 
 /** 車体の回転外形を挟める間隔で並べた積み木広場の配置契約。 */
-export const BREAKABLE_BLOCKS = [
-  { color: '#ef4444', id: 'plaza-red', position: [-26.7, 0.75, 9.5] as const },
-  { color: '#facc15', id: 'plaza-yellow', position: [-21.5, 0.75, 0] as const },
-  { color: '#3b82f6', id: 'plaza-blue', position: [-21.3, 0.75, 4.6] as const },
-  { color: '#65a30d', id: 'plaza-green', position: [-26.7, 0.75, 2.5] as const },
-] as const;
+export const BREAKABLE_BLOCKS = PRODUCTION_WORLD_MAP.landmarks.breakableBlocks;

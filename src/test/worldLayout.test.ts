@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import {
   BLOCK_PLAZA,
   BREAKABLE_BLOCKS,
@@ -12,6 +13,28 @@ import {
 } from '../voxel-game/scene/worldLayout';
 
 describe('voxel world layout', () => {
+  it('全公開座標をproduction mapのlandmarksと同じ参照から導出する', () => {
+    const map = PRODUCTION_WORLD_MAP as typeof PRODUCTION_WORLD_MAP & {
+      readonly landmarks?: {
+        readonly blockPlaza: typeof BLOCK_PLAZA;
+        readonly breakableBlocks: typeof BREAKABLE_BLOCKS;
+        readonly fire: typeof FIRE_POSITION;
+        readonly fireSprayTarget: typeof FIRE_SPRAY_TARGET_POSITION;
+        readonly garage: typeof GARAGE_POSITION;
+        readonly park: typeof PARK_CENTER;
+      };
+    };
+
+    expect(map.landmarks).toBeDefined();
+    if (!map.landmarks) return;
+    expect(GARAGE_POSITION).toBe(map.landmarks.garage);
+    expect(PARK_CENTER).toBe(map.landmarks.park);
+    expect(BLOCK_PLAZA).toBe(map.landmarks.blockPlaza);
+    expect(BREAKABLE_BLOCKS).toBe(map.landmarks.breakableBlocks);
+    expect(FIRE_POSITION).toBe(map.landmarks.fire);
+    expect(FIRE_SPRAY_TARGET_POSITION).toBe(map.landmarks.fireSprayTarget);
+  });
+
   it('72×72本番境界内へ中央ハブと既存遊びを置く', () => {
     expect(WORLD_BOUNDS).toEqual({ maxX: 36, maxZ: 36, minX: -36, minZ: -36 });
     expect(GARAGE_POSITION).toEqual([0, 0.8, 6]);

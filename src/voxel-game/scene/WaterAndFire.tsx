@@ -35,6 +35,12 @@ export interface VoxelBox {
   readonly scale: readonly [number, number, number];
 }
 
+/** 火災照準点から導出したhazardと3層の炎の相対配置。 */
+export interface FireAnchorLayout {
+  readonly hazardBox: VoxelBox;
+  readonly layerPositions: readonly (readonly [number, number, number])[];
+}
+
 interface StaticVoxelBatchProps {
   readonly boxes: readonly VoxelBox[];
   readonly color: string;
@@ -112,16 +118,45 @@ export const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map(([x, , z]) =
   scale: [0.62, 0.12, 0.62],
 }));
 
-export const FIRE_HAZARD_BOX: VoxelBox = {
-  position: [26.9, 0.9, -16.1],
-  scale: [1.2, 1.8, 1.2],
-};
+const FIRE_HAZARD_POSITION_OFFSET = [0, -0.55, 0] as const;
+const FIRE_LAYER_POSITION_OFFSETS = [
+  [0, -0.7, 0],
+  [0.05, 0.05, 0.08],
+  [0, 0.7, 0],
+] as const;
 
-export const FIRE_LAYER_POSITIONS: readonly (readonly [number, number, number])[] = [
-  [26.9, 0.75, -16.1],
-  [26.95, 1.5, -16.02],
-  [26.9, 2.15, -16.1],
-];
+/** map座標へ局所offsetを加え、authoring精度の小数へ正規化する。 */
+function addFirePositionOffset(
+  anchor: readonly [number, number, number],
+  offset: readonly [number, number, number],
+): readonly [number, number, number] {
+  return [
+    Number((anchor[0] + offset[0]).toFixed(6)),
+    Number((anchor[1] + offset[1]).toFixed(6)),
+    Number((anchor[2] + offset[2]).toFixed(6)),
+  ];
+}
+
+/** spray targetを唯一のanchorとしてhazardと炎3層のworld配置を導出する。 */
+export function createFireAnchorLayout(
+  sprayTarget: readonly [number, number, number],
+): FireAnchorLayout {
+  return {
+    hazardBox: {
+      position: addFirePositionOffset(sprayTarget, FIRE_HAZARD_POSITION_OFFSET),
+      scale: [1.2, 1.8, 1.2],
+    },
+    layerPositions: FIRE_LAYER_POSITION_OFFSETS.map((offset) => (
+      addFirePositionOffset(sprayTarget, offset)
+    )),
+  };
+}
+
+const FIRE_ANCHOR_LAYOUT = createFireAnchorLayout(FIRE_SPRAY_TARGET_POSITION);
+
+export const FIRE_HAZARD_BOX: VoxelBox = FIRE_ANCHOR_LAYOUT.hazardBox;
+
+export const FIRE_LAYER_POSITIONS = FIRE_ANCHOR_LAYOUT.layerPositions;
 
 export const FIRE_LAYER_BOXES: readonly VoxelBox[] = [
   { position: FIRE_LAYER_POSITIONS[0], scale: [1.15, 1.15, 1.15] },
