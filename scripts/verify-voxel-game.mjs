@@ -1062,11 +1062,29 @@ async function driveMissionToFire(page, touchDriver) {
   );
   let state = await readGameState(page);
   for (let attempt = 0; !state.mission.targeted && attempt < 12; attempt += 1) {
-    await pulseAlongWorldAxis(page, 'negativeX', 1, touchDriver);
+    const targetAxis = state.mission.nozzleOrigin[0] > target[0] ? 'negativeX' : 'positiveX';
+    await pulseAlongWorldAxis(page, targetAxis, 1, touchDriver);
     state = await readGameState(page);
   }
+  const targetDelta = [
+    target[0] - state.mission.nozzleOrigin[0],
+    target[2] - state.mission.nozzleOrigin[2],
+  ];
+  const targetHorizontalDistance = Math.hypot(...targetDelta);
+  const forwardHorizontalLength = Math.hypot(state.vehicle.forward[0], state.vehicle.forward[2]);
+  const targetHorizontalDot = (
+    state.vehicle.forward[0] / forwardHorizontalLength * targetDelta[0] / targetHorizontalDistance
+    + state.vehicle.forward[2] / forwardHorizontalLength * targetDelta[1] / targetHorizontalDistance
+  );
   assert(Number.isFinite(state.mission.distance) && state.mission.targeted,
-    `Fire route did not end targeted: ${JSON.stringify(state.mission)}`);
+    `Fire route did not end targeted: ${JSON.stringify({
+      mission: state.mission,
+      target,
+      targetHorizontalDistance,
+      targetHorizontalDot,
+      vehicle: state.vehicle,
+      worldBounds: state.world.bounds,
+    })}`);
   return state;
 }
 
@@ -1191,6 +1209,14 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     await waitForFrames(page, 2);
     await driveMissionToFire(page);
     const backwardRouteState = await readGameState(page);
+    const backwardRouteStartGeometry = getTargetGeometry(backwardRouteState);
+    const fireBuilding = requireWorldSolid(backwardRouteState, 'fire-building-body');
+    assert(backwardRouteState.mission.targeted && backwardRouteStartGeometry.dot >= 0.5,
+      `Backward route did not inherit a valid targeted fire arrival: ${JSON.stringify({
+        geometry: backwardRouteStartGeometry,
+        mission: backwardRouteState.mission,
+        vehicle: backwardRouteState.vehicle,
+      })}`);
     const backwardHorizontalSupport = Math.hypot(
       VEHICLE_COLLIDER_HALF_EXTENTS[0],
       VEHICLE_COLLIDER_HALF_EXTENTS[2],
@@ -1198,13 +1224,17 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     const backwardCoastReserve = 0.5;
     const backwardSafetyInset = backwardHorizontalSupport + backwardCoastReserve;
     const backwardHeadingReserve = 2 * backwardHorizontalSupport + backwardCoastReserve;
+    const fireBuildingEastX = fireBuilding.position[0] + fireBuilding.scale[0] / 2;
     /** 車体の保守的support半径を含むworld内側へwaypointを制限する。 */
     const clampToSafeWorld = (value, minimum, maximum) => (
       Math.max(minimum + backwardSafetyInset, Math.min(value, maximum - backwardSafetyInset))
     );
     const backwardWaypoint = {
       x: clampToSafeWorld(
-        targetPosition[0] + backwardHorizontalSupport,
+        Math.max(
+          targetPosition[0] + backwardHorizontalSupport,
+          fireBuildingEastX + backwardHorizontalSupport + backwardCoastReserve,
+        ),
         backwardRouteState.world.bounds.minX,
         backwardRouteState.world.bounds.maxX,
       ),
@@ -1225,50 +1255,260 @@ async function verifyForgivingSprayTargeting(browser, errors) {
         backwardWaypoint,
         worldBounds: backwardRouteState.world.bounds,
       })}`);
-    await alignWorldCoordinate(
-      page,
-      0,
-      backwardWaypoint.x,
-      'forgiving spray backward turn-in X',
-      0.2,
-    );
-    await alignWorldCoordinate(
-      page,
+    const backwardRouteResetCount = backwardRouteState.vehicle.resetCount;
+    const backwardSafetyMaximumX = backwardRouteState.world.bounds.maxX - backwardSafetyInset;
+    let backwardMaximumX = Number.NEGATIVE_INFINITY;
+    let backwardObservedFrameCount = 0;
+
+    /** 背面routeの各観測frameでreset・support込みbounds・最大Xを同時検査する。 */
+    const observeBackwardRouteState = (state, stage) => {
+      const colliderSupport = vehicleColliderSupport(state.vehicle);
+      const colliderInset = {
+        x: colliderSupport.x + backwardCoastReserve,
+        z: colliderSupport.z + backwardCoastReserve,
+      };
+      backwardMaximumX = Math.max(backwardMaximumX, state.vehicle.position[0]);
+      backwardObservedFrameCount += 1;
+      assert.equal(state.vehicle.resetCount, backwardRouteResetCount,
+        `${stage}: backward route reset unexpectedly: ${JSON.stringify(state.vehicle)}`);
+      assert(state.vehicle.position[0] >= state.world.bounds.minX + colliderInset.x
+        && state.vehicle.position[0] <= state.world.bounds.maxX - colliderInset.x
+        && state.vehicle.position[0] < backwardSafetyMaximumX
+        && state.vehicle.position[2] >= state.world.bounds.minZ + colliderInset.z
+        && state.vehicle.position[2] <= state.world.bounds.maxZ - colliderInset.z,
+      `${stage}: backward route left the support-safe world inset: ${JSON.stringify({
+        backwardSafetyInset,
+        colliderInset,
+        colliderSupport,
+        position: state.vehicle.position,
+        worldBounds: state.world.bounds,
+      })}`);
+      return state;
+    };
+
+    /** 1frameごとの入力・制動後に指定observerを通す。 */
+    const pulseBackwardRoute = async (
+      axis,
+      frameCount,
+      description,
+      observeState = observeBackwardRouteState,
+    ) => {
+      const input = WORLD_AXIS_INPUTS[axis];
+      assert(input, `${description}: unknown world axis ${axis}.`);
+      const heldKeys = new Set();
+      let latest = null;
+      try {
+        await syncKeyboardKeys(page, heldKeys, input.keys);
+        for (let frame = 0; frame < frameCount; frame += 1) {
+          await waitForFrames(page, 1);
+          latest = observeState(await readGameState(page), `${description}: input`);
+        }
+      } finally {
+        await releaseKeyboardKeys(page, heldKeys);
+      }
+      for (let frame = 0; frame < 150; frame += 1) {
+        await waitForFrames(page, 1);
+        latest = observeState(await readGameState(page), `${description}: brake`);
+        if (latest.vehicle.speed < 0.24) return latest;
+      }
+      throw new Error(`${description}: vehicle did not stop within 150 frames.`);
+    };
+
+    /** 背面route専用pulseでworld X/Zをwaypointへ整列する。 */
+    const alignBackwardCoordinate = async (
+      coordinateIndex,
+      targetValue,
+      description,
+      tolerance = 0.2,
+    ) => {
+      assert(coordinateIndex === 0 || coordinateIndex === 2,
+        `${description}: only X/Z can be aligned.`);
+      const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
+      const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
+      let latest = observeBackwardRouteState(await readGameState(page), `${description}: start`);
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        const delta = targetValue - latest.vehicle.position[coordinateIndex];
+        if (Math.abs(delta) <= tolerance) return latest;
+        const frameCount = Math.max(1, Math.min(7, Math.ceil(Math.abs(delta) * 1.5)));
+        latest = await pulseBackwardRoute(
+          delta > 0 ? positiveAxis : negativeAxis,
+          frameCount,
+          description,
+        );
+      }
+      throw new Error(`${description}: coordinate did not align: ${JSON.stringify({
+        actual: latest.vehicle.position[coordinateIndex],
+        colliderSupport: vehicleColliderSupport(latest.vehicle),
+        targetValue,
+        vehicle: latest.vehicle,
+      })}`);
+    };
+
+    observeBackwardRouteState(backwardRouteState, 'forgiving spray backward route start');
+    await alignBackwardCoordinate(
       2,
       backwardHeadingWaypointZ,
       'forgiving spray backward heading stage Z',
       0.2,
     );
-    const backwardHeadingResetCount = (await readGameState(page)).vehicle.resetCount;
-    let headingState = await readGameState(page);
+    await alignBackwardCoordinate(
+      0,
+      backwardWaypoint.x,
+      'forgiving spray backward turn-in X',
+      0.2,
+    );
+    let headingState = observeBackwardRouteState(
+      await readGameState(page),
+      'forgiving spray backward heading start',
+    );
     for (let attempt = 0; attempt < 36; attempt += 1) {
-      headingState = await readGameState(page);
       if (headingState.vehicle.forward[2] >= 0.8) break;
-      assert.equal(headingState.vehicle.resetCount, backwardHeadingResetCount,
-        `forgiving spray backward heading reset unexpectedly: ${JSON.stringify(headingState.vehicle)}`);
-      assert(headingState.vehicle.position[0] >= headingState.world.bounds.minX + backwardSafetyInset
-        && headingState.vehicle.position[0] <= headingState.world.bounds.maxX - backwardSafetyInset
-        && headingState.vehicle.position[2] >= headingState.world.bounds.minZ + backwardSafetyInset
-        && headingState.vehicle.position[2] <= headingState.world.bounds.maxZ - backwardSafetyInset,
-      `forgiving spray backward heading left the safe world inset: ${JSON.stringify({
-        position: headingState.vehicle.position,
-        worldBounds: headingState.world.bounds,
-      })}`);
-      await pulseAlongWorldAxis(page, 'positiveZ', 1);
+      headingState = await pulseBackwardRoute(
+        'positiveZ',
+        1,
+        'forgiving spray backward heading',
+      );
     }
     assert(headingState.vehicle.forward[2] >= 0.8,
       `forgiving spray backward heading did not converge south: ${JSON.stringify({
         forward: headingState.vehicle.forward,
         position: headingState.vehicle.position,
       })}`);
-    await alignWorldCoordinate(
-      page,
-      2,
-      backwardWaypoint.z,
-      'forgiving spray backward turn-in Z',
-      0.2,
+    const minimumCollisionClearance = -0.09;
+    const fireBuildingClearanceBeforeZ = collisionClearance(
+      headingState.vehicle,
+      fireBuilding,
+      'x',
+      1,
     );
-    const backwardEntry = await readGameState(page);
+    assert(fireBuildingClearanceBeforeZ >= minimumCollisionClearance,
+      `Backward route reached the fire building before final correction: ${JSON.stringify({
+        fireBuilding,
+        fireBuildingClearanceBeforeZ,
+        minimumCollisionClearance,
+        vehicle: headingState.vehicle,
+      })}`);
+    const maximumBackwardFinalApproachPulses = 96;
+    const maximumBackwardCorrectionPulses = 32;
+    const maximumBackwardCorrectionFrames = 320;
+    let backwardFinalApproachPulseCount = 0;
+    let backwardCorrectionPulseCount = 0;
+    let backwardCorrectionObservedFrameCount = 0;
+    let minimumFireBuildingClearance = Number.POSITIVE_INFINITY;
+
+    /** 最終Z区間の全frameで建物clearanceと共通route制約を検査する。 */
+    const observeBackwardFinalApproachState = (state, stage, isCorrection = false) => {
+      const latest = observeBackwardRouteState(state, stage);
+      const clearance = collisionClearance(latest.vehicle, fireBuilding, 'x', 1);
+      minimumFireBuildingClearance = Math.min(minimumFireBuildingClearance, clearance);
+      if (isCorrection) {
+        backwardCorrectionObservedFrameCount += 1;
+        assert(backwardCorrectionObservedFrameCount <= maximumBackwardCorrectionFrames,
+          `${stage}: backward correction exceeded its frame limit: ${JSON.stringify({
+            backwardCorrectionObservedFrameCount,
+            maximumBackwardCorrectionFrames,
+          })}`);
+      }
+      assert(clearance >= minimumCollisionClearance,
+        `${stage}: backward final approach penetrated the fire building: ${JSON.stringify({
+          clearance,
+          fireBuilding,
+          minimumCollisionClearance,
+          vehicle: latest.vehicle,
+        })}`);
+      return latest;
+    };
+
+    /** 建物側へ寄ったときだけboundedな+X pulseで必要clearanceを回復する。 */
+    const recoverBackwardFireBuildingClearance = async (initialState) => {
+      let latest = initialState;
+      while (collisionClearance(latest.vehicle, fireBuilding, 'x', 1) < backwardCoastReserve) {
+        assert(backwardCorrectionPulseCount < maximumBackwardCorrectionPulses,
+          `Backward fire-building correction did not converge within its pulse limit: ${JSON.stringify({
+            backwardCoastReserve,
+            backwardCorrectionObservedFrameCount,
+            backwardCorrectionPulseCount,
+            clearance: collisionClearance(latest.vehicle, fireBuilding, 'x', 1),
+            maximumBackwardCorrectionFrames,
+            maximumBackwardCorrectionPulses,
+            vehicle: latest.vehicle,
+          })}`);
+        backwardCorrectionPulseCount += 1;
+        latest = await pulseBackwardRoute(
+          'positiveX',
+          1,
+          'forgiving spray backward fire-building correction',
+          (state, stage) => observeBackwardFinalApproachState(state, stage, true),
+        );
+      }
+      return latest;
+    };
+
+    let backwardFinalState = observeBackwardFinalApproachState(
+      headingState,
+      'forgiving spray backward final approach start',
+    );
+    while (true) {
+      backwardFinalState = await recoverBackwardFireBuildingClearance(backwardFinalState);
+      const remainingZ = backwardWaypoint.z - backwardFinalState.vehicle.position[2];
+      if (Math.abs(remainingZ) <= 0.2) break;
+      assert(remainingZ > 0,
+        `Backward final approach overshot its +Z waypoint: ${JSON.stringify({
+          backwardFinalApproachPulseCount,
+          backwardWaypoint,
+          remainingZ,
+          vehicle: backwardFinalState.vehicle,
+        })}`);
+      assert(backwardFinalApproachPulseCount < maximumBackwardFinalApproachPulses,
+        `Backward final +Z approach did not converge within its pulse limit: ${JSON.stringify({
+          backwardCorrectionObservedFrameCount,
+          backwardCorrectionPulseCount,
+          backwardFinalApproachPulseCount,
+          backwardWaypoint,
+          clearance: collisionClearance(backwardFinalState.vehicle, fireBuilding, 'x', 1),
+          maximumBackwardFinalApproachPulses,
+          minimumFireBuildingClearance,
+          vehicle: backwardFinalState.vehicle,
+        })}`);
+      backwardFinalApproachPulseCount += 1;
+      backwardFinalState = await pulseBackwardRoute(
+        'positiveZ',
+        1,
+        'forgiving spray backward final +Z approach',
+        observeBackwardFinalApproachState,
+      );
+    }
+    const finalBackwardZError = Math.abs(
+      backwardWaypoint.z - backwardFinalState.vehicle.position[2],
+    );
+    const finalFireBuildingClearance = collisionClearance(
+      backwardFinalState.vehicle,
+      fireBuilding,
+      'x',
+      1,
+    );
+    assert(finalBackwardZError <= 0.2,
+      `Backward final +Z approach did not converge: ${JSON.stringify({
+        backwardCorrectionObservedFrameCount,
+        backwardCorrectionPulseCount,
+        backwardFinalApproachPulseCount,
+        backwardWaypoint,
+        finalBackwardZError,
+        minimumFireBuildingClearance,
+        vehicle: backwardFinalState.vehicle,
+      })}`);
+    assert(finalFireBuildingClearance >= backwardCoastReserve,
+      `Backward final approach ended without the required fire-building clearance: ${JSON.stringify({
+        backwardCoastReserve,
+        backwardCorrectionObservedFrameCount,
+        backwardCorrectionPulseCount,
+        finalFireBuildingClearance,
+        vehicle: backwardFinalState.vehicle,
+      })}`);
+    const backwardEntry = observeBackwardRouteState(
+      await readGameState(page),
+      'forgiving spray backward entry',
+    );
     const backwardEntryGeometry = getTargetGeometry(backwardEntry);
     assert.equal(backwardEntry.vehicle.resetCount, initial.vehicle.resetCount + 1,
       `Backward route did not start after exactly one explicit reset: ${JSON.stringify(backwardEntry.vehicle)}`);
@@ -1289,7 +1529,17 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       speed: backwardEntry.vehicle.speed,
       worldBounds: backwardEntry.world.bounds,
     })}`);
-    const backwardMaximumX = backwardEntry.vehicle.position[0];
+    assert(backwardMaximumX >= backwardRouteState.vehicle.position[0],
+      `Backward maximum X omitted route frames: ${JSON.stringify({
+        backwardMaximumX,
+        backwardRouteStartX: backwardRouteState.vehicle.position[0],
+      })}`);
+    assert(backwardMaximumX < backwardSafetyMaximumX,
+      `Backward maximum X reached the safety limit: ${JSON.stringify({
+        backwardMaximumX,
+        backwardObservedFrameCount,
+        backwardSafetyMaximumX,
+      })}`);
     const behind = backwardEntry;
     const { dot: behindDot, horizontalDistance: behindHorizontalDistance } = getTargetGeometry(behind);
     assert(Number.isFinite(behindDot) && behindHorizontalDistance <= 7 && behindDot < 0,
@@ -1338,7 +1588,11 @@ async function verifyForgivingSprayTargeting(browser, errors) {
         speed: backwardEntry.vehicle.speed,
       },
       backwardMaximumX,
-      backwardSafetyMaximumX: backwardRouteState.world.bounds.maxX - backwardSafetyInset,
+      backwardObservedFrameCount,
+      backwardRouteResetCount,
+      backwardRouteStartDot: backwardRouteStartGeometry.dot,
+      backwardRouteStartTargeted: backwardRouteState.mission.targeted,
+      backwardSafetyMaximumX,
       backwardTargeted: behind.mission.targeted,
       behindDot,
       behindHorizontalDistance,
@@ -1346,6 +1600,13 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       backwardHeadingWaypointZ,
       backwardHeadingReserve,
       backwardCoastReserve,
+      backwardCorrectionObservedFrameCount,
+      backwardCorrectionPulseCount,
+      backwardFinalApproachPulseCount,
+      finalBackwardZError,
+      finalFireBuildingClearance,
+      fireBuildingClearanceBeforeZ,
+      minimumFireBuildingClearance,
       dot: stagedGeometry.dot,
       endpointError,
       fireIntensityAfterForwardSpray: partiallyExtinguished.runtime.fireIntensity,
