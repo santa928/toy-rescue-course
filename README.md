@@ -73,7 +73,7 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは20 files / 174 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは20 files / 207 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -84,4 +84,4 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む33枚の代表画像は `output/voxel-game/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。2026-07-31の物理GPU再認証では、`ANGLE Metal Renderer: Apple M4`でDesktop 1280×720が平均60.1961fps、tablet landscape 1024×768が平均60.0702fps、mobile landscape 844×390が平均60.0678fpsとなり、各目標を満たしました。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む33枚の代表画像は `output/voxel-game/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。2026-07-31の過去計測（HEAD `535a5e0`）では、`ANGLE Metal Renderer: Apple M4`でDesktop 1280×720が平均60.1961fps、tablet landscape 1024×768が平均60.0702fps、mobile landscape 844×390が平均60.0678fpsとなり、各目標を満たしました。現HEADでは物理GPUをfresh再認証していないため、この値をcurrent性能認証とは扱いません。
