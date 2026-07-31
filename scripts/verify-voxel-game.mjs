@@ -657,9 +657,10 @@ function buildVerifiedScenarioArrival(
 
 /** 本番mapの初期world契約とhub→park→hub→south→hubの実入力移動を検証する。 */
 async function verifyProductionMap(browser, errors) {
+  const viewport = { hasTouch: false, height: 720, name: 'production-map', width: 1_280 };
   const { context, page } = await openViewportPage(
     browser,
-    { hasTouch: false, height: 720, name: 'production-map', width: 1_280 },
+    viewport,
     errors,
   );
   try {
@@ -670,6 +671,8 @@ async function verifyProductionMap(browser, errors) {
     assert.equal(initial.world.currentDistrict, 'hub');
     assert.equal(initial.world.destinationDistrict, 'fire');
     assert.equal(initial.visualLayout.worldSolids.length, 12);
+    const southSignPost = requireWorldSolid(initial, 'south-sign-post-west');
+    const southCaptureTargetZ = southSignPost.position[2] - 2;
     const initialResetCount = initial.vehicle.resetCount;
     const hubCaptureState = await driveAlongWorldAxis(
       page,
@@ -751,20 +754,51 @@ async function verifyProductionMap(browser, errors) {
       'production-map south capture center X',
       0.35,
     );
-    const southCaptureState = await driveAlongWorldAxis(
+    await driveAlongWorldAxis(
       page,
       'positiveZ',
-      (state) => state.vehicle.position[2] >= 22,
+      (state) => state.vehicle.position[2] >= southCaptureTargetZ,
       'production-map south sign staging',
     );
+    await waitForFrames(page, 3);
+    const southCaptureState = await readGameState(page);
     assert.equal(southCaptureState.vehicle.resetCount, initialResetCount,
       'production-map south capture reset the vehicle.');
     assert.equal(southCaptureState.world.currentDistrict, 'south',
       `production-map south capture left south: ${JSON.stringify(southCaptureState.world)}`);
-    assert(southCaptureState.vehicle.position[2] >= 22,
+    assert(southCaptureState.vehicle.position[2] >= southCaptureTargetZ,
       `production-map south capture stopped before the signs: ${JSON.stringify(
-        southCaptureState.vehicle,
+        { sign: southSignPost, targetZ: southCaptureTargetZ, vehicle: southCaptureState.vehicle },
       )}`);
+    const southCaptureLayout = await measureLayout(page, viewport);
+    const southSignScreenPosition = projectWorldPoint(
+      southCaptureState.camera,
+      southSignPost.position,
+    );
+    const [southSignScreenX, southSignScreenY] = southSignScreenPosition;
+    const screenSafetyMargin = 24;
+    assert(
+      southSignScreenX >= southCaptureLayout.canvas.left + screenSafetyMargin
+        && southSignScreenX <= southCaptureLayout.canvas.right - screenSafetyMargin
+        && southSignScreenY >= southCaptureLayout.canvas.top + screenSafetyMargin
+        && southSignScreenY <= southCaptureLayout.canvas.bottom - screenSafetyMargin,
+      `production-map south sign is outside the canvas safe area: ${JSON.stringify({
+        screenPosition: southSignScreenPosition,
+        sign: southSignPost,
+      })}`,
+    );
+    const overlappingHudControl = Object.entries(southCaptureLayout.controls).find(
+      ([, box]) => southSignScreenX >= box.left - screenSafetyMargin
+        && southSignScreenX <= box.right + screenSafetyMargin
+        && southSignScreenY >= box.top - screenSafetyMargin
+        && southSignScreenY <= box.bottom + screenSafetyMargin,
+    );
+    assert.equal(overlappingHudControl, undefined,
+      `production-map south sign overlaps a HUD safe area: ${JSON.stringify({
+        control: overlappingHudControl,
+        screenPosition: southSignScreenPosition,
+        sign: southSignPost,
+      })}`);
     const southMissionLabel = await captureStableMissionScreenshot(
       page,
       `${outputDirectory}/desktop-production-south.png`,
@@ -809,6 +843,12 @@ async function verifyProductionMap(browser, errors) {
       journeys,
       southCapture: {
         missionLabel: southMissionLabel,
+        signPost: {
+          id: southSignPost.id,
+          position: southSignPost.position,
+          screenPosition: southSignScreenPosition,
+          targetVehicleZ: southCaptureTargetZ,
+        },
         vehicle: southCaptureState.vehicle,
         world: southCaptureState.world,
       },
