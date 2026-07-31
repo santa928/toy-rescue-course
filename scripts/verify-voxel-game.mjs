@@ -1060,32 +1060,155 @@ async function driveMissionToFire(page, touchDriver) {
     0.35,
     touchDriver,
   );
-  let state = await readGameState(page);
-  for (let attempt = 0; !state.mission.targeted && attempt < 12; attempt += 1) {
-    const targetAxis = state.mission.nozzleOrigin[0] > target[0] ? 'negativeX' : 'positiveX';
-    await pulseAlongWorldAxis(page, targetAxis, 1, touchDriver);
-    state = await readGameState(page);
-  }
-  const targetDelta = [
-    target[0] - state.mission.nozzleOrigin[0],
-    target[2] - state.mission.nozzleOrigin[2],
-  ];
-  const targetHorizontalDistance = Math.hypot(...targetDelta);
-  const forwardHorizontalLength = Math.hypot(state.vehicle.forward[0], state.vehicle.forward[2]);
-  const targetHorizontalDot = (
-    state.vehicle.forward[0] / forwardHorizontalLength * targetDelta[0] / targetHorizontalDistance
-    + state.vehicle.forward[2] / forwardHorizontalLength * targetDelta[1] / targetHorizontalDistance
+  const maximumTargetAcquisitionAttempts = 12;
+  const maximumTargetAcquisitionBrakeFrames = 150;
+  const targetAcquisitionResetCount = initial.vehicle.resetCount;
+  let targetAcquisitionAttemptCount = 0;
+  let targetAcquisitionInputFrameCount = 0;
+  let targetAcquisitionBrakeFrameCount = 0;
+  let targetAcquisitionObservedFrameCount = 0;
+  let targetAcquisitionTargetedObservationCount = 0;
+  let targetAcquisitionCorrectionPulseCount = 0;
+  let targetAcquisitionFirstTargetedDot = null;
+  let targetedObservedBeforeStop = false;
+
+  /** fire targetへの水平距離と車両forwardとのdotを返す。 */
+  const getFireTargetGeometry = (candidate) => {
+    const targetDelta = [
+      target[0] - candidate.mission.nozzleOrigin[0],
+      target[2] - candidate.mission.nozzleOrigin[2],
+    ];
+    const horizontalDistance = Math.hypot(...targetDelta);
+    const forwardLength = Math.hypot(candidate.vehicle.forward[0], candidate.vehicle.forward[2]);
+    return {
+      dot: horizontalDistance > 0 && forwardLength > 0
+        ? (
+          candidate.vehicle.forward[0] / forwardLength
+            * targetDelta[0] / horizontalDistance
+          + candidate.vehicle.forward[2] / forwardLength
+            * targetDelta[1] / horizontalDistance
+        )
+        : Number.NaN,
+      horizontalDistance,
+    };
+  };
+
+  /** target最終調整の各snapshotでreset・world bounds・targetedを検査する。 */
+  const observeTargetAcquisitionState = (candidate, stage) => {
+    const colliderSupport = vehicleColliderSupport(candidate.vehicle);
+    targetAcquisitionObservedFrameCount += 1;
+    assert.equal(candidate.vehicle.resetCount, targetAcquisitionResetCount,
+      `${stage}: fire target acquisition reset unexpectedly: ${JSON.stringify(candidate.vehicle)}`);
+    assert(candidate.vehicle.position[0] >= candidate.world.bounds.minX + colliderSupport.x
+      && candidate.vehicle.position[0] <= candidate.world.bounds.maxX - colliderSupport.x
+      && candidate.vehicle.position[2] >= candidate.world.bounds.minZ + colliderSupport.z
+      && candidate.vehicle.position[2] <= candidate.world.bounds.maxZ - colliderSupport.z,
+    `${stage}: fire target acquisition left the support-safe world bounds: ${JSON.stringify({
+      colliderSupport,
+      position: candidate.vehicle.position,
+      worldBounds: candidate.world.bounds,
+    })}`);
+    if (candidate.mission.targeted) {
+      targetAcquisitionTargetedObservationCount += 1;
+      if (targetAcquisitionFirstTargetedDot === null) {
+        targetAcquisitionFirstTargetedDot = getFireTargetGeometry(candidate).dot;
+      }
+      targetedObservedBeforeStop = true;
+    }
+    return candidate;
+  };
+
+  /** 1frame入力と停止までの全brake frameをtarget observerへ通す。 */
+  const pulseTargetAcquisition = async (axis, description) => {
+    const input = WORLD_AXIS_INPUTS[axis];
+    assert(input, `${description}: unknown world axis ${axis}.`);
+    const heldKeys = new Set();
+    let latest = null;
+    try {
+      if (touchDriver) await touchDriver.setStick(...input.stick);
+      else await syncKeyboardKeys(page, heldKeys, input.keys);
+      await waitForFrames(page, 1);
+      targetAcquisitionInputFrameCount += 1;
+      latest = observeTargetAcquisitionState(
+        await readGameState(page),
+        `${description}: input`,
+      );
+    } finally {
+      await touchDriver?.releaseStick();
+      await releaseKeyboardKeys(page, heldKeys);
+    }
+    for (let frame = 0; frame < maximumTargetAcquisitionBrakeFrames; frame += 1) {
+      await waitForFrames(page, 1);
+      targetAcquisitionBrakeFrameCount += 1;
+      latest = observeTargetAcquisitionState(
+        await readGameState(page),
+        `${description}: brake`,
+      );
+      if (latest.vehicle.speed < 0.24) return latest;
+    }
+    throw new Error(`${description}: vehicle did not stop within the target acquisition frame limit: ${JSON.stringify({
+      latestVehicle: latest?.vehicle,
+      maximumTargetAcquisitionBrakeFrames,
+      targetAcquisitionAttemptCount,
+      targetAcquisitionBrakeFrameCount,
+      targetAcquisitionInputFrameCount,
+      targetAcquisitionObservedFrameCount,
+    })}`);
+  };
+
+  let state = observeTargetAcquisitionState(
+    await readGameState(page),
+    'fire route target acquisition start',
   );
-  assert(Number.isFinite(state.mission.distance) && state.mission.targeted,
-    `Fire route did not end targeted: ${JSON.stringify({
+  while (!state.mission.targeted
+    && targetAcquisitionAttemptCount < maximumTargetAcquisitionAttempts) {
+    if (targetedObservedBeforeStop) targetAcquisitionCorrectionPulseCount += 1;
+    const targetAxis = state.mission.nozzleOrigin[0] > target[0] ? 'negativeX' : 'positiveX';
+    targetAcquisitionAttemptCount += 1;
+    state = await pulseTargetAcquisition(
+      targetAxis,
+      'fire route target acquisition',
+    );
+  }
+  const targetGeometry = getFireTargetGeometry(state);
+  if (!Number.isFinite(state.mission.distance)
+    || !state.mission.targeted
+    || !Number.isFinite(targetAcquisitionFirstTargetedDot)
+    || targetAcquisitionFirstTargetedDot < 0.5
+    || !Number.isFinite(targetGeometry.dot)
+    || targetGeometry.dot < 0.5) {
+    throw new Error(`Fire route target acquisition did not converge: ${JSON.stringify({
+      maximumTargetAcquisitionAttempts,
       mission: state.mission,
       target,
-      targetHorizontalDistance,
-      targetHorizontalDot,
+      targetAcquisitionAttemptCount,
+      targetAcquisitionBrakeFrameCount,
+      targetAcquisitionCorrectionPulseCount,
+      targetAcquisitionFirstTargetedDot,
+      targetAcquisitionInputFrameCount,
+      targetAcquisitionObservedFrameCount,
+      targetAcquisitionTargetedObservationCount,
+      targetHorizontalDistance: targetGeometry.horizontalDistance,
+      targetHorizontalDot: targetGeometry.dot,
       vehicle: state.vehicle,
       worldBounds: state.world.bounds,
     })}`);
-  return state;
+  }
+  return {
+    ...state,
+    driveMissionTargetAcquisition: {
+      targetAcquisitionAttemptCount,
+      targetAcquisitionBrakeFrameCount,
+      targetAcquisitionCorrectionPulseCount,
+      targetAcquisitionFirstTargetedDot,
+      targetAcquisitionInputFrameCount,
+      targetAcquisitionObservedFrameCount,
+      targetAcquisitionTargetedObservationCount,
+      targetHorizontalDistance: targetGeometry.horizontalDistance,
+      targetHorizontalDot: targetGeometry.dot,
+      targeted: state.mission.targeted,
+    },
+  };
 }
 
 /** 照準済み放水が実際に開始するまで有界待機し、失敗時は入力・照準境界を診断する。 */
@@ -1207,8 +1330,7 @@ async function verifyForgivingSprayTargeting(browser, errors) {
 
     await page.evaluate(() => window.reset_voxel_game_vehicle?.());
     await waitForFrames(page, 2);
-    await driveMissionToFire(page);
-    const backwardRouteState = await readGameState(page);
+    const backwardRouteState = await driveMissionToFire(page);
     const backwardRouteStartGeometry = getTargetGeometry(backwardRouteState);
     const fireBuilding = requireWorldSolid(backwardRouteState, 'fire-building-body');
     assert(backwardRouteState.mission.targeted && backwardRouteStartGeometry.dot >= 0.5,
@@ -1392,6 +1514,7 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     const maximumBackwardCorrectionPulses = 32;
     const maximumBackwardCorrectionFrames = 320;
     let backwardFinalApproachPulseCount = 0;
+    let backwardFinalOvershootRecoveryPulseCount = 0;
     let backwardCorrectionPulseCount = 0;
     let backwardCorrectionObservedFrameCount = 0;
     let minimumFireBuildingClearance = Number.POSITIVE_INFINITY;
@@ -1452,29 +1575,25 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       backwardFinalState = await recoverBackwardFireBuildingClearance(backwardFinalState);
       const remainingZ = backwardWaypoint.z - backwardFinalState.vehicle.position[2];
       if (Math.abs(remainingZ) <= 0.2) break;
-      assert(remainingZ > 0,
-        `Backward final approach overshot its +Z waypoint: ${JSON.stringify({
-          backwardFinalApproachPulseCount,
-          backwardWaypoint,
-          remainingZ,
-          vehicle: backwardFinalState.vehicle,
-        })}`);
       assert(backwardFinalApproachPulseCount < maximumBackwardFinalApproachPulses,
-        `Backward final +Z approach did not converge within its pulse limit: ${JSON.stringify({
+        `Backward final Z approach did not converge within its pulse limit: ${JSON.stringify({
           backwardCorrectionObservedFrameCount,
           backwardCorrectionPulseCount,
           backwardFinalApproachPulseCount,
+          backwardFinalOvershootRecoveryPulseCount,
           backwardWaypoint,
           clearance: collisionClearance(backwardFinalState.vehicle, fireBuilding, 'x', 1),
           maximumBackwardFinalApproachPulses,
           minimumFireBuildingClearance,
           vehicle: backwardFinalState.vehicle,
         })}`);
+      const finalApproachAxis = remainingZ > 0 ? 'positiveZ' : 'negativeZ';
+      if (finalApproachAxis === 'negativeZ') backwardFinalOvershootRecoveryPulseCount += 1;
       backwardFinalApproachPulseCount += 1;
       backwardFinalState = await pulseBackwardRoute(
-        'positiveZ',
+        finalApproachAxis,
         1,
-        'forgiving spray backward final +Z approach',
+        `forgiving spray backward final ${finalApproachAxis} approach`,
         observeBackwardFinalApproachState,
       );
     }
@@ -1488,10 +1607,11 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       1,
     );
     assert(finalBackwardZError <= 0.2,
-      `Backward final +Z approach did not converge: ${JSON.stringify({
+      `Backward final Z approach did not converge: ${JSON.stringify({
         backwardCorrectionObservedFrameCount,
         backwardCorrectionPulseCount,
         backwardFinalApproachPulseCount,
+        backwardFinalOvershootRecoveryPulseCount,
         backwardWaypoint,
         finalBackwardZError,
         minimumFireBuildingClearance,
@@ -1603,10 +1723,12 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       backwardCorrectionObservedFrameCount,
       backwardCorrectionPulseCount,
       backwardFinalApproachPulseCount,
+      backwardFinalOvershootRecoveryPulseCount,
       finalBackwardZError,
       finalFireBuildingClearance,
       fireBuildingClearanceBeforeZ,
       minimumFireBuildingClearance,
+      driveMissionTargetAcquisition: backwardRouteState.driveMissionTargetAcquisition,
       dot: stagedGeometry.dot,
       endpointError,
       fireIntensityAfterForwardSpray: partiallyExtinguished.runtime.fireIntensity,
