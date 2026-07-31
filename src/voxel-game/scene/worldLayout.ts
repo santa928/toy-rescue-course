@@ -39,6 +39,13 @@ export const FIRE_POSITION = PRODUCTION_WORLD_MAP.landmarks.fire;
 /** 消火判定と水流補正に使う、画面に見える炎の中心位置。 */
 export const FIRE_SPRAY_TARGET_POSITION = PRODUCTION_WORLD_MAP.landmarks.fireSprayTarget;
 
+/** 中央車庫から火災地区へ導く非solid道しるべのworld座標。 */
+export const FIRE_ROUTE_MARKER_POSITIONS = PRODUCTION_WORLD_MAP.landmarks.fireRouteMarkers;
+
+/** 消火成功時に火災現場上空へ置く星中心のworld座標。 */
+export const CELEBRATION_STAR_CENTER_POSITIONS =
+  PRODUCTION_WORLD_MAP.landmarks.celebrationStarCenters;
+
 /** 中央公園の基準位置。 */
 export const PARK_CENTER = PRODUCTION_WORLD_MAP.landmarks.park;
 

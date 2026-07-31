@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import * as ProductionWorldMapModule from '../voxel-game/scene/productionWorldMap';
 import {
   PRODUCTION_WORLD_MAP,
   resolveWorldDistrict,
+  type ProductionWorldMapDefinition,
   validateProductionWorldMap,
 } from '../voxel-game/scene/productionWorldMap';
 
@@ -16,7 +18,29 @@ const EXPECTED_LANDMARKS = {
     { color: '#3b82f6', id: 'plaza-blue', position: [-21.3, 0.75, 4.6] as const },
     { color: '#65a30d', id: 'plaza-green', position: [-26.7, 0.75, 2.5] as const },
   ],
+  celebrationStarCenters: [
+    [24.8, 1, -11] as const,
+    [22.5, 1.2, -11.4] as const,
+    [31, 1, -11.8] as const,
+    [24, 1.8, -12.2] as const,
+    [31.25, 3, -15] as const,
+    [28.8, 1.7, -13] as const,
+  ],
   fire: [26, 1.2, -18] as const,
+  fireRouteMarkers: [
+    [0, 0.26, 3] as const,
+    [0, 0.26, 0] as const,
+    [4, 0.26, 0] as const,
+    [8, 0.26, 0] as const,
+    [12, 0.26, 0] as const,
+    [16, 0.26, 0] as const,
+    [20, 0.26, 0] as const,
+    [24, 0.26, 0] as const,
+    [28, 0.26, 0] as const,
+    [30, 0.26, -4] as const,
+    [30, 0.26, -8] as const,
+    [28, 0.26, -13] as const,
+  ],
   fireSprayTarget: [26.9, 1.45, -16.1] as const,
   garage: [0, 0.8, 6] as const,
   park: [0, 0, -24] as const,
@@ -28,6 +52,28 @@ const MAP_WITH_LANDMARK_FIXTURE = {
 } as const;
 
 describe('PRODUCTION_WORLD_MAP', () => {
+  it('canonical mapをmodule初期化guardへ接続し、不正定義を明確なErrorで拒否する', () => {
+    type ProductionWorldMapStartupGuard = <MapDefinition extends ProductionWorldMapDefinition>(
+      map: MapDefinition,
+    ) => MapDefinition;
+    const requireValidMap = (
+      ProductionWorldMapModule as typeof ProductionWorldMapModule & {
+        readonly requireValidProductionWorldMap?: ProductionWorldMapStartupGuard;
+      }
+    ).requireValidProductionWorldMap;
+    const invalidMap = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      bounds: { maxX: -36, maxZ: 36, minX: 36, minZ: -36 },
+    } as const;
+
+    expect(requireValidMap).toBeTypeOf('function');
+    if (!requireValidMap) return;
+    expect(requireValidMap(PRODUCTION_WORLD_MAP)).toBe(PRODUCTION_WORLD_MAP);
+    expect(() => requireValidMap(invalidMap)).toThrowError(
+      'Invalid production world map:\n- invalid world bounds',
+    );
+  });
+
   it('72×72の境界と中央ハブ＋4地区を公開する', () => {
     expect(PRODUCTION_WORLD_MAP.bounds).toEqual({
       maxX: 36, maxZ: 36, minX: -36, minZ: -36,
@@ -202,6 +248,60 @@ describe('PRODUCTION_WORLD_MAP', () => {
         },
       },
       'landmark outside world bounds: breakableBlock:plaza-red',
+    ],
+    [
+      '非有限fire route marker',
+      {
+        ...MAP_WITH_LANDMARK_FIXTURE,
+        landmarks: {
+          ...EXPECTED_LANDMARKS,
+          fireRouteMarkers: EXPECTED_LANDMARKS.fireRouteMarkers.map((position, index) => (
+            index === 0 ? [0, Number.NaN, 3] as const : position
+          )),
+        },
+      },
+      'non-finite landmark: fireRouteMarker:0',
+    ],
+    [
+      'world外fire route marker',
+      {
+        ...MAP_WITH_LANDMARK_FIXTURE,
+        landmarks: {
+          ...EXPECTED_LANDMARKS,
+          fireRouteMarkers: EXPECTED_LANDMARKS.fireRouteMarkers.map((position, index) => (
+            index === 0 ? [40, 0.26, 3] as const : position
+          )),
+        },
+      },
+      'landmark outside world bounds: fireRouteMarker:0',
+    ],
+    [
+      '非有限celebration star center',
+      {
+        ...MAP_WITH_LANDMARK_FIXTURE,
+        landmarks: {
+          ...EXPECTED_LANDMARKS,
+          celebrationStarCenters: EXPECTED_LANDMARKS.celebrationStarCenters.map(
+            (position, index) => (
+              index === 0 ? [24.8, 1, Number.POSITIVE_INFINITY] as const : position
+            ),
+          ),
+        },
+      },
+      'non-finite landmark: celebrationStarCenter:0',
+    ],
+    [
+      'world外celebration star center',
+      {
+        ...MAP_WITH_LANDMARK_FIXTURE,
+        landmarks: {
+          ...EXPECTED_LANDMARKS,
+          celebrationStarCenters: EXPECTED_LANDMARKS.celebrationStarCenters.map(
+            (position, index) => (index === 0 ? [24.8, 1, -40] as const : position),
+          ),
+        },
+      },
+      'landmark outside world bounds: celebrationStarCenter:0',
     ],
     [
       'block plazaの非正scale',

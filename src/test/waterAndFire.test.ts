@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from 'react';
 import type * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { VoxelGameRuntime } from '../voxel-game/domain/VoxelGameRuntime';
+import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import * as WaterAndFireModule from '../voxel-game/scene/WaterAndFire';
 import {
   createFireVoxelFrame,
@@ -109,6 +110,23 @@ describe('WaterAndFire', () => {
       [28, 0.26, 0], [30, 0.26, -4], [30, 0.26, -8], [28, 0.26, -13],
     ]);
     expect(ROUTE_BOXES.every(({ scale }) => scale[1] <= 0.14)).toBe(true);
+  });
+
+  it('道しるべと成功星のworld座標をproduction mapの参照から描画へ渡す', () => {
+    const map = PRODUCTION_WORLD_MAP as typeof PRODUCTION_WORLD_MAP & {
+      readonly landmarks: typeof PRODUCTION_WORLD_MAP.landmarks & {
+        readonly celebrationStarCenters?: typeof CELEBRATION_STAR_CENTERS;
+        readonly fireRouteMarkers?: readonly (readonly [number, number, number])[];
+      };
+    };
+
+    expect(map.landmarks.fireRouteMarkers).toHaveLength(12);
+    expect(map.landmarks.celebrationStarCenters).toHaveLength(6);
+    if (!map.landmarks.fireRouteMarkers || !map.landmarks.celebrationStarCenters) return;
+    for (const [index, box] of ROUTE_BOXES.entries()) {
+      expect(box.position).toBe(map.landmarks.fireRouteMarkers[index]);
+    }
+    expect(CELEBRATION_STAR_CENTERS).toBe(map.landmarks.celebrationStarCenters);
   });
 
   it.each([

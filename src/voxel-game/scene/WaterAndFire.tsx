@@ -28,7 +28,11 @@ import {
   type FireVoxelTransform,
 } from './fireVfx';
 import { scaleToHalfExtents } from './worldCollisionLayout';
-import { FIRE_SPRAY_TARGET_POSITION } from './worldLayout';
+import {
+  CELEBRATION_STAR_CENTER_POSITIONS,
+  FIRE_ROUTE_MARKER_POSITIONS,
+  FIRE_SPRAY_TARGET_POSITION,
+} from './worldLayout';
 
 export interface VoxelBox {
   readonly position: readonly [number, number, number];
@@ -107,14 +111,8 @@ const WATER_SPLASH_CYCLE_SECONDS = 0.22;
 const WATER_BLUE_INSTANCE_COUNT = 22;
 const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
 
-const ROUTE_POSITIONS: readonly (readonly [number, number, number])[] = [
-  [0, 0.26, 3], [0, 0.26, 0], [4, 0.26, 0], [8, 0.26, 0],
-  [12, 0.26, 0], [16, 0.26, 0], [20, 0.26, 0], [24, 0.26, 0],
-  [28, 0.26, 0], [30, 0.26, -4], [30, 0.26, -8], [28, 0.26, -13],
-] as const;
-
-export const ROUTE_BOXES: readonly VoxelBox[] = ROUTE_POSITIONS.map(([x, , z]) => ({
-  position: [x, 0.26, z],
+export const ROUTE_BOXES: readonly VoxelBox[] = FIRE_ROUTE_MARKER_POSITIONS.map((position) => ({
+  position,
   scale: [0.62, 0.12, 0.62],
 }));
 
@@ -164,10 +162,8 @@ export const FIRE_LAYER_BOXES: readonly VoxelBox[] = [
   { position: FIRE_LAYER_POSITIONS[2], scale: [0.68, 1.12, 0.68] },
 ];
 
-export const CELEBRATION_STAR_CENTERS: readonly (readonly [number, number, number])[] = [
-  [24.8, 1, -11], [22.5, 1.2, -11.4], [31, 1, -11.8],
-  [24, 1.8, -12.2], [31.25, 3, -15], [28.8, 1.7, -13],
-];
+export const CELEBRATION_STAR_CENTERS: readonly (readonly [number, number, number])[] =
+  CELEBRATION_STAR_CENTER_POSITIONS;
 
 /** 5つのcubeで十字型の星を作る。 */
 function createStarBoxes(centers: readonly (readonly [number, number, number])[]): readonly VoxelBox[] {

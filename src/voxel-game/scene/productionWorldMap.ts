@@ -51,7 +51,9 @@ export interface BlockPlazaLandmarkDefinition {
 export interface WorldLandmarksDefinition {
   readonly blockPlaza: BlockPlazaLandmarkDefinition;
   readonly breakableBlocks: readonly BreakableBlockLandmarkDefinition[];
+  readonly celebrationStarCenters: readonly WorldPoint[];
   readonly fire: WorldPoint;
+  readonly fireRouteMarkers: readonly WorldPoint[];
   readonly fireSprayTarget: WorldPoint;
   readonly garage: WorldPoint;
   readonly park: WorldPoint;
@@ -76,7 +78,7 @@ export interface ProductionWorldMapDefinition {
 }
 
 /** 描画・物理・ゲームプレイ間で共有する72×72本番箱庭の唯一の座標定義。 */
-export const PRODUCTION_WORLD_MAP = {
+const PRODUCTION_WORLD_MAP_DEFINITION = {
   bounds: { maxX: 36, maxZ: 36, minX: -36, minZ: -36 },
   districts: [
     { bounds: { maxX: 10, maxZ: 10, minX: -10, minZ: -10 }, id: 'hub', label: 'ちゅうおうしゃこ' },
@@ -96,7 +98,29 @@ export const PRODUCTION_WORLD_MAP = {
       { color: '#3b82f6', id: 'plaza-blue', position: [-21.3, 0.75, 4.6] },
       { color: '#65a30d', id: 'plaza-green', position: [-26.7, 0.75, 2.5] },
     ],
+    celebrationStarCenters: [
+      [24.8, 1, -11],
+      [22.5, 1.2, -11.4],
+      [31, 1, -11.8],
+      [24, 1.8, -12.2],
+      [31.25, 3, -15],
+      [28.8, 1.7, -13],
+    ],
     fire: [26, 1.2, -18],
+    fireRouteMarkers: [
+      [0, 0.26, 3],
+      [0, 0.26, 0],
+      [4, 0.26, 0],
+      [8, 0.26, 0],
+      [12, 0.26, 0],
+      [16, 0.26, 0],
+      [20, 0.26, 0],
+      [24, 0.26, 0],
+      [28, 0.26, 0],
+      [30, 0.26, -4],
+      [30, 0.26, -8],
+      [28, 0.26, -13],
+    ],
     fireSprayTarget: [26.9, 1.45, -16.1],
     garage: [0, 0.8, 6],
     park: [0, 0, -24],
@@ -261,6 +285,14 @@ export function validateProductionWorldMap(
     { name: 'fire', position: map.landmarks.fire },
     { name: 'fireSprayTarget', position: map.landmarks.fireSprayTarget },
     { name: 'blockPlaza', position: map.landmarks.blockPlaza.position },
+    ...map.landmarks.fireRouteMarkers.map((position, index) => ({
+      name: `fireRouteMarker:${index}`,
+      position,
+    })),
+    ...map.landmarks.celebrationStarCenters.map((position, index) => ({
+      name: `celebrationStarCenter:${index}`,
+      position,
+    })),
     ...map.landmarks.breakableBlocks.map(({ id, position }) => ({
       name: `breakableBlock:${id}`,
       position,
@@ -326,3 +358,19 @@ export function validateProductionWorldMap(
 
   return errors;
 }
+
+/** 不正なmapを明確なErrorで拒否し、有効なら元のtyped参照を返す起動guard。 */
+export function requireValidProductionWorldMap<
+  const MapDefinition extends ProductionWorldMapDefinition,
+>(map: MapDefinition): MapDefinition {
+  const errors = validateProductionWorldMap(map);
+  if (errors.length > 0) {
+    throw new Error(`Invalid production world map:\n${errors.map((error) => `- ${error}`).join('\n')}`);
+  }
+  return map;
+}
+
+/** module初期化時の検証を通過した、本番箱庭の唯一のcanonical map。 */
+export const PRODUCTION_WORLD_MAP = requireValidProductionWorldMap(
+  PRODUCTION_WORLD_MAP_DEFINITION,
+);

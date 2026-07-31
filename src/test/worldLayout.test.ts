@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
+import * as WorldLayoutModule from '../voxel-game/scene/worldLayout';
 import {
   BLOCK_PLAZA,
   BREAKABLE_BLOCKS,
@@ -13,6 +14,28 @@ import {
 } from '../voxel-game/scene/worldLayout';
 
 describe('voxel world layout', () => {
+  it('道しるべと成功星のworld座標もproduction mapと同じ参照から公開する', () => {
+    const map = PRODUCTION_WORLD_MAP as typeof PRODUCTION_WORLD_MAP & {
+      readonly landmarks: typeof PRODUCTION_WORLD_MAP.landmarks & {
+        readonly celebrationStarCenters?: readonly (readonly [number, number, number])[];
+        readonly fireRouteMarkers?: readonly (readonly [number, number, number])[];
+      };
+    };
+    const layout = WorldLayoutModule as typeof WorldLayoutModule & {
+      readonly CELEBRATION_STAR_CENTER_POSITIONS?: readonly (readonly [number, number, number])[];
+      readonly FIRE_ROUTE_MARKER_POSITIONS?: readonly (readonly [number, number, number])[];
+    };
+
+    expect(map.landmarks.fireRouteMarkers).toBeDefined();
+    expect(map.landmarks.celebrationStarCenters).toBeDefined();
+    expect(layout.FIRE_ROUTE_MARKER_POSITIONS).toBeDefined();
+    expect(layout.CELEBRATION_STAR_CENTER_POSITIONS).toBeDefined();
+    expect(layout.FIRE_ROUTE_MARKER_POSITIONS).toBe(map.landmarks.fireRouteMarkers);
+    expect(layout.CELEBRATION_STAR_CENTER_POSITIONS).toBe(
+      map.landmarks.celebrationStarCenters,
+    );
+  });
+
   it('全公開座標をproduction mapのlandmarksと同じ参照から導出する', () => {
     const map = PRODUCTION_WORLD_MAP as typeof PRODUCTION_WORLD_MAP & {
       readonly landmarks?: {
