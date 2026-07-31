@@ -623,7 +623,10 @@ function buildVerifiedScenarioArrival(
   const arrivedAtMs = Date.now();
   const durationSeconds = (arrivedAtMs - startedAtMs) / 1_000;
   assert.equal(arrived.world.currentDistrict, destinationDistrict,
-    `${description}: arrived in ${arrived.world.currentDistrict}.`);
+    `${description}: arrived in ${arrived.world.currentDistrict}: ${JSON.stringify({
+      position: arrived.vehicle.position,
+      world: arrived.world,
+    })}`);
   assert(durationSeconds <= 35,
     `${description}: district journey exceeded 35 seconds (${durationSeconds}).`);
   return {
@@ -1554,6 +1557,12 @@ async function driveToBlockApproach(page, block) {
     ), `${block.id} west trunk road`);
     await alignWorldCoordinate(page, 0, westStageX, `${block.id} west stage X`);
     await alignWorldCoordinate(page, 2, block.position[2], `${block.id} west approach Z`);
+    const staged = await readGameState(page);
+    if (staged.world.currentDistrict !== 'blocks') {
+      await driveAlongWorldAxis(page, 'positiveX', (state) => (
+        state.world.currentDistrict === 'blocks'
+      ), `${block.id} enter blocks district`);
+    }
     return { axis: 'positiveX', approach: 'west-via-north-bypass', garageExit };
   }
 
@@ -2591,8 +2600,8 @@ async function verifyVoxelGame() {
         browser,
         errors,
         contractFailures,
-        'plaza-red',
-        'red',
+        'plaza-green',
+        'green',
       );
       assert.equal(fire.arrival?.world.currentDistrict, 'fire',
         `production-map fire scenario arrived in ${fire.arrival?.world.currentDistrict}.`);
@@ -2603,7 +2612,7 @@ async function verifyVoxelGame() {
       assert((blocks.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
         `production-map blocks scenario exceeded 35 seconds: ${JSON.stringify(blocks.journey)}.`);
       copyVerifiedScreenshot(
-        `${outputDirectory}/desktop-break-red-first-observed.png`,
+        `${outputDirectory}/desktop-break-green-first-observed.png`,
         `${outputDirectory}/desktop-production-blocks.png`,
       );
       const errorCounts = {
