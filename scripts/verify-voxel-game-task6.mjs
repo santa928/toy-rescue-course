@@ -436,22 +436,77 @@ async function driveToHubGateBypass(page, description) {
   return anchors;
 }
 
+/** block telemetryのXZ外接矩形中心を、viewport共通のoverview captureアンカーとして返す。 */
+function readBlockPlazaCaptureAnchor(state) {
+  const xCoordinates = state.landmarks.breakableBlocks.map(({ position }) => position[0]);
+  const zCoordinates = state.landmarks.breakableBlocks.map(({ position }) => position[2]);
+  const lookOffsetX = state.camera.lookTarget[0] - state.vehicle.position[0];
+  const lookOffsetZ = state.camera.lookTarget[2] - state.vehicle.position[2];
+  const lookX = (Math.min(...xCoordinates) + Math.max(...xCoordinates)) / 2;
+  const lookZ = (Math.min(...zCoordinates) + Math.max(...zCoordinates)) / 2;
+  return {
+    lookOffsetX,
+    lookOffsetZ,
+    lookX,
+    lookZ,
+    vehicleX: lookX - lookOffsetX,
+    vehicleZ: lookZ - lookOffsetZ,
+  };
+}
+
+/** 固定cameraのlook targetがtelemetry由来captureアンカーへ収束するまで有界待機する。 */
+async function waitForOverviewCameraAnchor(page, anchor) {
+  let latest = null;
+  for (let frame = 0; frame < 120; frame += 1) {
+    await waitForFrames(page, 1);
+    latest = await readGameState(page);
+    const expectedLookX = latest.vehicle.position[0] + anchor.lookOffsetX;
+    const expectedLookZ = latest.vehicle.position[2] + anchor.lookOffsetZ;
+    if (Math.abs(latest.camera.lookTarget[0] - expectedLookX) <= 0.2
+      && Math.abs(latest.camera.lookTarget[2] - expectedLookZ) <= 0.2) {
+      return latest;
+    }
+  }
+  throw new Error(`Plaza overview camera did not reach capture anchor: ${JSON.stringify({
+    anchor,
+    lookTarget: latest?.camera.lookTarget,
+  })}`);
+}
+
 /** 西側道路の中央まで実走し、積み木広場4個を同時に見渡せる視点を作る。 */
-async function driveToBlockPlazaOverview(page) {
+async function driveToBlockPlazaOverview(page, hudControlRects) {
   const initial = await readGameState(page);
-  const overviewX = Math.min(...initial.landmarks.breakableBlocks.map(({ position }) => position[0]));
+  const captureAnchor = readBlockPlazaCaptureAnchor(initial);
   const { plaza } = await driveToHubGateBypass(page, 'plaza overview');
   const westTransitX = plaza.position[0] - plaza.scale[0] / 2 - 2;
   const [positiveX, positiveXDriftZ] = resolveImpactWorldDirection(initial, {
     screenDirection: [1, -1],
   });
   const corridorEntryZ = plaza.position[2]
-    - (overviewX - westTransitX) * positiveXDriftZ / positiveX;
+    - (captureAnchor.vehicleX - westTransitX) * positiveXDriftZ / positiveX;
   await driveToWorldCoordinate(page, 0, westTransitX, 'plaza overview west transit X');
   await driveToWorldCoordinate(page, 2, corridorEntryZ, 'plaza overview corridor entry Z');
-  await alignWorldCoordinate(page, 0, overviewX, 'plaza overview west-column X');
-  await alignWorldCoordinate(page, 2, plaza.position[2], 'plaza overview center Z');
-  await waitForFrames(page, 15);
+  await alignWorldCoordinate(page, 0, captureAnchor.vehicleX, 'plaza overview capture X', 0.16);
+  await alignWorldCoordinate(page, 2, captureAnchor.vehicleZ, 'plaza overview capture Z', 0.16);
+  const centeredState = await waitForOverviewCameraAnchor(page, captureAnchor);
+  const correction = findBlockPlazaCaptureCorrection(centeredState, hudControlRects);
+  if (Math.hypot(correction.deltaX, correction.deltaZ) > 0.05) {
+    await alignWorldCoordinate(
+      page,
+      0,
+      centeredState.vehicle.position[0] + correction.deltaX,
+      'plaza overview HUD-safe X',
+      0.12,
+    );
+    await alignWorldCoordinate(
+      page,
+      2,
+      centeredState.vehicle.position[2] + correction.deltaZ,
+      'plaza overview HUD-safe Z',
+      0.12,
+    );
+    await waitForOverviewCameraAnchor(page, captureAnchor);
+  }
 }
 
 /** 4 blockの実camera投影がviewport内に収まることを数値で確認する。 */
@@ -483,6 +538,75 @@ function measureBlockPlazaVisibility(state, hudControlRects) {
     minimumViewportMargin,
     rects,
   };
+}
+
+/** 実camera/HUD投影から4px条件を満たし、最小clearanceが最大のcapture補正を選ぶ。 */
+function findBlockPlazaCaptureCorrection(state, hudControlRects) {
+  const current = measureBlockPlazaVisibility(state, hudControlRects);
+  if (current.allInsideViewport
+    && current.minimumViewportMargin >= 4
+    && current.minimumHudControlGap >= 4) {
+    return { clearance: Math.min(current.minimumViewportMargin, current.minimumHudControlGap), deltaX: 0, deltaZ: 0 };
+  }
+
+  const xCoordinates = state.landmarks.breakableBlocks.map(({ position }) => position[0]);
+  const zCoordinates = state.landmarks.breakableBlocks.map(({ position }) => position[2]);
+  const searchRadius = Math.max(
+    Math.max(...xCoordinates) - Math.min(...xCoordinates),
+    Math.max(...zCoordinates) - Math.min(...zCoordinates),
+  ) / 2;
+  const step = Math.max(0.1, 4 / state.camera.zoom);
+  let best = null;
+  for (let deltaX = -searchRadius; deltaX <= searchRadius; deltaX += step) {
+    for (let deltaZ = -searchRadius; deltaZ <= searchRadius; deltaZ += step) {
+      const camera = {
+        ...state.camera,
+        lookTarget: [
+          state.camera.lookTarget[0] + deltaX,
+          state.camera.lookTarget[1],
+          state.camera.lookTarget[2] + deltaZ,
+        ],
+        position: [
+          state.camera.position[0] + deltaX,
+          state.camera.position[1],
+          state.camera.position[2] + deltaZ,
+        ],
+      };
+      const measurement = measureBlockPlazaVisibility({ ...state, camera }, hudControlRects);
+      const clearance = Math.min(
+        measurement.minimumViewportMargin,
+        measurement.minimumHudControlGap,
+      );
+      if (!measurement.allInsideViewport || clearance < 4) continue;
+      const travel = Math.hypot(deltaX, deltaZ);
+      if (!best || clearance > best.clearance
+        || (Math.abs(clearance - best.clearance) < 0.001 && travel < best.travel)) {
+        best = { clearance, deltaX, deltaZ, travel };
+      }
+    }
+  }
+  assert(best, `No HUD-safe plaza capture anchor was found: ${JSON.stringify(current)}`);
+  return best;
+}
+
+/** 現在viewportの4つのHUD control矩形をcapture判定用に読む。 */
+async function readHudControlRects(page) {
+  return page.evaluate(() => [
+    '.fullscreen-button',
+    '.mission-pill',
+    '.spray-button',
+    '.touch-joystick',
+  ].map((selector) => {
+    const element = document.querySelector(selector);
+    if (!element) throw new Error(`Missing HUD control: ${selector}`);
+    const rect = element.getBoundingClientRect();
+    return {
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+    };
+  }));
 }
 
 /** throttleを離した自然減速で次の旋回・接近を安定させる。 */
@@ -993,24 +1117,9 @@ try {
   ]) {
     const overviewPage = await openGamePage(browser, `plaza-${viewport.name}`, errors, viewport);
     try {
-      await driveToBlockPlazaOverview(overviewPage);
+      const hudControlRects = await readHudControlRects(overviewPage);
+      await driveToBlockPlazaOverview(overviewPage, hudControlRects);
       const state = await readGameState(overviewPage);
-      const hudControlRects = await overviewPage.evaluate(() => [
-        '.fullscreen-button',
-        '.mission-pill',
-        '.spray-button',
-        '.touch-joystick',
-      ].map((selector) => {
-        const element = document.querySelector(selector);
-        if (!element) throw new Error(`Missing HUD control: ${selector}`);
-        const rect = element.getBoundingClientRect();
-        return {
-          bottom: rect.bottom,
-          left: rect.left,
-          right: rect.right,
-          top: rect.top,
-        };
-      }));
       const visibility = measureBlockPlazaVisibility(state, hudControlRects);
       assert(
         visibility.allInsideViewport,

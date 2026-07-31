@@ -612,6 +612,37 @@ async function verifyDistrictJourney(page, destinationDistrict, description, dri
   };
 }
 
+/** 再利用scenarioの開始から地区到着までを検証し、JSON保存用snapshotとwall-clockを返す。 */
+function buildVerifiedScenarioArrival(
+  started,
+  arrived,
+  destinationDistrict,
+  startedAtMs,
+  description,
+) {
+  const arrivedAtMs = Date.now();
+  const durationSeconds = (arrivedAtMs - startedAtMs) / 1_000;
+  assert.equal(arrived.world.currentDistrict, destinationDistrict,
+    `${description}: arrived in ${arrived.world.currentDistrict}.`);
+  assert(durationSeconds <= 35,
+    `${description}: district journey exceeded 35 seconds (${durationSeconds}).`);
+  return {
+    arrival: {
+      mission: arrived.mission,
+      vehicle: arrived.vehicle,
+      world: arrived.world,
+    },
+    journey: {
+      arrivedAtMs,
+      destinationDistrict,
+      durationSeconds,
+      from: started.vehicle.position,
+      startedAtMs,
+      to: arrived.vehicle.position,
+    },
+  };
+}
+
 /** 本番mapの初期world契約とhub→park→hub→south→hubの実入力移動を検証する。 */
 async function verifyProductionMap(browser, errors) {
   const { context, page } = await openViewportPage(
@@ -697,10 +728,11 @@ async function verifyProductionMap(browser, errors) {
       }),
     ));
 
+    const { breakableBlocks, ...singletonLandmarks } = initial.landmarks;
     return {
       density: {
         districtCount: initial.world.districts.length,
-        landmarkCount: initial.landmarks.breakableBlocks.length + 4,
+        landmarkCount: breakableBlocks.length + Object.keys(singletonLandmarks).length,
         routeMarkerCount: initial.visualLayout.routeMarkers.length,
         worldSolidCount: initial.visualLayout.worldSolids.length,
       },
@@ -1333,7 +1365,15 @@ async function verifyCompleteMission(
     assertInitialWorldPhysicsContract(initial);
     const initialResetCount = initial.vehicle.resetCount;
     readPoolIdentity(initial, `${name} initial`);
+    const fireJourneyStartedAtMs = Date.now();
     const targeted = await driveMissionToFire(page, touch);
+    const fireArrival = buildVerifiedScenarioArrival(
+      initial,
+      targeted,
+      'fire',
+      fireJourneyStartedAtMs,
+      `${name}: fire journey`,
+    );
     if (targetedScreenshot) await captureVerifiedScreenshot(page, targetedScreenshot);
     if (touch) await touch.pressSpray();
     else await page.keyboard.down('Space');
@@ -1364,6 +1404,7 @@ async function verifyCompleteMission(
     assert.equal(restarted.vehicle.resetCount, initialResetCount, `${name}: mission route used a vehicle reset.`);
     assert(restarted.runtime.routeVisible, `${name}: route was not restored at garage.`);
     return {
+      ...fireArrival,
       celebration: celebration.runtime,
       freeRoam: freeRoam.runtime,
       input: hasTouch ? 'touch' : 'keyboard',
@@ -1662,8 +1703,16 @@ async function verifyBreakTimeline(browser, errors, contractFailures, blockId, c
     const beforeImpactCounts = Object.fromEntries(initial.breakables.blocks.map(
       ({ id, vehicleImpactCount }) => [id, vehicleImpactCount],
     ));
+    const blockJourneyStartedAtMs = Date.now();
     const approach = await driveToBlockApproach(page, block);
     const approachState = await readGameState(page);
+    const blockArrival = buildVerifiedScenarioArrival(
+      initial,
+      approachState,
+      'blocks',
+      blockJourneyStartedAtMs,
+      `${blockId}: blocks journey`,
+    );
     for (const telemetry of approachState.breakables.blocks) {
       assert.equal(telemetry.vehicleImpactCount, beforeImpactCounts[telemetry.id],
         `${blockId}: approach touched ${telemetry.id} before observation.`);
@@ -1711,6 +1760,7 @@ async function verifyBreakTimeline(browser, errors, contractFailures, blockId, c
       );
       await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png`);
       return {
+        ...blockArrival,
         activationObserved: false,
         approach,
         impactSpeed: latestCandidate?.breakables.blocks.find(({ id }) => id === blockId)?.maxImpactSpeed,
@@ -1746,6 +1796,7 @@ async function verifyBreakTimeline(browser, errors, contractFailures, blockId, c
       `${blockId}: block did not restore after five seconds while vehicle was outside radius three.`);
     assertPoolIdentity(restored, identity, `${blockId} restored`);
     return {
+      ...blockArrival,
       activationObserved: true,
       analysis,
       approach,
@@ -2543,6 +2594,14 @@ async function verifyVoxelGame() {
         'plaza-red',
         'red',
       );
+      assert.equal(fire.arrival?.world.currentDistrict, 'fire',
+        `production-map fire scenario arrived in ${fire.arrival?.world.currentDistrict}.`);
+      assert((fire.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
+        `production-map fire scenario exceeded 35 seconds: ${JSON.stringify(fire.journey)}.`);
+      assert.equal(blocks.arrival?.world.currentDistrict, 'blocks',
+        `production-map blocks scenario arrived in ${blocks.arrival?.world.currentDistrict}.`);
+      assert((blocks.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
+        `production-map blocks scenario exceeded 35 seconds: ${JSON.stringify(blocks.journey)}.`);
       copyVerifiedScreenshot(
         `${outputDirectory}/desktop-break-red-first-observed.png`,
         `${outputDirectory}/desktop-production-blocks.png`,
