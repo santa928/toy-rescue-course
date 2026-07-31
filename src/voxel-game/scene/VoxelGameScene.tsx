@@ -21,6 +21,7 @@ import {
 import { VoxelWorld } from './VoxelWorld';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
 import { WorldFixedCamera, type WorldCameraTelemetryRef } from './WorldFixedCamera';
+import { WORLD_GROUND_BOX, scaleToHalfExtents } from './worldCollisionLayout';
 import { BREAKABLE_BLOCKS, isInsideGarageRestartArea } from './worldLayout';
 
 interface VoxelGameSceneProps {
@@ -157,7 +158,10 @@ export function VoxelGameScene({
           telemetryRef={telemetryRef}
         />
         <RigidBody colliders={false} type="fixed">
-          <CuboidCollider args={[18, 0.2, 18]} position={[0, -0.2, 0]} />
+          <CuboidCollider
+            args={scaleToHalfExtents(WORLD_GROUND_BOX.scale)}
+            position={WORLD_GROUND_BOX.position}
+          />
         </RigidBody>
         <VehicleController commandRef={commandRef} ref={controllerRef} telemetryRef={telemetryRef} />
       </Physics>

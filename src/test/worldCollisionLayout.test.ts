@@ -4,6 +4,7 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VoxelWorld, WorldSolidColliders } from '../voxel-game/scene/VoxelWorld';
+import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import {
   FIRE_BUILDING_BODY,
   GARAGE_WALLS,
@@ -12,6 +13,7 @@ import {
   PLAYGROUND_SUPPORT,
   TREE_TRUNKS,
   VEHICLE_COLLIDER_HALF_EXTENTS,
+  WORLD_GROUND_BOX,
   WORLD_SOLID_BOXES,
   getAxisAlignedSeparation,
   isValidBoxDefinition,
@@ -73,24 +75,27 @@ describe('worldCollisionLayout', () => {
     rapierRenderRecords.rigidBodies.length = 0;
   });
 
-  it('木・建物・車庫3壁・遊具2部品を9個のstatic solidとして公開する', () => {
+  it('本番mapのsolid:trueだけを12個のstatic colliderとして公開する', () => {
     expect(WORLD_SOLID_BOXES.map(({ id }) => id)).toEqual([
       'tree-trunk-1',
       'tree-trunk-2',
       'tree-trunk-3',
-      'fire-building-body',
+      'playground-plank',
+      'playground-support',
       'garage-back-wall',
       'garage-left-wall',
       'garage-right-wall',
-      'playground-plank',
-      'playground-support',
+      'fire-building-body',
+      'hub-gate-post',
+      'south-sign-post-west',
+      'south-sign-post-east',
     ]);
-    expect(WORLD_SOLID_BOXES).toEqual([
-      ...TREE_TRUNKS,
-      FIRE_BUILDING_BODY,
-      ...GARAGE_WALLS,
-      ...PLAYGROUND_SOLIDS,
-    ]);
+    expect(WORLD_SOLID_BOXES).toEqual(
+      PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid),
+    );
+    expect(TREE_TRUNKS).toEqual(WORLD_SOLID_BOXES.slice(0, 3));
+    expect(FIRE_BUILDING_BODY).toBe(WORLD_SOLID_BOXES[8]);
+    expect(GARAGE_WALLS).toEqual(WORLD_SOLID_BOXES.slice(5, 8));
     expect(PLAYGROUND_SOLIDS).toEqual([PLAYGROUND_PLANK, PLAYGROUND_SUPPORT]);
   });
 
@@ -101,7 +106,7 @@ describe('worldCollisionLayout', () => {
     ));
     expect(initialSeparations.every(([x, , z]) => x >= 0 || z >= 0)).toBe(true);
 
-    const exitCenter = [0, GARAGE_POSITION[1], 16.3] as const;
+    const exitCenter = [0, GARAGE_POSITION[1], 2.7] as const;
     for (const sideWall of GARAGE_WALLS.slice(1)) {
       const [, , z] = getAxisAlignedSeparation(
         sideWall,
@@ -129,15 +134,19 @@ describe('worldCollisionLayout', () => {
 
   it('既存visualと同じworld座標とfull scaleを維持する', () => {
     expect(TREE_TRUNKS).toEqual([
-      { id: 'tree-trunk-1', position: [-4, 1.25, -2], scale: [0.7, 2.2, 0.7] },
-      { id: 'tree-trunk-2', position: [-4.5, 1.25, 2], scale: [0.7, 2.2, 0.7] },
-      { id: 'tree-trunk-3', position: [4.4, 1.25, 2.1], scale: [0.7, 2.2, 0.7] },
+      PRODUCTION_WORLD_MAP.visualBoxes[2],
+      PRODUCTION_WORLD_MAP.visualBoxes[3],
+      PRODUCTION_WORLD_MAP.visualBoxes[4],
     ]);
-    expect(FIRE_BUILDING_BODY).toEqual({
-      id: 'fire-building-body',
-      position: [9.5, 1.8, -9.5],
-      scale: [6, 3.4, 5],
+    expect(FIRE_BUILDING_BODY).toBe(PRODUCTION_WORLD_MAP.visualBoxes[15]);
+  });
+
+  it('72×72 groundを±36境界と同じhalf extentsで構成する', () => {
+    expect(WORLD_GROUND_BOX).toEqual({
+      position: [0, -0.2, 0],
+      scale: [72, 0.4, 72],
     });
+    expect(scaleToHalfExtents(WORLD_GROUND_BOX.scale)).toEqual([36, 0.2, 36]);
   });
 
   it('full scaleをRapier CuboidColliderのhalf extentsへ変換する', () => {
@@ -163,13 +172,13 @@ describe('worldCollisionLayout', () => {
     )).toBe(false);
   });
 
-  it('単一fixed bodyに共有定義由来の9 colliderだけを構成する', () => {
+  it('単一fixed bodyに共有定義由来の12 colliderだけを構成する', () => {
     const rigidBody = inspectElement(WorldSolidColliders());
     const colliders = Children.toArray(rigidBody.props.children).map(inspectElement);
 
     expect(rigidBody.type).toBe(RigidBody);
     expect(rigidBody.props).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(colliders).toHaveLength(9);
+    expect(colliders).toHaveLength(12);
     expect(colliders.every((collider) => collider.type === CuboidCollider)).toBe(true);
     expect(colliders.map(({ props }) => ({
       args: props.args,
@@ -187,7 +196,7 @@ describe('worldCollisionLayout', () => {
 
     expect(rapierRenderRecords.rigidBodies).toHaveLength(1);
     expect(rapierRenderRecords.rigidBodies[0]).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(rapierRenderRecords.cuboidColliders).toHaveLength(9);
+    expect(rapierRenderRecords.cuboidColliders).toHaveLength(12);
     expect(rapierRenderRecords.cuboidColliders.map(({ args, position, rotation }) => ({
       args,
       position,
