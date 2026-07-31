@@ -278,6 +278,15 @@ async function captureVerifiedScreenshot(page, path) {
   throw latestError;
 }
 
+/** mission pillを数frame安定させ、非空labelを確認してから検証済みPNGを保存する。 */
+async function captureStableMissionScreenshot(page, path, description) {
+  await waitForFrames(page, 3);
+  const missionLabel = (await page.locator('.mission-pill__label').textContent())?.trim() ?? '';
+  assert(missionLabel.length > 0, `${description}: mission pill label is empty.`);
+  await captureVerifiedScreenshot(page, path);
+  return missionLabel;
+}
+
 /** 検証済みPNGを代表名へ複製し、元画像の画素証跡も同時に引き継ぐ。 */
 function copyVerifiedScreenshot(sourcePath, targetPath) {
   const sourceName = sourcePath.split('/').at(-1);
@@ -661,7 +670,27 @@ async function verifyProductionMap(browser, errors) {
     assert.equal(initial.world.currentDistrict, 'hub');
     assert.equal(initial.world.destinationDistrict, 'fire');
     assert.equal(initial.visualLayout.worldSolids.length, 12);
-    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-production-hub.png`);
+    const initialResetCount = initial.vehicle.resetCount;
+    const hubCaptureState = await driveAlongWorldAxis(
+      page,
+      'negativeZ',
+      (state) => state.vehicle.position[2] <= initial.landmarks.garage[2] - 5.5,
+      'production-map hub garage opening',
+    );
+    assert.equal(hubCaptureState.vehicle.resetCount, initialResetCount,
+      'production-map hub capture reset the vehicle.');
+    assert.equal(hubCaptureState.world.currentDistrict, 'hub',
+      `production-map hub capture left hub: ${JSON.stringify(hubCaptureState.world)}`);
+    assert(initial.vehicle.position[2] - hubCaptureState.vehicle.position[2] >= 5,
+      `production-map hub capture did not leave the garage: ${JSON.stringify({
+        initial: initial.vehicle.position,
+        outside: hubCaptureState.vehicle.position,
+      })}`);
+    const hubMissionLabel = await captureStableMissionScreenshot(
+      page,
+      `${outputDirectory}/desktop-production-hub.png`,
+      'production-map hub capture',
+    );
 
     const journeys = [];
     journeys.push(await verifyDistrictJourney(
@@ -715,20 +744,52 @@ async function verifyProductionMap(browser, errors) {
         return { state, waypoints: [eastStage.vehicle.position] };
       },
     ));
-    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-production-south.png`);
+    await alignWorldCoordinate(
+      page,
+      0,
+      0,
+      'production-map south capture center X',
+      0.35,
+    );
+    const southCaptureState = await driveAlongWorldAxis(
+      page,
+      'positiveZ',
+      (state) => state.vehicle.position[2] >= 22,
+      'production-map south sign staging',
+    );
+    assert.equal(southCaptureState.vehicle.resetCount, initialResetCount,
+      'production-map south capture reset the vehicle.');
+    assert.equal(southCaptureState.world.currentDistrict, 'south',
+      `production-map south capture left south: ${JSON.stringify(southCaptureState.world)}`);
+    assert(southCaptureState.vehicle.position[2] >= 22,
+      `production-map south capture stopped before the signs: ${JSON.stringify(
+        southCaptureState.vehicle,
+      )}`);
+    const southMissionLabel = await captureStableMissionScreenshot(
+      page,
+      `${outputDirectory}/desktop-production-south.png`,
+      'production-map south capture',
+    );
 
     journeys.push(await verifyDistrictJourney(
       page,
       'hub',
       'production-map south to hub',
-      async () => ({
-        state: await driveAlongWorldAxis(
+      async () => {
+        const eastStage = await driveAlongWorldAxis(
+          page,
+          'positiveX',
+          (state) => state.vehicle.position[0] >= initial.landmarks.garage[0] + 6.5,
+          'production-map south return garage bypass',
+        );
+        const state = await driveAlongWorldAxis(
           page,
           'negativeZ',
-          (state) => state.world.currentDistrict === 'hub',
+          (candidate) => candidate.world.currentDistrict === 'hub',
           'production-map south to hub',
-        ),
-      }),
+        );
+        return { state, waypoints: [eastStage.vehicle.position] };
+      },
     ));
 
     const { breakableBlocks, ...singletonLandmarks } = initial.landmarks;
@@ -740,7 +801,17 @@ async function verifyProductionMap(browser, errors) {
         worldSolidCount: initial.visualLayout.worldSolids.length,
       },
       initial: initial.world,
+      hubCapture: {
+        missionLabel: hubMissionLabel,
+        vehicle: hubCaptureState.vehicle,
+        world: hubCaptureState.world,
+      },
       journeys,
+      southCapture: {
+        missionLabel: southMissionLabel,
+        vehicle: southCaptureState.vehicle,
+        world: southCaptureState.world,
+      },
     };
   } finally {
     await context.close();
@@ -1852,7 +1923,13 @@ async function verifyCompleteMission(
       fireJourneyStartedAtMs,
       `${name}: fire journey`,
     );
-    if (targetedScreenshot) await captureVerifiedScreenshot(page, targetedScreenshot);
+    if (targetedScreenshot) {
+      await captureStableMissionScreenshot(
+        page,
+        targetedScreenshot,
+        `${name}: targeted capture`,
+      );
+    }
     if (touch) await touch.pressSpray();
     else await page.keyboard.down('Space');
     await waitForTargetedSpray(page, `${name}: targeted spray`);
@@ -2982,13 +3059,26 @@ async function verifyViewport(browser, target, errors) {
       assert(cancelled.controls.moveX === 0 && cancelled.controls.moveY === 0,
         `${target.name}: touch release did not center movement.`);
     } else {
-      await page.keyboard.down('KeyW');
-      await page.keyboard.down('KeyA');
-      await waitForFrames(page, 30);
-      await page.keyboard.up('KeyW');
-      await page.keyboard.up('KeyA');
-      await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-driving.png`);
-      await brakeVehicle(page);
+      const driven = await driveAlongWorldAxis(
+        page,
+        'negativeZ',
+        (state) => state.vehicle.position[2] <= initial.landmarks.garage[2] - 5.5,
+        'desktop driving garage opening',
+      );
+      assert.equal(driven.vehicle.resetCount, initial.vehicle.resetCount,
+        'Desktop driving capture reset the vehicle.');
+      assert.equal(driven.world.currentDistrict, 'hub',
+        `Desktop driving capture left hub: ${JSON.stringify(driven.world)}`);
+      assert(initial.vehicle.position[2] - driven.vehicle.position[2] >= 5,
+        `Desktop driving capture did not leave the garage: ${JSON.stringify({
+          initial: initial.vehicle.position,
+          outside: driven.vehicle.position,
+        })}`);
+      await captureStableMissionScreenshot(
+        page,
+        `${outputDirectory}/desktop-driving.png`,
+        'desktop driving capture',
+      );
       const beforeTurn = await readGameState(page);
       await page.keyboard.down('KeyA');
       await waitForFrames(page, 18);

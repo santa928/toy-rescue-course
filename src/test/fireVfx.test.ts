@@ -7,6 +7,7 @@ import {
   createFireVoxelFrame,
   getActiveFireVoxelCount,
 } from '../voxel-game/scene/fireVfx';
+import { FIRE_SPRAY_TARGET_POSITION } from '../voxel-game/scene/worldLayout';
 
 type ReusableFireFrameFactory = (
   input: { readonly elapsedSeconds: number; readonly layerCount: number },
@@ -41,6 +42,28 @@ describe('fireVfx', () => {
       Array.from({ length: 18 }, (_, slot) => slot),
     );
     expect(FIRE_ROLE_CAPACITY).toEqual({ core: 4, middle: 8, outer: 6 });
+  });
+
+  it('全fire slotを本番spray target周辺へ配置し旧map座標へ戻さない', () => {
+    const center = FIRE_VOXEL_SLOTS.reduce(
+      (sum, { basePosition }) => [sum[0] + basePosition[0], sum[1] + basePosition[2]],
+      [0, 0],
+    ).map((sum) => sum / FIRE_VOXEL_SLOTS.length);
+    const targetDistances = FIRE_VOXEL_SLOTS.map(({ basePosition }) => Math.hypot(
+      basePosition[0] - FIRE_SPRAY_TARGET_POSITION[0],
+      basePosition[2] - FIRE_SPRAY_TARGET_POSITION[2],
+    ));
+    const legacyAnchor = [12.9, -9] as const;
+
+    expect(Math.hypot(
+      center[0] - FIRE_SPRAY_TARGET_POSITION[0],
+      center[1] - FIRE_SPRAY_TARGET_POSITION[2],
+    )).toBeLessThanOrEqual(0.1);
+    expect(Math.max(...targetDistances)).toBeLessThanOrEqual(0.45);
+    expect(FIRE_VOXEL_SLOTS.every(({ basePosition }) => Math.hypot(
+      basePosition[0] - legacyAnchor[0],
+      basePosition[2] - legacyAnchor[1],
+    ) > 10)).toBe(true);
   });
 
   it.each([
