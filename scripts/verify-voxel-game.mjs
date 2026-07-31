@@ -1191,26 +1191,40 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     await waitForFrames(page, 2);
     await driveMissionToFire(page);
     const backwardRouteState = await readGameState(page);
-    const backwardSafetyInset = Math.hypot(
+    const backwardHorizontalSupport = Math.hypot(
       VEHICLE_COLLIDER_HALF_EXTENTS[0],
       VEHICLE_COLLIDER_HALF_EXTENTS[2],
-    ) + 0.5;
+    );
+    const backwardCoastReserve = 0.5;
+    const backwardSafetyInset = backwardHorizontalSupport + backwardCoastReserve;
+    const backwardHeadingReserve = 2 * backwardHorizontalSupport + backwardCoastReserve;
     /** 車体の保守的support半径を含むworld内側へwaypointを制限する。 */
     const clampToSafeWorld = (value, minimum, maximum) => (
       Math.max(minimum + backwardSafetyInset, Math.min(value, maximum - backwardSafetyInset))
     );
     const backwardWaypoint = {
       x: clampToSafeWorld(
-        targetPosition[0] + 2.6,
+        targetPosition[0] + backwardHorizontalSupport,
         backwardRouteState.world.bounds.minX,
         backwardRouteState.world.bounds.maxX,
       ),
       z: clampToSafeWorld(
-        targetPosition[2] + 2.4,
+        targetPosition[2] + backwardCoastReserve,
         backwardRouteState.world.bounds.minZ,
         backwardRouteState.world.bounds.maxZ,
       ),
     };
+    const backwardHeadingWaypointZ = clampToSafeWorld(
+      backwardWaypoint.z - backwardHeadingReserve,
+      backwardRouteState.world.bounds.minZ,
+      backwardRouteState.world.bounds.maxZ,
+    );
+    assert(backwardWaypoint.x <= backwardRouteState.world.bounds.maxX - backwardSafetyInset,
+      `Backward waypoint exceeds the safe world inset: ${JSON.stringify({
+        backwardSafetyInset,
+        backwardWaypoint,
+        worldBounds: backwardRouteState.world.bounds,
+      })}`);
     await alignWorldCoordinate(
       page,
       0,
@@ -1218,6 +1232,35 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       'forgiving spray backward turn-in X',
       0.2,
     );
+    await alignWorldCoordinate(
+      page,
+      2,
+      backwardHeadingWaypointZ,
+      'forgiving spray backward heading stage Z',
+      0.2,
+    );
+    const backwardHeadingResetCount = (await readGameState(page)).vehicle.resetCount;
+    let headingState = await readGameState(page);
+    for (let attempt = 0; attempt < 36; attempt += 1) {
+      headingState = await readGameState(page);
+      if (headingState.vehicle.forward[2] >= 0.8) break;
+      assert.equal(headingState.vehicle.resetCount, backwardHeadingResetCount,
+        `forgiving spray backward heading reset unexpectedly: ${JSON.stringify(headingState.vehicle)}`);
+      assert(headingState.vehicle.position[0] >= headingState.world.bounds.minX + backwardSafetyInset
+        && headingState.vehicle.position[0] <= headingState.world.bounds.maxX - backwardSafetyInset
+        && headingState.vehicle.position[2] >= headingState.world.bounds.minZ + backwardSafetyInset
+        && headingState.vehicle.position[2] <= headingState.world.bounds.maxZ - backwardSafetyInset,
+      `forgiving spray backward heading left the safe world inset: ${JSON.stringify({
+        position: headingState.vehicle.position,
+        worldBounds: headingState.world.bounds,
+      })}`);
+      await pulseAlongWorldAxis(page, 'positiveZ', 1);
+    }
+    assert(headingState.vehicle.forward[2] >= 0.8,
+      `forgiving spray backward heading did not converge south: ${JSON.stringify({
+        forward: headingState.vehicle.forward,
+        position: headingState.vehicle.position,
+      })}`);
     await alignWorldCoordinate(
       page,
       2,
@@ -1230,11 +1273,14 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     assert.equal(backwardEntry.vehicle.resetCount, initial.vehicle.resetCount + 1,
       `Backward route did not start after exactly one explicit reset: ${JSON.stringify(backwardEntry.vehicle)}`);
     assert(backwardEntry.vehicle.speed <= 0.24
-      && backwardEntry.vehicle.position[0] >= backwardEntry.world.bounds.minX
-      && backwardEntry.vehicle.position[0] <= backwardEntry.world.bounds.maxX
-      && backwardEntry.vehicle.position[2] >= backwardEntry.world.bounds.minZ
-      && backwardEntry.vehicle.position[2] <= backwardEntry.world.bounds.maxZ
-      && backwardEntryGeometry.horizontalDistance <= 4.3,
+      && backwardEntry.vehicle.position[0] >= backwardEntry.world.bounds.minX + backwardSafetyInset
+      && backwardEntry.vehicle.position[0] <= backwardEntry.world.bounds.maxX - backwardSafetyInset
+      && backwardEntry.vehicle.position[2] >= backwardEntry.world.bounds.minZ + backwardSafetyInset
+      && backwardEntry.vehicle.position[2] <= backwardEntry.world.bounds.maxZ - backwardSafetyInset
+      && backwardEntry.vehicle.forward[2] >= 0.5
+      && backwardEntryGeometry.horizontalDistance <= 4.3
+      && backwardEntryGeometry.dot < 0
+      && !backwardEntry.mission.targeted,
     `Backward route entry is not safely staged: ${JSON.stringify({
       forward: backwardEntry.vehicle.forward,
       geometry: backwardEntryGeometry,
@@ -1243,40 +1289,8 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       speed: backwardEntry.vehicle.speed,
       worldBounds: backwardEntry.world.bounds,
     })}`);
-    let behind = null;
-    let latestBackwardState = backwardEntry;
-    for (let attempt = 0; attempt < 36; attempt += 1) {
-      const state = await readGameState(page);
-      latestBackwardState = state;
-      const geometry = getTargetGeometry(state);
-      assert.equal(state.vehicle.resetCount, backwardEntry.vehicle.resetCount,
-        `forgiving spray backward facing: vehicle reset unexpectedly: ${JSON.stringify({
-          current: state.vehicle,
-          entry: backwardEntry.vehicle,
-        })}`);
-      assert(state.vehicle.position[0] >= state.world.bounds.minX + backwardSafetyInset
-        && state.vehicle.position[0] <= state.world.bounds.maxX - backwardSafetyInset
-        && state.vehicle.position[2] >= state.world.bounds.minZ + backwardSafetyInset
-        && state.vehicle.position[2] <= state.world.bounds.maxZ - backwardSafetyInset,
-      `forgiving spray backward facing left the safe world inset: ${JSON.stringify({
-        position: state.vehicle.position,
-        worldBounds: state.world.bounds,
-      })}`);
-      if (!state.mission.targeted && geometry.horizontalDistance <= 4.3 && geometry.dot < 0) {
-        behind = state;
-        break;
-      }
-      await pulseAlongWorldAxis(page, 'positiveX', 1);
-    }
-    assert(behind,
-      `forgiving spray backward facing did not align safely: ${JSON.stringify({
-        geometry: getTargetGeometry(latestBackwardState),
-        position: latestBackwardState.vehicle.position,
-        resetCount: latestBackwardState.vehicle.resetCount,
-        speed: latestBackwardState.vehicle.speed,
-        waypoint: backwardWaypoint,
-        worldBounds: latestBackwardState.world.bounds,
-      })}`);
+    const backwardMaximumX = backwardEntry.vehicle.position[0];
+    const behind = backwardEntry;
     const { dot: behindDot, horizontalDistance: behindHorizontalDistance } = getTargetGeometry(behind);
     assert(Number.isFinite(behindDot) && behindHorizontalDistance <= 7 && behindDot < 0,
       `Backward spray was not strictly behind the vehicle: ${JSON.stringify({
@@ -1323,10 +1337,15 @@ async function verifyForgivingSprayTargeting(browser, errors) {
         resetCount: backwardEntry.vehicle.resetCount,
         speed: backwardEntry.vehicle.speed,
       },
+      backwardMaximumX,
+      backwardSafetyMaximumX: backwardRouteState.world.bounds.maxX - backwardSafetyInset,
       backwardTargeted: behind.mission.targeted,
       behindDot,
       behindHorizontalDistance,
       backwardWaypoint,
+      backwardHeadingWaypointZ,
+      backwardHeadingReserve,
+      backwardCoastReserve,
       dot: stagedGeometry.dot,
       endpointError,
       fireIntensityAfterForwardSpray: partiallyExtinguished.runtime.fireIntensity,
