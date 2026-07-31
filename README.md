@@ -53,7 +53,8 @@ docker compose up --build web
 
 炎は18 slot以内の固定poolを赤い外炎・橙の中炎・黄白い芯の3色batchで描く立体ボクセルVFXです。
 炎の舌はslotごとに非同期で揺れ、火の粉は上昇・縮小して循環します。消火では表示数が
-18→12→6→0へ減り、車庫へ帰って仕事を再開すると18へ戻ります。
+18→12→6→0へ減り、車庫へ帰って仕事を再開すると18へ戻ります。炎の配置は本番の
+放水照準位置をanchorにしているため、照準点と見えている炎がずれません。
 
 最終E2E、3 viewportの代表画像、software renderer分類はDocker内で生成します。
 物理GPU性能は、同じ3 viewportをホストの物理GPU対応ブラウザで別途認証します。
@@ -72,7 +73,7 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは20 files / 173 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは20 files / 174 testsです。
 
 ```bash
 docker compose run --rm web npm test
