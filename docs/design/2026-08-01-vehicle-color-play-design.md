@@ -141,15 +141,15 @@ React stateはactivation、色変更、秒境界、期限、切替時だけ更�
 
 ## 受け入れ条件
 
-- [ ] 赤・青・黄のプールとシャワーを南地区で一目で区別できる。
-- [ ] 消防車とブルドーザーのどちらでも6 sourceから色を受け取れる。
-- [ ] 接触中の保持、離脱後の減算、再接触、別色上書き、12秒後の復元が決定的に動く。
-- [ ] rejected切替は色を維持し、成功した別車種切替だけ色を解除する。
-- [ ] 車体の役割識別部品と既存アクションを維持したままpaint bodyだけが変わる。
-- [ ] 色遊びが消防・工事・積み木・車庫循環へ回帰を起こさない。
-- [ ] keyboardとtouchで実sourceへ走行し、色替えを完遂できる。
-- [ ] 1280×720、1024×768、844×390でHUDと主要対象の欠け・重なり・はみ出しがない。
-- [ ] unit、build、専用E2E、canonical回帰、画像目視、physical GPU再確認がPASSする。
+- [x] 赤・青・黄のプールとシャワーを南地区で一目で区別できる。
+- [x] 消防車とブルドーザーのどちらでも6 sourceから色を受け取れる。
+- [x] 接触中の保持、離脱後の減算、再接触、別色上書き、12秒後の復元が決定的に動く。
+- [x] rejected切替は色を維持し、成功した別車種切替だけ色を解除する。
+- [x] 車体の役割識別部品と既存アクションを維持したままpaint bodyだけが変わる。
+- [x] 色遊びが消防・工事・積み木・車庫循環へ回帰を起こさない。
+- [x] keyboardとtouchで実sourceへ走行し、色替えを完遂できる。
+- [x] 1280×720、1024×768、844×390でHUDと主要対象の欠け・重なり・はみ出しがない。
+- [x] unit、build、専用E2E、canonical回帰、画像目視、physical GPU再確認がPASSする。
 
 ## 非対象
 
@@ -176,3 +176,14 @@ React stateはactivation、色変更、秒境界、期限、切替時だけ更�
 - React state更新は色イベントと秒境界のみで、毎frame更新しない。
 - 物理GPU 1280×720でmedian 55fps以上、p10 45fps以上を維持する。
 - 72×72で目標を満たす限りchunk streaming／LODは実装しない。96×96超または性能未達時だけ再評価する。
+
+## 検証記録（2026-08-01）
+
+- 専用E2EはDesktop 1280×720 keyboard、Tablet 1024×768 touch、Mobile landscape 844×390 touchで、赤pool、離脱countdown、再接触、青上書き、12秒後の復元、黄showerを実走した。
+- 車庫外の拒否切替では色効果を維持し、帰庫後の実UIによるブルドーザー切替で解除した。Desktopでは続けてブルドーザーを赤poolへ走らせ、二車種での適用を確認した。
+- 6枚の原寸画像で、青い車体とpool、黄色い車体とshower滴、役割識別部品、HUDを確認した。mission pillと色pillの間隔は全viewportで10px、viewport内余白は8px以上だった。
+- station実測はpool 24 cube、shower 54 cube、合計78 cube、5 calls。車体は両車7 callsを維持した。
+- Apple M4／ANGLE Metal、1280×720、2秒warm-up＋12秒probeで、消防車はmean 59.92fps／median 59.88fps／p10 56.82fps／scene 28 calls、ブルドーザーはmean 58.92fps／median 59.88fps／p10 56.82fps／scene 27 callsだった。
+- 72×72の現mapで性能目標を満たしたため、chunk streaming／LODは実装しない。96×96超への拡張または物理GPU性能未達を再検討条件とする。
+- Docker内fresh unitは32 files／303 tests、production build、canonical full、二車種専用E2EがすべてPASSした。canonicalは`completed/full`、browser errorはconsole／page／requestとも0件だった。
+- canonicalで再現した中央交差点の過剰な中心合わせと、背面放水経路の東端driftは、道路幅に沿う許容差と「Xを内側へ退避→Z→X再補正」の経路順へ限定修正した。production-map、collision、nonbreakの各focusと最終fullで実走回帰した。

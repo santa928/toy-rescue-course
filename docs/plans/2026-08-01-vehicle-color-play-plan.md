@@ -99,7 +99,7 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - [x] active paint色をVehicleControllerへ渡し、成功した別車種切替だけclearする。
 - [x] mission pill下へ`.color-effect-pill`をアンカーし、aria-liveを同期する。
 - [x] focused/full unit、build、canonical nonbreak回帰を通す。
-- [ ] `色替え状態をゲーム本体へ統合する`でcommit・scan・push・公開確認する。
+- [x] `色替え状態をゲーム本体へ統合する`でcommit・scan・push・公開確認する。
 
 ## Task 6: 3 viewport E2E、目視、性能、ドキュメント
 
@@ -110,16 +110,16 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - Modify: `docs/design/2026-08-01-vehicle-color-play-design.md`
 - Modify: `progress.md`（git管理外）
 
-- [ ] RED: actual UI／keyboard／touchで南地区へ走り、source未実装assertを確認する。
-- [ ] 3 viewportで赤pool、離脱、再接触、青上書き、期限、黄showerを完遂する。
-- [ ] rejected切替維持、帰庫後の成功切替clearを実DOMとtelemetryで確認する。
-- [ ] 色pillとmissionの10px、viewport 8px、操作阻害なしを数値assertする。
-- [ ] 6代表画像をoriginal detailで目視し、station、色車体、HUD、主要対象を確認する。
-- [ ] fresh full unit、build、canonical、二車種E2Eを通す。
-- [ ] physical Apple M4で消防車／ブルドーザーを各12秒計測し、目標とdraw callを記録する。
-- [ ] 72×72で性能達成ならchunk streaming／LOD不要を記録する。
-- [ ] READMEと要件台帳、受け入れ条件、非対象、リスク、性能目標、作業ログを同期する。
-- [ ] `色替え遊びを本番検証する`でcommit・全範囲scan・pushする。
+- [x] RED: actual UI／keyboard／touchで南地区へ走り、source未実装assertを確認する。
+- [x] 3 viewportで赤pool、離脱、再接触、青上書き、期限、黄showerを完遂する。
+- [x] rejected切替維持、帰庫後の成功切替clearを実DOMとtelemetryで確認する。
+- [x] 色pillとmissionの10px、viewport 8px、操作阻害なしを数値assertする。
+- [x] 6代表画像をoriginal detailで目視し、station、色車体、HUD、主要対象を確認する。
+- [x] fresh full unit、build、canonical、二車種E2Eを通す。
+- [x] physical Apple M4で消防車／ブルドーザーを各12秒計測し、目標とdraw callを記録する。
+- [x] 72×72で性能達成ならchunk streaming／LOD不要を記録する。
+- [x] READMEと要件台帳、受け入れ条件、非対象、リスク、性能目標、作業ログを同期する。
+- [x] `色替え遊びを本番検証する`でcommit・全範囲scan・pushする。
 - [ ] Actions／Pages success、公開URLへの専用E2E、remote SHA 0/0を確認し、完了記録を追加pushする。
 
 ## Final checklist

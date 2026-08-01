@@ -736,7 +736,9 @@ async function verifyProductionMap(browser, errors) {
       }),
     ));
     await alignWorldCoordinate(page, 0, initial.landmarks.garage[0], 'production-map hub X');
-    await alignWorldCoordinate(page, 2, 0, 'production-map central crossing Z');
+    // 東西幹線は幅5unitあるため、停止時の約0.9unitの惰性を許容しても車体は道路内に収まる。
+    // 0.32unitへの過剰な中心合わせは1frame pulseで往復し、正しい経路をflakyに失敗させる。
+    await alignWorldCoordinate(page, 2, 0, 'production-map central crossing Z', 1);
 
     journeys.push(await verifyDistrictJourney(
       page,
@@ -1180,7 +1182,9 @@ async function driveMissionToFire(page, touchDriver) {
   await alignWorldCoordinate(
     page,
     0,
-    target[0] + 4.5,
+    // 1frameの西向きpulse後も「前方60度」の照準帯を飛び越えない助走距離を確保する。
+    // x=32.7は東道路中心付近で、車体supportを含めてもworld境界内に収まる。
+    target[0] + 5.8,
     'fire route target east X',
     0.35,
     touchDriver,
@@ -1592,6 +1596,14 @@ async function verifyForgivingSprayTargeting(browser, errors) {
     };
 
     observeBackwardRouteState(backwardRouteState, 'forgiving spray backward route start');
+    // 固定cameraのscreen入力はworld cardinalへ完全一致しないため、Z pulseより先に
+    // 東境界から内側へ寄せ、斜めdriftを含めた車体supportの安全余白を確保する。
+    await alignBackwardCoordinate(
+      0,
+      backwardWaypoint.x,
+      'forgiving spray backward safety inset X',
+      0.2,
+    );
     await alignBackwardCoordinate(
       2,
       backwardHeadingWaypointZ,

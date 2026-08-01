@@ -45,6 +45,8 @@ docker compose up --build web
 
 どちらの車でも赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。北の公園の木の幹と火災建物本体には進入できません。
 
+南地区には赤・青・黄の色水プールと色シャワーがあります。通り抜けると選んだ車の塗装部分だけが12秒間その色に変わり、同じ場所へ入り直すと12秒へ戻ります。別の色へ入れば即座に上書きされ、時間切れか車庫で別の車へ乗り換えると元の玩具色へ戻ります。窓、タイヤ、梯子、ブレード、灯火は元の色を保つので、車の役割は見分けられます。
+
 炎から約7unit以内でおおむね正面を向いて放水すると、見えている炎へ照準が補助されます。真横・背後・範囲外からの放水では消火できません。
 
 ### 箱庭の物理対象
@@ -67,6 +69,7 @@ docker compose up --build web
 ```bash
 docker compose --profile e2e run --rm --build voxel-game-e2e
 docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
+docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 ```
 
 ## Vehicle Labの操作
@@ -79,7 +82,7 @@ docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは29 files / 266 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは32 files / 303 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -87,10 +90,11 @@ docker compose run --rm web npm run build
 docker compose --profile e2e run --rm --build e2e
 docker compose --profile e2e run --rm --build voxel-game-e2e
 docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
+docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 ```
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー仕事・帰庫再開の結果と6枚の代表画像は `output/voxel-game-vehicles/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー仕事・帰庫再開の結果と6枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
 
-2026-08-01の現実装を1280×720の `ANGLE Metal Renderer: Apple M4` で2秒warm-up＋12秒計測した結果、消防車はmedian 59.88fps／p10 56.82fps／平均60.00fps（scene 23 calls、車体7 calls）、ブルドーザーはmedian 59.88fps／p10 56.82fps／平均60.00fps（scene 22 calls、車体7 calls）でした。両車とも認証目標のmedian 55fps以上／p10 45fps以上を満たしています。実機再認証時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。
+2026-08-01の色遊び込み実装を1280×720の `ANGLE Metal Renderer: Apple M4` で2秒warm-up＋12秒計測した結果、消防車はmedian 59.88fps／p10 56.82fps／平均59.92fps（scene 28 calls、車体7 calls）、ブルドーザーはmedian 59.88fps／p10 56.82fps／平均58.92fps（scene 27 calls、車体7 calls）でした。色遊びstationは78 cube／5 callsで、両車とも認証目標のmedian 55fps以上／p10 45fps以上を満たしています。72×72の現mapではchunk streaming／LODは不要と判定し、96×96超への拡張または性能未達時だけ再評価します。実機再認証時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。
