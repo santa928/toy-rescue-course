@@ -78,7 +78,7 @@ feature固有scenarioの4層に分ける。
 - [x] canonicalはCDP同時touch driverを維持し、共有drive APIだけを使う。
 - [x] 二車種と色替えから重複helperを削除し、feature固有assertを残す。
 - [x] node test、focus、二車種、色替えE2Eを通す。
-- [ ] `E2Eの走行harnessを共有する`でcommit・scan・push・公開確認する。
+- [x] `E2Eの走行harnessを共有する`でcommit・scan・push・公開確認する。
 
 ## Task 5: focus責務と進捗記録を分離する
 
