@@ -95,9 +95,11 @@ declare global {
         readonly radius: number;
       }[];
       readonly colorPlaySources: readonly import('./voxel-game/scene/productionWorldMap').ColorPlaySourceDefinition[];
+      readonly construction: readonly [number, number, number];
       readonly fire: readonly [number, number, number];
       readonly fireSprayTarget: readonly [number, number, number];
       readonly garage: readonly [number, number, number];
+      readonly town: readonly [number, number, number];
     };
     readonly mission: import('./voxel-game/domain/VehicleMissionCoordinator').VehicleMissionSnapshot
     & import('./voxel-game/domain/jobTelemetry').MissionJobTelemetry & Omit<

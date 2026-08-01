@@ -68,8 +68,8 @@ describe('voxel world layout', () => {
     expect(FIRE_SPRAY_TARGET_POSITION).toBe(map.landmarks.fireSprayTarget);
   });
 
-  it('72×72本番境界内へ中央ハブと既存遊びを置く', () => {
-    expect(WORLD_BOUNDS).toEqual({ maxX: 36, maxZ: 36, minX: -36, minZ: -36 });
+  it('96×96本番境界内へ既存遊びの座標を変えずに置く', () => {
+    expect(WORLD_BOUNDS).toEqual({ maxX: 48, maxZ: 48, minX: -48, minZ: -48 });
     expect(GARAGE_POSITION).toEqual([0, 0.8, 6]);
     expect(PARK_CENTER).toEqual([0, 0, -24]);
     expect(BLOCK_PLAZA).toEqual({
@@ -92,7 +92,27 @@ describe('voxel world layout', () => {
     expect(resolveVehicleDistrict(FIRE_POSITION)).toBe('fire');
     expect(resolveVehicleDistrict(BLOCK_PLAZA.position)).toBe('blocks');
     expect(resolveVehicleDistrict([0, 0, 24])).toBe('south');
+    expect(resolveVehicleDistrict([-31, 0, -31])).toBe('construction');
+    expect(resolveVehicleDistrict([31, 0, 31])).toBe('town');
     expect(resolveVehicleDistrict([12, 0, 0])).toBe('road');
+  });
+
+  it('追加地区中心をproduction mapと同じ参照から公開する', () => {
+    const map = PRODUCTION_WORLD_MAP as typeof PRODUCTION_WORLD_MAP & {
+      readonly landmarks: typeof PRODUCTION_WORLD_MAP.landmarks & {
+        readonly construction?: readonly [number, number, number];
+        readonly town?: readonly [number, number, number];
+      };
+    };
+    const layout = WorldLayoutModule as typeof WorldLayoutModule & {
+      readonly CONSTRUCTION_CENTER?: readonly [number, number, number];
+      readonly TOWN_CENTER?: readonly [number, number, number];
+    };
+
+    expect(layout.CONSTRUCTION_CENTER).toEqual([-31, 0, -31]);
+    expect(layout.TOWN_CENTER).toEqual([31, 0, 31]);
+    expect(layout.CONSTRUCTION_CENTER).toBe(map.landmarks.construction);
+    expect(layout.TOWN_CENTER).toBe(map.landmarks.town);
   });
 
   it('建物の代表位置と分離した見える炎の照準点を固定する', () => {

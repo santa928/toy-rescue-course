@@ -113,7 +113,7 @@ function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
   );
 }
 
-/** 共有visual定義から12個の静的solidを単一fixed bodyに構成する。 */
+/** 共有visual定義から静的solidを単一fixed bodyに構成する。 */
 export function WorldSolidColliders(): ReactElement {
   return (
     <RigidBody colliders={false} type="fixed">
@@ -129,7 +129,7 @@ export function WorldSolidColliders(): ReactElement {
   );
 }
 
-/** 72×72の木製床と道路、全地区のランドマークを安定batchで構成する。 */
+/** 96×96の木製床と道路、全地区のランドマークを安定batchで構成する。 */
 export function VoxelWorld(): ReactElement {
   return (
     <group>

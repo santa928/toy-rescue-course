@@ -19,7 +19,7 @@ function inspectElement(node: ReactNode): ReactElement<InspectedElementProps> {
 }
 
 describe('production world render', () => {
-  it('72×72 floor、道路、visual batch、solid layerを各1回だけ接続する', () => {
+  it('96×96 floor、道路、visual batch、solid layerを各1回だけ接続する', () => {
     const world = inspectElement(VoxelWorld());
     expect(world.type).toBe('group');
     const children = Children.toArray(world.props.children).map(inspectElement);
@@ -29,14 +29,14 @@ describe('production world render', () => {
       .map(inspectElement)
       .find(({ type }) => type === 'boxGeometry');
     expect(floor.props.position).toEqual([0, -0.2, 0]);
-    expect(floorGeometry?.props.args).toEqual([72, 0.4, 72]);
+    expect(floorGeometry?.props.args).toEqual([96, 0.4, 96]);
 
     expect(children.filter(
       ({ props }) => props.boxes === PRODUCTION_WORLD_MAP.roads,
     )).toHaveLength(1);
 
     const roadMarkingBatch = children.find(({ props }) => props.color === '#f0c94a');
-    expect(roadMarkingBatch?.props.boxes).toHaveLength(14);
+    expect(roadMarkingBatch?.props.boxes).toHaveLength(26);
     expect(roadMarkingBatch?.props.boxes).toEqual(expect.arrayContaining([
       { position: [-17.75, 0.19, 0], scale: [32.5, 0.05, 0.22] },
       { position: [17.75, 0.19, 0], scale: [32.5, 0.05, 0.22] },

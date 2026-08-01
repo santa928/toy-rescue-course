@@ -14,7 +14,7 @@ export const WORLD_SOLID_BOXES: readonly WorldBoxDefinition[] = (
   PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)
 );
 
-/** 72×72の描画床とRapier ground colliderで共有する直方体。 */
+/** 96×96の描画床とRapier ground colliderで共有する直方体。 */
 export const WORLD_GROUND_BOX = {
   position: [0, -0.2, 0] as const,
   scale: [

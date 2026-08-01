@@ -244,7 +244,7 @@ function assertInitialWorldPhysicsContract(initial) {
   assert.equal(initial.visualLayout.routeMarkers.length, 12, 'Route marker layout is incomplete.');
   assert(initial.visualLayout.routeMarkers.every(({ scale }) => scale[1] <= 0.14),
     'Route marker is still obstacle-height.');
-  assert.equal(initial.visualLayout.worldSolids.length, 12, 'Production world solids are incomplete.');
+  assert.equal(initial.visualLayout.worldSolids.length, 27, 'Production world solids are incomplete.');
 }
 
 /** 実camera telemetryを使ってworld座標を現在viewportのscreen座標へ投影する。 */
@@ -679,11 +679,11 @@ async function verifyProductionMap(browser, errors) {
   try {
     const initial = await readGameState(page);
     assert.deepEqual(initial.world.bounds, {
-      maxX: 36, maxZ: 36, minX: -36, minZ: -36,
+      maxX: 48, maxZ: 48, minX: -48, minZ: -48,
     });
     assert.equal(initial.world.currentDistrict, 'hub');
     assert.equal(initial.world.destinationDistrict, 'fire');
-    assert.equal(initial.visualLayout.worldSolids.length, 12);
+    assert.equal(initial.visualLayout.worldSolids.length, 27);
     const southSignPost = requireWorldSolid(initial, 'south-sign-post-west');
     const southCaptureTargetZ = southSignPost.position[2] - 2;
     const initialResetCount = initial.vehicle.resetCount;
@@ -3347,6 +3347,21 @@ async function verifyWorldCollisions(browser, errors) {
     'tree-trunk-2': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'playground-support': 'the adjacent playground-plank assembly is covered through real input',
     'garage-left-wall': 'garage-right-wall covers the symmetric side-wall collider and garage-back-wall covers the rear wall',
+    'construction-office-body': 'the dedicated production-map E2E covers this solid through real keyboard and touch input',
+    'construction-crane-post-west': 'the east crane post shares the same post collider dimensions and production-map contract',
+    'construction-crane-post-east': 'the west crane post shares the same post collider dimensions and production-map contract',
+    'construction-timber-stack-a': 'the three timber stacks share one collider shape and the dedicated route proves the assembly blocks traversal',
+    'construction-timber-stack-b': 'the three timber stacks share one collider shape and the dedicated route proves the assembly blocks traversal',
+    'construction-timber-stack-c': 'the three timber stacks share one collider shape and the dedicated route proves the assembly blocks traversal',
+    'construction-sign-post': 'the dedicated production-map route proves this signed road edge remains a solid obstacle',
+    'town-house-red-body': 'the dedicated production-map E2E covers this solid through real keyboard and touch input',
+    'town-house-yellow-body': 'the red house covers the same house collider dimensions through real input',
+    'town-house-white-body': 'the red house covers the same house collider dimensions through real input',
+    'town-tree-trunk-a': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
+    'town-tree-trunk-b': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
+    'town-tree-trunk-c': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
+    'town-sign-post-west': 'south-sign-post-west covers the same sign-post collider shape through real keyboard input',
+    'town-sign-post-east': 'south-sign-post-east covers the same sign-post collider shape through real keyboard input',
   };
   const sharedDefinitionOnly = worldSolids
     .filter(({ id }) => !testedIds.includes(id))
@@ -3363,7 +3378,7 @@ async function verifyWorldCollisions(browser, errors) {
     sharedDefinitionOnly,
     sharedDefinitionOnlyReasons,
     testedIds,
-    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 12 production solids share one definition',
+    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 27 production solids share one definition',
   };
 }
 

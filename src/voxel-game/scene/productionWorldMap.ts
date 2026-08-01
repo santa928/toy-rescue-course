@@ -1,7 +1,14 @@
-/** 72×72の本番箱庭を描画・物理・ゲームプレイで共有する純粋な座標定義。 */
+/** 96×96の本番箱庭を描画・物理・ゲームプレイで共有する純粋な座標定義。 */
 
 /** 本番箱庭にある目的地地区の識別子。 */
-export type WorldDistrictId = 'hub' | 'park' | 'fire' | 'blocks' | 'south';
+export type WorldDistrictId =
+  | 'hub'
+  | 'park'
+  | 'fire'
+  | 'blocks'
+  | 'south'
+  | 'construction'
+  | 'town';
 
 /** 任意のworld座標を解決した結果の地区識別子。 */
 export type ResolvedWorldDistrictId = WorldDistrictId | 'road' | 'outside';
@@ -82,11 +89,13 @@ export interface WorldLandmarksDefinition {
   readonly bulldozerRouteMarkers: readonly WorldPoint[];
   readonly celebrationStarCenters: readonly WorldPoint[];
   readonly colorPlaySources: readonly ColorPlaySourceDefinition[];
+  readonly construction: WorldPoint;
   readonly fire: WorldPoint;
   readonly fireRouteMarkers: readonly WorldPoint[];
   readonly fireSprayTarget: WorldPoint;
   readonly garage: WorldPoint;
   readonly park: WorldPoint;
+  readonly town: WorldPoint;
 }
 
 /** 地区をつなぐ、描画可能な道路boxの定義。 */
@@ -107,15 +116,25 @@ export interface ProductionWorldMapDefinition {
   readonly visualBoxes: readonly WorldBoxDefinition[];
 }
 
-/** 描画・物理・ゲームプレイ間で共有する72×72本番箱庭の唯一の座標定義。 */
+/** 描画・物理・ゲームプレイ間で共有する96×96本番箱庭の唯一の座標定義。 */
 const PRODUCTION_WORLD_MAP_DEFINITION = {
-  bounds: { maxX: 36, maxZ: 36, minX: -36, minZ: -36 },
+  bounds: { maxX: 48, maxZ: 48, minX: -48, minZ: -48 },
   districts: [
     { bounds: { maxX: 10, maxZ: 10, minX: -10, minZ: -10 }, id: 'hub', label: 'ちゅうおうしゃこ' },
     { bounds: { maxX: 12, maxZ: -14, minX: -12, minZ: -34 }, id: 'park', label: 'こうえん' },
     { bounds: { maxX: 34, maxZ: 6, minX: 14, minZ: -20 }, id: 'fire', label: 'かさいげんば' },
     { bounds: { maxX: -14, maxZ: 16, minX: -34, minZ: -10 }, id: 'blocks', label: 'つみきひろば' },
     { bounds: { maxX: 12, maxZ: 34, minX: -12, minZ: 14 }, id: 'south', label: 'じゆうそうこう' },
+    {
+      bounds: { maxX: -16, maxZ: -16, minX: -46, minZ: -46 },
+      id: 'construction',
+      label: 'こうじヤード',
+    },
+    {
+      bounds: { maxX: 46, maxZ: 46, minX: 16, minZ: 16 },
+      id: 'town',
+      label: 'おもちゃのまち',
+    },
   ],
   landmarks: {
     blockPlaza: {
@@ -172,6 +191,7 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
         triggerBounds: { maxX: 11.7, maxZ: 31.3, minX: 7.1, minZ: 27.7 },
       },
     ],
+    construction: [-31, 0, -31],
     breakableBlocks: [
       { color: '#ef4444', id: 'plaza-red', position: [-26.7, 0.75, 9.5] },
       { color: '#facc15', id: 'plaza-yellow', position: [-21.5, 0.75, 0] },
@@ -218,6 +238,7 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     fireSprayTarget: [26.9, 1.45, -16.1],
     garage: [0, 0.8, 6],
     park: [0, 0, -24],
+    town: [31, 0, 31],
   },
   roads: [
     { connects: ['blocks', 'hub', 'fire'], id: 'road-hub-east-west', position: [0, 0.08, 0], scale: [68, 0.18, 5] },
@@ -232,6 +253,38 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { connects: ['south'], id: 'road-south-bottom', position: [0, 0.08, 32], scale: [24, 0.18, 4] },
     { connects: ['south'], id: 'road-south-west', position: [-10, 0.08, 24], scale: [4, 0.18, 16] },
     { connects: ['south'], id: 'road-south-east', position: [10, 0.08, 24], scale: [4, 0.18, 16] },
+    {
+      connects: ['blocks', 'construction'],
+      id: 'road-construction-blocks-connector',
+      position: [-32, 0.08, -13],
+      scale: [4, 0.18, 6],
+    },
+    { connects: ['construction'], id: 'road-construction-south', position: [-31, 0.08, -18], scale: [26, 0.18, 4] },
+    { connects: ['construction'], id: 'road-construction-west', position: [-44, 0.08, -31], scale: [4, 0.18, 26] },
+    { connects: ['construction'], id: 'road-construction-north', position: [-31, 0.08, -44], scale: [26, 0.18, 4] },
+    { connects: ['construction'], id: 'road-construction-east', position: [-18, 0.08, -31], scale: [4, 0.18, 26] },
+    {
+      connects: ['construction', 'park'],
+      id: 'road-construction-park-connector',
+      position: [-14, 0.08, -32],
+      scale: [8, 0.18, 4],
+    },
+    {
+      connects: ['fire', 'town'],
+      id: 'road-town-fire-connector',
+      position: [32, 0.08, 11],
+      scale: [4, 0.18, 10],
+    },
+    { connects: ['town'], id: 'road-town-north', position: [31, 0.08, 18], scale: [26, 0.18, 4] },
+    { connects: ['town'], id: 'road-town-east', position: [44, 0.08, 31], scale: [4, 0.18, 26] },
+    { connects: ['town'], id: 'road-town-south', position: [31, 0.08, 44], scale: [26, 0.18, 4] },
+    { connects: ['town'], id: 'road-town-west', position: [18, 0.08, 31], scale: [4, 0.18, 26] },
+    {
+      connects: ['south', 'town'],
+      id: 'road-town-south-connector',
+      position: [14, 0.08, 24],
+      scale: [8, 0.18, 4],
+    },
   ],
   visualBoxes: [
     { color: '#78a94f', id: 'park-ground', position: [0, 0.18, -24], scale: [20, 0.34, 16], solid: false },
@@ -261,6 +314,34 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#86552f', id: 'south-sign-post-east', position: [3.5, 1.1, 29.5], scale: [0.7, 2, 0.7], solid: true },
     { color: '#f2c94c', id: 'south-sign-board-west', position: [-3.5, 2.15, 18.5], scale: [3, 1, 0.4], solid: false },
     { color: '#e24b3f', id: 'south-sign-board-east', position: [3.5, 2.15, 29.5], scale: [3, 1, 0.4], solid: false },
+    { color: '#e1c78c', id: 'construction-ground', position: [-31, 0.18, -31], scale: [30, 0.34, 30], solid: false },
+    { color: '#3b82f6', id: 'construction-office-body', position: [-38, 1.5, -37], scale: [6, 2.8, 5], solid: true },
+    { color: '#facc15', id: 'construction-office-roof', position: [-38, 3.1, -37], scale: [6.8, 0.4, 5.8], solid: false },
+    { color: '#f2c94c', id: 'construction-crane-post-west', position: [-27, 2, -38], scale: [0.8, 3.8, 0.8], solid: true },
+    { color: '#f2c94c', id: 'construction-crane-post-east', position: [-21, 2, -38], scale: [0.8, 3.8, 0.8], solid: true },
+    { color: '#f2c94c', id: 'construction-crane-beam', position: [-24, 3.85, -38], scale: [7, 0.5, 0.8], solid: false },
+    { color: '#86552f', id: 'construction-timber-stack-a', position: [-35, 0.8, -26], scale: [3, 1.4, 2], solid: true },
+    { color: '#86552f', id: 'construction-timber-stack-b', position: [-30, 0.8, -26], scale: [3, 1.4, 2], solid: true },
+    { color: '#86552f', id: 'construction-timber-stack-c', position: [-25, 0.8, -26], scale: [3, 1.4, 2], solid: true },
+    { color: '#86552f', id: 'construction-sign-post', position: [-40, 1.1, -22], scale: [0.7, 2, 0.7], solid: true },
+    { color: '#e24b3f', id: 'construction-sign-board', position: [-40, 2.15, -22], scale: [3.4, 1, 0.4], solid: false },
+    { color: '#78a94f', id: 'town-green-west', position: [22, 0.18, 34], scale: [4, 0.34, 12], solid: false },
+    { color: '#78a94f', id: 'town-green-east', position: [40, 0.18, 35], scale: [4, 0.34, 14], solid: false },
+    { color: '#e24b3f', id: 'town-house-red-body', position: [25, 1.5, 25], scale: [6, 2.8, 5], solid: true },
+    { color: '#c83e34', id: 'town-house-red-roof', position: [25, 3.1, 25], scale: [6.8, 0.4, 5.8], solid: false },
+    { color: '#f2c94c', id: 'town-house-yellow-body', position: [37, 1.5, 25], scale: [6, 2.8, 5], solid: true },
+    { color: '#6f4327', id: 'town-house-yellow-roof', position: [37, 3.1, 25], scale: [6.8, 0.4, 5.8], solid: false },
+    { color: '#f1efe6', id: 'town-house-white-body', position: [31, 1.5, 37], scale: [6, 2.8, 5], solid: true },
+    { color: '#c83e34', id: 'town-house-white-roof', position: [31, 3.1, 37], scale: [6.8, 0.4, 5.8], solid: false },
+    { color: '#86552f', id: 'town-tree-trunk-a', position: [22, 1.25, 34], scale: [0.7, 2.2, 0.7], solid: true },
+    { color: '#3f7f3a', id: 'town-tree-crown-a', position: [22, 2.85, 34], scale: [2.2, 1.4, 2.2], solid: false },
+    { color: '#86552f', id: 'town-tree-trunk-b', position: [40, 1.25, 33], scale: [0.7, 2.2, 0.7], solid: true },
+    { color: '#3f7f3a', id: 'town-tree-crown-b', position: [40, 2.85, 33], scale: [2.2, 1.4, 2.2], solid: false },
+    { color: '#86552f', id: 'town-tree-trunk-c', position: [24, 1.25, 40], scale: [0.7, 2.2, 0.7], solid: true },
+    { color: '#3f7f3a', id: 'town-tree-crown-c', position: [24, 2.85, 40], scale: [2.2, 1.4, 2.2], solid: false },
+    { color: '#86552f', id: 'town-sign-post-west', position: [28, 1.1, 21.5], scale: [0.7, 2, 0.7], solid: true },
+    { color: '#86552f', id: 'town-sign-post-east', position: [34, 1.1, 21.5], scale: [0.7, 2, 0.7], solid: true },
+    { color: '#f2c94c', id: 'town-sign-board', position: [31, 2.15, 21.5], scale: [7, 1, 0.4], solid: false },
   ],
 } as const satisfies ProductionWorldMapDefinition;
 
@@ -402,6 +483,8 @@ export function validateProductionWorldMap(
     { name: 'fire', position: map.landmarks.fire },
     { name: 'fireSprayTarget', position: map.landmarks.fireSprayTarget },
     { name: 'blockPlaza', position: map.landmarks.blockPlaza.position },
+    { name: 'construction', position: map.landmarks.construction },
+    { name: 'town', position: map.landmarks.town },
     ...map.landmarks.fireRouteMarkers.map((position, index) => ({
       name: `fireRouteMarker:${index}`,
       position,
@@ -551,6 +634,8 @@ export function validateProductionWorldMap(
     { expected: 'fire', name: 'fire', position: map.landmarks.fire },
     { expected: 'fire', name: 'fireSprayTarget', position: map.landmarks.fireSprayTarget },
     { expected: 'blocks', name: 'blockPlaza', position: map.landmarks.blockPlaza.position },
+    { expected: 'construction', name: 'construction', position: map.landmarks.construction },
+    { expected: 'town', name: 'town', position: map.landmarks.town },
   ];
   for (const landmark of expectedDistricts) {
     const received = resolveWorldDistrictInMap(map, landmark.position);

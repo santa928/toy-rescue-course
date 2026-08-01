@@ -75,7 +75,7 @@ describe('worldCollisionLayout', () => {
     rapierRenderRecords.rigidBodies.length = 0;
   });
 
-  it('本番mapのsolid:trueだけを12個のstatic colliderとして公開する', () => {
+  it('本番mapのsolid:trueだけを27個のstatic colliderとして公開する', () => {
     expect(WORLD_SOLID_BOXES.map(({ id }) => id)).toEqual([
       'tree-trunk-1',
       'tree-trunk-2',
@@ -89,6 +89,21 @@ describe('worldCollisionLayout', () => {
       'hub-gate-post',
       'south-sign-post-west',
       'south-sign-post-east',
+      'construction-office-body',
+      'construction-crane-post-west',
+      'construction-crane-post-east',
+      'construction-timber-stack-a',
+      'construction-timber-stack-b',
+      'construction-timber-stack-c',
+      'construction-sign-post',
+      'town-house-red-body',
+      'town-house-yellow-body',
+      'town-house-white-body',
+      'town-tree-trunk-a',
+      'town-tree-trunk-b',
+      'town-tree-trunk-c',
+      'town-sign-post-west',
+      'town-sign-post-east',
     ]);
     expect(WORLD_SOLID_BOXES).toEqual(
       PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid),
@@ -143,12 +158,12 @@ describe('worldCollisionLayout', () => {
     );
   });
 
-  it('72×72 groundを±36境界と同じhalf extentsで構成する', () => {
+  it('96×96 groundを±48境界と同じhalf extentsで構成する', () => {
     expect(WORLD_GROUND_BOX).toEqual({
       position: [0, -0.2, 0],
-      scale: [72, 0.4, 72],
+      scale: [96, 0.4, 96],
     });
-    expect(scaleToHalfExtents(WORLD_GROUND_BOX.scale)).toEqual([36, 0.2, 36]);
+    expect(scaleToHalfExtents(WORLD_GROUND_BOX.scale)).toEqual([48, 0.2, 48]);
   });
 
   it('full scaleをRapier CuboidColliderのhalf extentsへ変換する', () => {
@@ -174,13 +189,13 @@ describe('worldCollisionLayout', () => {
     )).toBe(false);
   });
 
-  it('単一fixed bodyに共有定義由来の12 colliderだけを構成する', () => {
+  it('単一fixed bodyに共有定義由来の27 colliderだけを構成する', () => {
     const rigidBody = inspectElement(WorldSolidColliders());
     const colliders = Children.toArray(rigidBody.props.children).map(inspectElement);
 
     expect(rigidBody.type).toBe(RigidBody);
     expect(rigidBody.props).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(colliders).toHaveLength(12);
+    expect(colliders).toHaveLength(27);
     expect(colliders.every((collider) => collider.type === CuboidCollider)).toBe(true);
     expect(colliders.map(({ props }) => ({
       args: props.args,
@@ -198,7 +213,7 @@ describe('worldCollisionLayout', () => {
 
     expect(rapierRenderRecords.rigidBodies).toHaveLength(1);
     expect(rapierRenderRecords.rigidBodies[0]).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(rapierRenderRecords.cuboidColliders).toHaveLength(12);
+    expect(rapierRenderRecords.cuboidColliders).toHaveLength(27);
     expect(rapierRenderRecords.cuboidColliders.map(({ args, position, rotation }) => ({
       args,
       position,

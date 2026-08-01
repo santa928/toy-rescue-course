@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-01
 
-**状態:** 設計確定・実装待ち
+**状態:** 実装済み・ローカル検証済み・公開検証待ち
 
 **対象:** world bounds、追加2地区、道路、静的ランドマーク、物理、telemetry、E2E、chunk判断
 
@@ -112,16 +112,16 @@ Docker software rendererのfpsは機能回帰の参考に留め、判断根拠�
 
 ## 9. 受け入れ条件
 
-- [ ] world bounds、ground、範囲外復帰が96×96の同一定義を使う。
-- [ ] 既存5地区に加えて、こうじヤードとおもちゃのまちが表示・地区解決される。
-- [ ] 新地区はそれぞれ既存2地区へ道路接続し、入口・中心・別出口を実走できる。
-- [ ] 詰所、家、木、資材、門柱を貫通せず、装飾屋根・樹冠・看板板は意図どおり非solidである。
-- [ ] 既存15仕事、帰庫、乗り換え、色遊び、音、積み木破壊が回帰しない。
-- [ ] Desktop、Tablet、Mobile landscapeでHUDと新地区ランドマークが干渉しない。
-- [ ] `render_game_to_text()`が96×96、7地区、新中心、solidを公開する。
-- [ ] 全unit、build、専用E2E、fleet E2E、production smokeがDocker内で成功する。
+- [x] world bounds、ground、範囲外復帰が96×96の同一定義を使う。
+- [x] 既存5地区に加えて、こうじヤードとおもちゃのまちが表示・地区解決される。
+- [x] 新地区はそれぞれ既存2地区へ道路接続し、入口・中心・別出口を実走できる。
+- [x] 詰所、家、木、資材、門柱を貫通せず、装飾屋根・樹冠・看板板は意図どおり非solidである。
+- [x] 既存15仕事、帰庫、乗り換え、色遊び、音、積み木破壊が回帰しない。
+- [x] Desktop、Tablet、Mobile landscapeでHUDと新地区ランドマークが干渉しない。
+- [x] `render_game_to_text()`が96×96、7地区、新中心、solidを公開する。
+- [x] 全unit、build、専用E2E、fleet E2E、production smokeがDocker内で成功する。
 - [ ] 公開URLでも専用E2Eとconsole cleanを確認する。
-- [ ] chunk streaming／LOD判断を物理GPUの再評価条件とともに記録する。
+- [x] chunk streaming／LOD判断を物理GPUの再評価条件とともに記録する。
 
 ## 10. 非対象
 
@@ -157,3 +157,13 @@ Docker software rendererのfpsは機能回帰の参考に留め、判断根拠�
 - [x] 非対象がある。
 - [x] リスクと対策がある。
 - [x] 性能目標がある。
+
+## 14. ローカル検証結果
+
+2026-08-01のDocker検証では、canonical mapは96×96、7地区、道路24、visual box 55、static solid 27で確定した。追加地区の専用E2Eは1280×720、1024×768 touch、844×390 touchの3画面を一括完走し、こうじヤード68unit、おもちゃのまち71unitで設計上限72unit以内だった。各地区は入口と別出口を実走し、建設事務所と赤い家への衝突もkeyboard／touchで確認した。
+
+HUDは各画面でCanvas内包と主要要素間8px以上を満たし、追加地区6画像を目視して見切れ、重なり、操作阻害がないことを確認した。renderer callは26〜27、static colliderは27で構造予算内だった。
+
+関連unit 94件、全unit 448件、production build、bundle budget、5車種15仕事のfleet E2E、production smokeは成功した。canonical総合E2Eはマップ、左右直進、消火、3画面の実ミッション、放水タイムライン、既存衝突入力を実行し、追加solidの監査理由を更新後にcollision focusも成功した。Docker wall clockとsoftware rendererのfpsは性能認証へ使用しない。
+
+96×96ちょうど、27 collider、既存InstancedMesh構造、追加asset fetch 0のため、chunk streaming／LODは導入しない。96×96版の物理GPU再認証は最終リリース工程で行い、Desktop median 55fps／p10 45fpsを下回った場合だけ再検討する。

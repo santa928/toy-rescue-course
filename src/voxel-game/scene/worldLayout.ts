@@ -4,7 +4,7 @@ import {
   type ResolvedWorldDistrictId,
 } from './productionWorldMap';
 
-/** 純ボクセル箱庭で使用する72×72本番座標境界。 */
+/** 純ボクセル箱庭で使用する96×96本番座標境界。 */
 export const WORLD_BOUNDS = PRODUCTION_WORLD_MAP.bounds;
 
 /** 描画・物理と共有する本番箱庭の地区定義。 */
@@ -48,6 +48,12 @@ export const CELEBRATION_STAR_CENTER_POSITIONS =
 
 /** 中央公園の基準位置。 */
 export const PARK_CENTER = PRODUCTION_WORLD_MAP.landmarks.park;
+
+/** 北西のこうじヤードを代表するworld座標。 */
+export const CONSTRUCTION_CENTER = PRODUCTION_WORLD_MAP.landmarks.construction;
+
+/** 南東のおもちゃのまちを代表するworld座標。 */
+export const TOWN_CENTER = PRODUCTION_WORLD_MAP.landmarks.town;
 
 /** 西側の積み木地区へ収める木製積み木広場の土台。 */
 export const BLOCK_PLAZA = PRODUCTION_WORLD_MAP.landmarks.blockPlaza;

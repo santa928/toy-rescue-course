@@ -24,8 +24,8 @@ docker compose up --build web
 
 ## 本番箱庭
 
-72×72相当の机上箱庭を、中央の車庫、北の公園、東の火災現場、
-西の積み木・工事広場、南の自由走行地区で構成しています。中央の道路から
+96×96の机上箱庭を、中央の車庫、北の公園、東の火災現場、
+西の積み木・工事広場、南の自由走行地区、北西のこうじヤード、南東のおもちゃのまちで構成しています。中央の道路から
 各地区へ寄り道でき、消防車の消火、ブルドーザーのがれき片付け、ショベルカーの土掘り、救急車の手当て、パトカーの巡回、積み木破壊を
 同じ1枚続きの世界で遊べます。
 
@@ -59,6 +59,8 @@ docker compose up --build web
 - 車庫は正面開口から出入りし、背面壁・左右壁を通り抜けません。
 - 北の公園の赤い遊具と黄色い支柱はsolidです。
 - 中央ハブのゲートpostと南の自由走行地区の標識postはsolidです。
+- こうじヤードの詰所、クレーン柱、木材、標識postはsolidです。
+- おもちゃのまちの家、街路樹の幹、入口標識postはsolidです。
 - 炎は燃えている間だけ進入できず、消火後は同じ場所を走れます。
 - 黄色い道しるべは道路へ埋め込まれた案内灯なので通過できます。
 - 樹冠、窓、屋根装飾、道路線、水、星は非solidです。
@@ -77,6 +79,7 @@ docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 docker compose --profile e2e run --rm --build voxel-game-fleet-e2e
 docker compose --profile e2e run --rm --build voxel-game-audio-e2e
+docker compose --profile e2e run --rm --build voxel-game-map-e2e
 ```
 
 canonical E2Eはscenarioの開始、30秒ごとのheartbeat、成功／失敗、経過秒を`[voxel-e2e]`行へ出力し、
@@ -98,7 +101,7 @@ VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-ga
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは46 files / 446 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。96×96マップ実装後のfresh unit testは46 files / 448 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -111,12 +114,13 @@ docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 docker compose --profile e2e run --rm --build voxel-game-fleet-e2e
 docker compose --profile e2e run --rm --build voxel-game-audio-e2e
+docker compose --profile e2e run --rm --build voxel-game-map-e2e
 ```
 
 production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
 決定的なchunkへ分割します。`postbuild`が3つのHTML entryからのasset参照と、game entry 350kB、
-通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-01の音実装後の実測は
-game 140,509 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
+通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-01の96×96マップ実装後の実測は
+game 144,786 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
 
 Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状態読取、keyboard／touch stick、
 制動、world軸走行、座標補正を`scripts/voxel-game-e2e/drive-harness.mjs`で共有します。canonicalの
@@ -133,13 +137,13 @@ docker compose run --rm web node --test \
 ```
 共有走行、scenario進捗、HUD screenshot proof、job別火災経路を含むNode test 24件を実行します。
 canonical fullの最新manifestは全scenario成功、33 artifacts＝33 screenshot proofs、contract failure 0、
-browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目へ進みます。
+browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目へ進みます。96×96マップ専用E2Eは、こうじヤード68unit、おもちゃのまち71unitの実走、別出口、代表solid衝突、7地区、27 solid、HUD 8px安全余白を3 viewportで確認します。
 
 `production-smoke-e2e`は生成済みbundleをVite previewで配信し、root、互換URL、Vehicle LabのWebGL起動と
 console／page／request errorがないことを実ブラウザで確認します。
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。ショベルカーの3土山、救急車の患者手当て、パトカーの3地点巡回について、成功、帰庫、次仕事までを3 viewportで実走した24枚は `output/voxel-game-fleet/` へ生成されます。実AudioContextのon/off、5車種action、速度連動engine、HUD実寸とオン／オフ6枚は`output/voxel-game-audio/`へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。ショベルカーの3土山、救急車の患者手当て、パトカーの3地点巡回について、成功、帰庫、次仕事までを3 viewportで実走した24枚は `output/voxel-game-fleet/` へ生成されます。実AudioContextのon/off、5車種action、速度連動engine、HUD実寸とオン／オフ6枚は`output/voxel-game-audio/`へ生成されます。追加2地区の経路、物理、HUD実寸と6枚は`output/voxel-game-map/`へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
 
-2026-08-01の色遊び込み実装を1280×720の `ANGLE Metal Renderer: Apple M4` で2秒warm-up＋12秒計測した結果、消防車はmedian 59.88fps／p10 56.82fps／平均59.92fps（scene 28 calls、車体7 calls）、ブルドーザーはmedian 59.88fps／p10 56.82fps／平均58.92fps（scene 27 calls、車体7 calls）でした。色遊びstationは78 cube／5 callsで、両車とも認証目標のmedian 55fps以上／p10 45fps以上を満たしています。72×72の現mapではchunk streaming／LODは不要と判定し、96×96超への拡張または性能未達時だけ再評価します。実機再認証時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。
+2026-08-01の色遊び込み実装を1280×720の `ANGLE Metal Renderer: Apple M4` で2秒warm-up＋12秒計測した結果、消防車はmedian 59.88fps／p10 56.82fps／平均59.92fps（scene 28 calls、車体7 calls）、ブルドーザーはmedian 59.88fps／p10 56.82fps／平均58.92fps（scene 27 calls、車体7 calls）でした。色遊びstationは78 cube／5 callsで、両車とも認証目標のmedian 55fps以上／p10 45fps以上を満たしています。この数値は拡張前mapのため、96×96版は最終リリース工程で再認証します。現mapは96×96ちょうど、27 static collider、既存InstancedMesh構造のためchunk streaming／LODは導入せず、一辺96unit超への拡張または96×96版の物理GPU性能未達時だけ再評価します。実機再認証時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。

@@ -123,12 +123,22 @@ const EXPECTED_LANDMARKS = {
   fireSprayTarget: [26.9, 1.45, -16.1] as const,
   garage: [0, 0.8, 6] as const,
   park: [0, 0, -24] as const,
+  construction: [-31, 0, -31] as const,
+  town: [31, 0, 31] as const,
 } as const;
 
 const MAP_WITH_LANDMARK_FIXTURE = {
   ...PRODUCTION_WORLD_MAP,
   landmarks: EXPECTED_LANDMARKS,
 } as const;
+
+/** const tupleのunionを文字列接続集合として比較するtest専用helper。 */
+function connectsDistrict(
+  road: { readonly connects: readonly string[] },
+  districtId: string,
+): boolean {
+  return road.connects.includes(districtId);
+}
 
 describe('PRODUCTION_WORLD_MAP', () => {
   it('canonical mapをmodule初期化guardへ接続し、不正定義を明確なErrorで拒否する', () => {
@@ -153,29 +163,59 @@ describe('PRODUCTION_WORLD_MAP', () => {
     );
   });
 
-  it('72×72の境界と中央ハブ＋4地区を公開する', () => {
+  it('96×96の境界と中央ハブ＋既存4地区＋追加2地区を公開する', () => {
     expect(PRODUCTION_WORLD_MAP.bounds).toEqual({
-      maxX: 36, maxZ: 36, minX: -36, minZ: -36,
+      maxX: 48, maxZ: 48, minX: -48, minZ: -48,
     });
     expect(PRODUCTION_WORLD_MAP.districts.map(({ id }) => id)).toEqual([
-      'hub', 'park', 'fire', 'blocks', 'south',
+      'hub', 'park', 'fire', 'blocks', 'south', 'construction', 'town',
     ]);
   });
 
-  it('道路12本が中央ハブから4地区を接続する', () => {
-    expect(PRODUCTION_WORLD_MAP.roads).toHaveLength(12);
+  it('道路24本が既存地区を維持し、新2地区へ各2方向から接続する', () => {
+    expect(PRODUCTION_WORLD_MAP.roads).toHaveLength(24);
     expect(new Set(PRODUCTION_WORLD_MAP.roads.flatMap(({ connects }) => connects))).toEqual(
-      new Set(['hub', 'park', 'fire', 'blocks', 'south']),
+      new Set(['hub', 'park', 'fire', 'blocks', 'south', 'construction', 'town']),
     );
+    expect(PRODUCTION_WORLD_MAP.roads.filter((road) => (
+      connectsDistrict(road, 'construction') && road.connects.length > 1
+    )).map(({ id }) => id)).toEqual([
+      'road-construction-blocks-connector',
+      'road-construction-park-connector',
+    ]);
+    expect(PRODUCTION_WORLD_MAP.roads.filter((road) => (
+      connectsDistrict(road, 'town') && road.connects.length > 1
+    )).map(({ id }) => id)).toEqual([
+      'road-town-fire-connector',
+      'road-town-south-connector',
+    ]);
     expect(PRODUCTION_WORLD_MAP.roads.every(({ scale }) => (
-      Math.max(scale[0], scale[2]) >= 16 && Math.min(scale[0], scale[2]) >= 4
+      Math.max(scale[0], scale[2]) >= 6 && Math.min(scale[0], scale[2]) >= 4
     ))).toBe(true);
   });
 
   it('visualとsolidを同じbox定義で共有する', () => {
-    expect(PRODUCTION_WORLD_MAP.visualBoxes).toHaveLength(27);
-    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)).toHaveLength(12);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes).toHaveLength(55);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)).toHaveLength(27);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid).length).toBeLessThanOrEqual(28);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.every(({ id }) => id.length > 0)).toBe(true);
+  });
+
+  it('追加地区の代表中心とランドマークを対応地区へ置く', () => {
+    const landmarks = PRODUCTION_WORLD_MAP.landmarks as typeof PRODUCTION_WORLD_MAP.landmarks & {
+      readonly construction?: readonly [number, number, number];
+      readonly town?: readonly [number, number, number];
+    };
+
+    expect(landmarks.construction).toEqual([-31, 0, -31]);
+    expect(landmarks.town).toEqual([31, 0, 31]);
+    expect(landmarks.construction && resolveWorldDistrict(landmarks.construction))
+      .toBe('construction');
+    expect(landmarks.town && resolveWorldDistrict(landmarks.town)).toBe('town');
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.some(({ id }) => id === 'construction-office-body'))
+      .toBe(true);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ id }) => id.startsWith('town-house-')))
+      .toHaveLength(6);
   });
 
   it('車庫屋根は中央の車体確認用開口を残す3辺フレームである', () => {
@@ -346,7 +386,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
         ...MAP_WITH_LANDMARK_FIXTURE,
         districts: MAP_WITH_LANDMARK_FIXTURE.districts.map((district) => (
           district.id === 'hub'
-            ? { ...district, bounds: { ...district.bounds, maxX: 37 } }
+            ? { ...district, bounds: { ...district.bounds, maxX: 49 } }
             : district
         )),
       },
@@ -513,7 +553,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
       'world外landmark',
       {
         ...MAP_WITH_LANDMARK_FIXTURE,
-        landmarks: { ...EXPECTED_LANDMARKS, park: [40, 0, -24] as const },
+        landmarks: { ...EXPECTED_LANDMARKS, park: [49, 0, -24] as const },
       },
       'landmark outside world bounds: park',
     ],
@@ -537,7 +577,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
         landmarks: {
           ...EXPECTED_LANDMARKS,
           breakableBlocks: EXPECTED_LANDMARKS.breakableBlocks.map((block, index) => (
-            index === 0 ? { ...block, position: [-40, 0.75, 9.5] as const } : block
+            index === 0 ? { ...block, position: [-49, 0.75, 9.5] as const } : block
           )),
         },
       },
@@ -563,7 +603,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
         landmarks: {
           ...EXPECTED_LANDMARKS,
           fireRouteMarkers: EXPECTED_LANDMARKS.fireRouteMarkers.map((position, index) => (
-            index === 0 ? [40, 0.26, 3] as const : position
+            index === 0 ? [49, 0.26, 3] as const : position
           )),
         },
       },
@@ -591,7 +631,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
         landmarks: {
           ...EXPECTED_LANDMARKS,
           celebrationStarCenters: EXPECTED_LANDMARKS.celebrationStarCenters.map(
-            (position, index) => (index === 0 ? [24.8, 1, -40] as const : position),
+            (position, index) => (index === 0 ? [24.8, 1, -49] as const : position),
           ),
         },
       },
@@ -649,15 +689,16 @@ describe('PRODUCTION_WORLD_MAP', () => {
   });
 
   it('地区と全boxをworld境界内へ収める', () => {
+    const { bounds: worldBounds } = PRODUCTION_WORLD_MAP;
     expect(PRODUCTION_WORLD_MAP.districts.every(({ bounds }) => (
-      bounds.minX >= -36 && bounds.maxX <= 36
-      && bounds.minZ >= -36 && bounds.maxZ <= 36
+      bounds.minX >= worldBounds.minX && bounds.maxX <= worldBounds.maxX
+      && bounds.minZ >= worldBounds.minZ && bounds.maxZ <= worldBounds.maxZ
     ))).toBe(true);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.every(({ position, scale }) => (
-      position[0] - scale[0] / 2 >= -36
-      && position[0] + scale[0] / 2 <= 36
-      && position[2] - scale[2] / 2 >= -36
-      && position[2] + scale[2] / 2 <= 36
+      position[0] - scale[0] / 2 >= worldBounds.minX
+      && position[0] + scale[0] / 2 <= worldBounds.maxX
+      && position[2] - scale[2] / 2 >= worldBounds.minZ
+      && position[2] + scale[2] / 2 <= worldBounds.maxZ
     ))).toBe(true);
   });
 
@@ -668,7 +709,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
     [[-24, 0.18, 6], 'blocks'],
     [[0, 0, 24], 'south'],
     [[12, 0, 0], 'road'],
-    [[40, 0, 0], 'outside'],
+    [[49, 0, 0], 'outside'],
     [[Number.NaN, 0, 0], 'outside'],
     [[0, Number.NaN, 0], 'outside'],
     [[0, Number.POSITIVE_INFINITY, 0], 'outside'],
