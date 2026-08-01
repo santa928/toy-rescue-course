@@ -155,3 +155,19 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - 保留項目は理由、影響、代替タスク、復帰条件を記載した。
 - 既存機能の暗黙削除はなく、追加3台を段階公開できる境界に分けた。
 - ユーザー指定により個別デザイン承認待ちは設けず、この台帳を実装判断の基準にする。
+
+## 実装・検証結果
+
+### Task 1: 設計公開
+
+- commit `2a03219`をmainへpushし、remote SHA一致・ahead／behind `0/0`を確認した。
+- GitHub Pages run `30703175735`はunit、budget付きbuild、deployがすべてsuccessだった。
+
+### Task 2: 共通ActionTarget基盤
+
+- REDではruntime、contact、VFX、sceneの未作成importが3 suiteと1 suiteでそれぞれ失敗した。
+- `ActionTargetMissionRuntime`へ対象の冪等完了、1800ms成功、自由走行、帰庫、同一instance再割当を実装した。
+- 接触中心、距離、速度範囲、主操作、最大50msの継続累積をpure helperへ分離した。
+- 最大3対象のbody 18、accent 9、particle 18、route 7、star 12 slotを一度だけ確保し、固定5 batchで描く共通sceneを追加した。非選択時は全slotを非activeにする。
+- focusedは3 files／20 tests、fresh full unitは40 files／378 testsがPASSした。
+- production buildは641 modulesでPASSし、game 93,654 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで全budget内だった。共通sceneは未接続のため配信bundleと既存draw callはまだ変えていない。

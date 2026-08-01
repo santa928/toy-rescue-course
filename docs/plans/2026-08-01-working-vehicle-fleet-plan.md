@@ -12,14 +12,14 @@
 
 - [x] REQ-053〜REQ-062、世界観辞書、遊び、UIアンカー、受け入れ条件、非対象、性能、リスクを定義する。
 - [x] 共通ActionTarget方式と既存runtime温存を比較して採用する。
-- [ ] 日本語commit、secret scan、main push、Actions／Pagesを確認する。
+- [x] 日本語commit、secret scan、main push、Actions／Pagesを確認する。
 
 ## Task 2: 共通ActionTarget domain／scene基盤
 
-- [ ] pure runtimeの対象完了、冪等性、1800ms成功、帰庫、再割当をRED→GREENにする。
-- [ ] 距離、速度、継続時間の接触gateと50ms clampをRED→GREENにする。
-- [ ] target／particle／route／starの固定slot frameをRED→GREENにする。
-- [ ] disabled時count 0、job切替in-place、telemetry一致を固定する。
+- [x] pure runtimeの対象完了、冪等性、1800ms成功、帰庫、再割当をRED→GREENにする。
+- [x] 距離、速度、継続時間の接触gateと50ms clampをRED→GREENにする。
+- [x] target／particle／route／starの固定slot frameをRED→GREENにする。
+- [x] disabled時count 0、job切替in-place、telemetry一致を固定する。
 - [ ] 日本語commit、secret scan、main push、Actions／Pagesを確認する。
 
 ## Task 3: ショベルカー
