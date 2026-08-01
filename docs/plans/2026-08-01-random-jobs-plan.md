@@ -25,7 +25,7 @@
 - [x] 車種別bag、current job、cycle、seedをsnapshotへ追加する。
 - [x] ブルドーザーruntimeへ同じinstanceで対象IDを再割当するAPIを追加する。
 - [x] 乗り換え、未完了帰庫、timer、既存通知回数の回帰をGREENにする。
-- [ ] 日本語commit、secret scan、push、公開確認を行う。
+- [x] 日本語commit、secret scan、push、公開確認を行う。
 
 本番の仕事ローテーションはTask 4・5で両sceneが仕事座標を反映するまで安全ゲートをOFFにし、coordinatorのoptionを有効化したtestだけで先に契約を固定する。片側だけを先行公開して表示対象と判定対象をずらさない。
 
