@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { BulldozerMissionSnapshot } from '../domain/BulldozerMissionRuntime';
 import type { VehicleMissionCoordinator } from '../domain/VehicleMissionCoordinator';
 import type { VehicleId } from '../domain/vehicleDefinitions';
+import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetryRef } from './VehicleController';
 import type { WorldPoint } from './productionWorldMap';
 import {
@@ -50,7 +51,7 @@ export type BulldozerMissionTelemetryRef = MutableRefObject<BulldozerMissionTele
 export type BulldozerMissionSnapshotRef = MutableRefObject<BulldozerMissionSnapshot>;
 
 interface BulldozerDebrisMissionProps {
-  readonly actionActiveRef: RefObject<boolean>;
+  readonly commandRef: RefObject<DriveCommand>;
   readonly coordinator: VehicleMissionCoordinator;
   readonly enabled: boolean;
   readonly missionTelemetryRef: BulldozerMissionTelemetryRef;
@@ -157,7 +158,7 @@ function VoxelPool({
 
 /** がれき、流れるchip、道しるべ、成功星を固定poolで描画し、1 frame最大1塊を片付ける。 */
 export function BulldozerDebrisMission({
-  actionActiveRef,
+  commandRef,
   coordinator,
   enabled,
   missionTelemetryRef,
@@ -207,7 +208,7 @@ export function BulldozerDebrisMission({
       else if (clearTimes[index] < 0) clearTimes[index] = elapsedSeconds;
     }
 
-    if (enabled && actionActiveRef.current === true) {
+    if (enabled && commandRef.current.primaryAction) {
       for (let index = 0; index < BULLDOZER_DEBRIS.length; index += 1) {
         const source = BULLDOZER_DEBRIS[index];
         if (snapshot.debris[index]?.cleared) continue;

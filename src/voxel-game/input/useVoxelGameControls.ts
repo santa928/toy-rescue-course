@@ -12,10 +12,10 @@ import type { DigitalAction, DriveCommand } from './controlState';
 export interface VoxelGameControls {
   readonly commandRef: RefObject<DriveCommand>;
   readonly reset: () => void;
-  readonly setSpray: (pressed: boolean) => void;
+  readonly setPrimaryAction: (pressed: boolean) => void;
   readonly setTouchStick: (x: number, y: number) => void;
-  /** HUDのaria/見た目へ同期する放水の現在状態。 */
-  readonly sprayPressed: boolean;
+  /** HUDのaria/見た目へ同期する車種別主操作の現在状態。 */
+  readonly primaryActionPressed: boolean;
 }
 
 /** browser APIに依存せずevent listenerを登録できる最小のtarget契約。 */
@@ -42,7 +42,7 @@ const KEY_ACTIONS: Readonly<Record<string, DigitalAction>> = {
   KeyD: 'right',
   KeyS: 'backward',
   KeyW: 'forward',
-  Space: 'spray',
+  Space: 'primaryAction',
 };
 
 /**
@@ -94,14 +94,16 @@ export function bindVoxelGameControlEvents({
 export function useVoxelGameControls(): VoxelGameControls {
   const stateRef = useRef(createControlState());
   const commandRef = useRef<DriveCommand>(toDriveCommand(stateRef.current));
-  const [sprayPressed, setSprayPressed] = useState(commandRef.current.spray);
+  const [primaryActionPressed, setPrimaryActionPressed] = useState(commandRef.current.primaryAction);
 
-  /** 状態と外部公開commandを更新し、放水変化だけHUD再描画へ通知する。 */
+  /** 状態と外部公開commandを更新し、主操作変化だけHUD再描画へ通知する。 */
   const commit = useCallback((nextState: ReturnType<typeof createControlState>) => {
-    const previousSpray = commandRef.current.spray;
+    const previousPrimaryAction = commandRef.current.primaryAction;
     stateRef.current = nextState;
     commandRef.current = toDriveCommand(nextState);
-    if (previousSpray !== commandRef.current.spray) setSprayPressed(commandRef.current.spray);
+    if (previousPrimaryAction !== commandRef.current.primaryAction) {
+      setPrimaryActionPressed(commandRef.current.primaryAction);
+    }
   }, []);
 
   /** すべての入力を解除して、フォーカス喪失後も車両が動かないようにする。 */
@@ -119,9 +121,9 @@ export function useVoxelGameControls(): VoxelGameControls {
     commit(applyTouchStick(stateRef.current, x, y));
   }, [commit]);
 
-  /** 放水ボタンの押下状態を更新する。 */
-  const setSpray = useCallback((pressed: boolean) => {
-    setAction('spray', pressed);
+  /** 車種別主操作ボタンの押下状態を更新する。 */
+  const setPrimaryAction = useCallback((pressed: boolean) => {
+    setAction('primaryAction', pressed);
   }, [setAction]);
 
   useEffect(() => {
@@ -134,5 +136,11 @@ export function useVoxelGameControls(): VoxelGameControls {
     });
   }, [reset, setAction]);
 
-  return useMemo(() => ({ commandRef, reset, setSpray, setTouchStick, sprayPressed }), [reset, setSpray, setTouchStick, sprayPressed]);
+  return useMemo(() => ({
+    commandRef,
+    primaryActionPressed,
+    reset,
+    setPrimaryAction,
+    setTouchStick,
+  }), [primaryActionPressed, reset, setPrimaryAction, setTouchStick]);
 }

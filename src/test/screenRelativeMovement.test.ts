@@ -20,10 +20,10 @@ function dotXZ(left: readonly [number, number, number], right: readonly [number,
 
 describe('screenRelativeMovement', () => {
   it.each([
-    [{ moveX: -1, moveY: 0, spray: false }, screenRight, -1, cameraForward],
-    [{ moveX: 1, moveY: 0, spray: false }, screenRight, 1, cameraForward],
-    [{ moveX: 0, moveY: 1, spray: false }, cameraForward, 1, screenRight],
-    [{ moveX: 0, moveY: -1, spray: false }, cameraForward, -1, screenRight],
+    [{ moveX: -1, moveY: 0, primaryAction: false }, screenRight, -1, cameraForward],
+    [{ moveX: 1, moveY: 0, primaryAction: false }, screenRight, 1, cameraForward],
+    [{ moveX: 0, moveY: 1, primaryAction: false }, cameraForward, 1, screenRight],
+    [{ moveX: 0, moveY: -1, primaryAction: false }, cameraForward, -1, screenRight],
   ] as const)('画面入力%jを固定camera basisの対応方向へ写す', (command, expectedAxis, directionSign, orthogonalAxis) => {
     const movement = resolveScreenRelativeMovement(command);
     expect(dotXZ(movement.direction, expectedAxis) * directionSign).toBeCloseTo(1, 9);
@@ -32,7 +32,7 @@ describe('screenRelativeMovement', () => {
   });
 
   it('中間touch入力の大きさを速度へ残す', () => {
-    const movement = resolveScreenRelativeMovement({ moveX: 0.3, moveY: 0.4, spray: false });
+    const movement = resolveScreenRelativeMovement({ moveX: 0.3, moveY: 0.4, primaryAction: false });
     expect(movement.magnitude).toBeCloseTo(0.5, 9);
     expect(Math.hypot(movement.velocity[0], movement.velocity[2])).toBeCloseTo(3.7, 6);
   });
@@ -43,7 +43,7 @@ describe('screenRelativeMovement', () => {
   });
 
   it('停止commandへ有限なzero movementを返す', () => {
-    expect(resolveScreenRelativeMovement({ moveX: 0, moveY: 0, spray: false }))
+    expect(resolveScreenRelativeMovement({ moveX: 0, moveY: 0, primaryAction: false }))
       .toMatchObject({ magnitude: 0, screenProjection: [0, 0], velocity: [0, 0, 0] });
   });
 });

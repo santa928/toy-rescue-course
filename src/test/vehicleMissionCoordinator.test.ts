@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { VehicleMissionCoordinator } from '../voxel-game/domain/VehicleMissionCoordinator';
+import {
+  advanceVehicleMissionFrame,
+  advanceVehicleMissionManualClock,
+  VehicleMissionCoordinator,
+} from '../voxel-game/domain/VehicleMissionCoordinator';
 
 const BLOCK_IDS = ['block-a'] as const;
 const DEBRIS_IDS = ['debris-a', 'debris-b', 'debris-c'] as const;
@@ -89,5 +93,17 @@ describe('VehicleMissionCoordinator', () => {
     coordinator.registerDebrisClear('debris-a');
 
     expect(snapshots).toEqual(['bulldozer:assigned', 'bulldozer:active']);
+  });
+
+  it('手動clock直後だけ通常frameをskipし、次frameを50ms上限で進める', () => {
+    const coordinator = new VehicleMissionCoordinator(BLOCK_IDS, DEBRIS_IDS);
+    const manualClockFlag = { current: false };
+
+    advanceVehicleMissionManualClock(coordinator, manualClockFlag, 20);
+    expect(coordinator.getSnapshot().fire.elapsedMs).toBe(20);
+    advanceVehicleMissionFrame(coordinator, manualClockFlag, 0.2);
+    expect(coordinator.getSnapshot().fire.elapsedMs).toBe(20);
+    advanceVehicleMissionFrame(coordinator, manualClockFlag, 0.2);
+    expect(coordinator.getSnapshot().fire.elapsedMs).toBe(70);
   });
 });

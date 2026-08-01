@@ -1,5 +1,5 @@
 /** キーボードまたは画面ボタンから入力できる離散操作。 */
-export type DigitalAction = 'forward' | 'backward' | 'left' | 'right' | 'spray';
+export type DigitalAction = 'forward' | 'backward' | 'left' | 'right' | 'primaryAction';
 
 /** デバイス別の入力を保持する不変の内部状態。 */
 export interface ControlState {
@@ -7,11 +7,11 @@ export interface ControlState {
   readonly touchStick: readonly [number, number] | null;
 }
 
-/** 車両制御と放水処理が共通で読む画面方向の正規化済み入力値。 */
+/** 車両制御と車種別の主操作が共通で読む正規化済み入力値。 */
 export interface DriveCommand {
   readonly moveX: number;
   readonly moveY: number;
-  readonly spray: boolean;
+  readonly primaryAction: boolean;
 }
 
 const TOUCH_STICK_DEAD_ZONE = 0.14;
@@ -19,7 +19,7 @@ const TOUCH_STICK_DEAD_ZONE = 0.14;
 /** 全操作を離した初期状態を返す。 */
 export function createControlState(): ControlState {
   return {
-    digital: { backward: false, forward: false, left: false, right: false, spray: false },
+    digital: { backward: false, forward: false, left: false, primaryAction: false, right: false },
     touchStick: null,
   };
 }
@@ -60,5 +60,5 @@ export function toDriveCommand(state: ControlState): DriveCommand {
       moveY = Math.sign(moveY) * Math.SQRT1_2;
     }
   }
-  return { moveX, moveY, spray: state.digital.spray };
+  return { moveX, moveY, primaryAction: state.digital.primaryAction };
 }

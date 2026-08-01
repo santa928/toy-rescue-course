@@ -134,7 +134,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
     useImperativeHandle(ref, () => ({ resetVehicle }), [resetVehicle]);
 
     useFrame((_state, delta) => {
-      actionActiveRef.current = commandRef.current.spray;
+      actionActiveRef.current = commandRef.current.primaryAction;
       const body = bodyRef.current;
       if (!body) return;
 

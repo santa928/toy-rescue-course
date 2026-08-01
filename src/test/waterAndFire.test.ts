@@ -310,7 +310,7 @@ describe('WaterAndFire', () => {
   });
 
   it('見える炎から水平7unit内でおおむね正面ならtargetedな消火signalを作る', () => {
-    const command = { moveX: 0, moveY: 0, spray: true } as const;
+    const command = { moveX: 0, moveY: 0, primaryAction: true } as const;
     const forgiving = resolveWaterAndFireFrame(
       {
         forward: [0, 0, -1],
@@ -370,13 +370,36 @@ describe('WaterAndFire', () => {
         resetCount: 0,
         speed: 0,
       },
-      { moveX: 0, moveY: 0, spray: true },
+      { moveX: 0, moveY: 0, primaryAction: true },
     );
 
     runtime.setSignals({ sprayActive: frame.sprayActive, sprayOnFire: frame.sprayOnFire });
     runtime.advance(2_500);
 
     expect(runtime.getSnapshot()).toMatchObject({ fireIntensity: 0, missionPhase: 'celebrating' });
+  });
+
+  it('消防車以外では主操作を押しても放水signalを作らない', () => {
+    const frame = resolveWaterAndFireFrame(
+      {
+        forward: [0, 0, -1],
+        id: 'bulldozer',
+        mass: 2.3,
+        position: [29.5, 0.8, -10.2],
+        resetCount: 0,
+        speed: 0,
+      },
+      { moveX: 0, moveY: 0, primaryAction: true },
+      0.4,
+      0.1,
+      false,
+    );
+
+    expect(frame).toMatchObject({
+      sprayActive: false,
+      sprayOnFire: false,
+      targeted: true,
+    });
   });
 
   it('放水を押し続けたvehicle resetCount変化では時計をdeltaから再開する', () => {

@@ -5,6 +5,17 @@ declare global {
   interface VoxelGameTextState {
     readonly blocks: readonly import('./voxel-game/domain/VoxelGameRuntime').BreakableSnapshot[];
     readonly breakables: import('./voxel-game/scene/BreakableBlockPlaza').BreakableTelemetry;
+    readonly bulldozer: {
+      readonly activeChipCount: number;
+      readonly bladeCenter: readonly [number, number, number];
+      readonly clearedCount: number;
+      readonly debris: readonly import('./voxel-game/domain/BulldozerMissionRuntime').BulldozerDebrisSnapshot[];
+      readonly debrisVisibleVoxelCount: number;
+      readonly missionPhase: import('./voxel-game/domain/VoxelGameRuntime').MissionPhase;
+      readonly routeMarkerCount: number;
+      readonly starVoxelCount: number;
+      readonly targetCount: number;
+    };
     readonly camera: import('./voxel-game/scene/WorldFixedCamera').WorldCameraTelemetry;
     readonly controls: import('./voxel-game/input/controlState').DriveCommand;
     readonly coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south';
@@ -22,16 +33,19 @@ declare global {
         readonly position: readonly [number, number, number];
         readonly scale: readonly [number, number, number];
       };
+      readonly bulldozerDebris: readonly {
+        readonly id: string;
+        readonly position: readonly [number, number, number];
+        readonly radius: number;
+      }[];
       readonly fire: readonly [number, number, number];
       readonly fireSprayTarget: readonly [number, number, number];
       readonly garage: readonly [number, number, number];
     };
-    readonly mission: Omit<
+    readonly mission: import('./voxel-game/domain/VehicleMissionCoordinator').VehicleMissionSnapshot & Omit<
       import('./voxel-game/scene/WaterAndFire').MissionTelemetry,
       'waterPath'
     > & {
-      readonly phase: import('./voxel-game/domain/VoxelGameRuntime').MissionPhase;
-      readonly routeVisible: boolean;
       readonly waterPath: {
         readonly control: readonly [number, number, number];
         readonly end: readonly [number, number, number];
@@ -59,6 +73,8 @@ declare global {
       }[];
     };
     readonly visuals: {
+      readonly bulldozerChipCubeCount: number;
+      readonly bulldozerDebrisCubeCount: number;
       readonly fireHazardEnabled: boolean;
       readonly fireLayerCount: number;
       readonly fireVoxelCount: number;
@@ -77,6 +93,11 @@ declare global {
         readonly slot: number;
       }[];
     };
+    readonly vehicleSelection: {
+      readonly available: readonly import('./voxel-game/domain/vehicleDefinitions').VehicleId[];
+      readonly canSwitch: boolean;
+      readonly selected: import('./voxel-game/domain/vehicleDefinitions').VehicleId;
+    };
     readonly worldBounds: {
       readonly maxX: number;
       readonly maxZ: number;
@@ -87,7 +108,7 @@ declare global {
       readonly bounds: import('./voxel-game/scene/productionWorldMap').WorldBounds2D;
       readonly currentDistrict:
         import('./voxel-game/scene/productionWorldMap').ResolvedWorldDistrictId;
-      readonly destinationDistrict: 'fire';
+      readonly destinationDistrict: 'fire' | 'blocks';
       readonly districts: readonly {
         readonly id: import('./voxel-game/scene/productionWorldMap').WorldDistrictId;
         readonly label: string;
@@ -98,6 +119,9 @@ declare global {
   interface Window {
     render_game_to_text?: () => string;
     reset_voxel_game_vehicle?: () => void;
+    select_voxel_game_vehicle?: (
+      vehicleId: import('./voxel-game/domain/vehicleDefinitions').VehicleId,
+    ) => boolean;
     advanceTime?: (milliseconds: number) => void;
     render_vehicle_lab_to_text?: () => string;
     set_vehicle_lab_view?: (

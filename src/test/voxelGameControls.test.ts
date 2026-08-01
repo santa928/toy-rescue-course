@@ -33,7 +33,7 @@ describe('voxel game controls', () => {
     state = setDigitalAction(state, 'left', true);
 
     const command = toDriveCommand(state);
-    expect(command).toEqual({ moveX: -Math.SQRT1_2, moveY: Math.SQRT1_2, spray: false });
+    expect(command).toEqual({ moveX: -Math.SQRT1_2, moveY: Math.SQRT1_2, primaryAction: false });
     expect(Math.hypot(command.moveX, command.moveY)).toBeCloseTo(1, 9);
     expect(command).not.toHaveProperty('steer');
     expect(command).not.toHaveProperty('throttle');
@@ -46,19 +46,19 @@ describe('voxel game controls', () => {
     ['backward', 0, -1],
   ] as const)('%sを対応する画面方向へ変換する', (action, moveX, moveY) => {
     const state = setDigitalAction(createControlState(), action, true);
-    expect(toDriveCommand(state)).toEqual({ moveX, moveY, spray: false });
+    expect(toDriveCommand(state)).toEqual({ moveX, moveY, primaryAction: false });
   });
 
   it('touch stickをkeyboardより優先し、DOM上方向をmoveY正へ変換する', () => {
     const state = setTouchStick(createControlState(), 0.8, -0.6);
-    expect(toDriveCommand(state)).toEqual({ moveX: 0.8, moveY: 0.6, spray: false });
+    expect(toDriveCommand(state)).toEqual({ moveX: 0.8, moveY: 0.6, primaryAction: false });
     expect(toDriveCommand(setTouchStick(state, 0.05, 0.05)))
-      .toEqual({ moveX: 0, moveY: 0, spray: false });
+      .toEqual({ moveX: 0, moveY: 0, primaryAction: false });
   });
 
   it('非有限touch値を停止commandへ正規化する', () => {
     const state = setTouchStick(createControlState(), Number.NaN, Number.POSITIVE_INFINITY);
-    expect(toDriveCommand(state)).toEqual({ moveX: 0, moveY: 0, spray: false });
+    expect(toDriveCommand(state)).toEqual({ moveX: 0, moveY: 0, primaryAction: false });
   });
 
   it('touch stickを半径1へ収めて斜め最高速度を増やさない', () => {
@@ -73,7 +73,7 @@ describe('voxel game controls', () => {
     state = setTouchStick(state, 0.8, -0.6);
     state = setTouchStick(state, 0, 0);
 
-    expect(toDriveCommand(state)).toEqual({ moveX: 0, moveY: 1, spray: false });
+    expect(toDriveCommand(state)).toEqual({ moveX: 0, moveY: 1, primaryAction: false });
   });
 
   it('keyboard、blur、hidden visibilityをcommand callbackへ反映する', () => {
@@ -97,7 +97,7 @@ describe('voxel game controls', () => {
     visibilityState = 'hidden';
     visibilityTarget.dispatch('visibilitychange');
 
-    expect(actions).toEqual([['forward', true], ['forward', false], ['spray', true]]);
+    expect(actions).toEqual([['forward', true], ['forward', false], ['primaryAction', true]]);
     expect(resets).toBe(2);
   });
 

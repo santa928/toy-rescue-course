@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildWorldTelemetry } from '../voxel-game/VoxelGameApp';
-import { advanceRenderTelemetry } from '../voxel-game/scene/VoxelGameScene';
+import {
+  advanceRenderTelemetry,
+  syncVehicleMissionSpatialSignals,
+} from '../voxel-game/scene/VoxelGameScene';
+import { VehicleMissionCoordinator } from '../voxel-game/domain/VehicleMissionCoordinator';
 import {
   createInitialVehicleTelemetry,
   resolveVehicleControllerConfig,
@@ -55,5 +59,21 @@ describe('buildWorldTelemetry', () => {
         { id: 'south', label: 'じゆうそうこう' },
       ],
     });
+  });
+
+  it('選択中仕事に応じて工事地区を目的地へ公開する', () => {
+    expect(buildWorldTelemetry([0, 0.8, 6], 'blocks').destinationDistrict).toBe('blocks');
+  });
+});
+
+describe('syncVehicleMissionSpatialSignals', () => {
+  it('ブルドーザーで工事地区へ着くと工事仕事を開始する', () => {
+    const coordinator = new VehicleMissionCoordinator([], ['debris-a']);
+    coordinator.selectVehicle('bulldozer', { atGarage: true, speed: 0 });
+
+    syncVehicleMissionSpatialSignals(coordinator, [-24, 0.8, 13]);
+    coordinator.advance(1);
+
+    expect(coordinator.getSnapshot().mission.phase).toBe('active');
   });
 });

@@ -53,6 +53,7 @@ interface StaticVoxelBatchProps {
 
 interface WaterAndFireProps {
   readonly commandRef: RefObject<DriveCommand>;
+  readonly enabled: boolean;
   readonly missionTelemetryRef: MissionTelemetryRef;
   readonly runtime: VoxelGameRuntime;
   readonly telemetryRef: VehicleTelemetryRef;
@@ -327,6 +328,7 @@ export function resolveWaterAndFireFrame(
   command: DriveCommand,
   sprayElapsedSeconds = 0,
   splashElapsedSeconds = 0,
+  enabled = true,
 ): MissionTelemetry {
   const horizontalLength = Math.hypot(telemetry.forward[0], telemetry.forward[2]) || 1;
   const forward: readonly [number, number, number] = [
@@ -346,13 +348,14 @@ export function resolveWaterAndFireFrame(
     targetPosition: FIRE_SPRAY_TARGET_POSITION,
     targeted: target.targeted,
   });
+  const sprayActive = enabled && command.primaryAction;
   return {
     direction: target.direction,
     distance: target.distance,
     nozzleOrigin,
-    sprayActive: command.spray,
+    sprayActive,
     sprayElapsedSeconds,
-    sprayOnFire: command.spray && target.targeted,
+    sprayOnFire: sprayActive && target.targeted,
     splashElapsedSeconds,
     targeted: target.targeted,
     waterPath,
@@ -420,6 +423,7 @@ function updateWaterBatch(
 /** 純ボクセルの3段階炎、stream 24＋splash 8を2色固定poolで描く水、道しるべ、成功星を描画する。 */
 export function WaterAndFire({
   commandRef,
+  enabled,
   missionTelemetryRef,
   runtime,
   telemetryRef,
@@ -505,7 +509,13 @@ export function WaterAndFire({
     previousResetCountRef.current = telemetryRef.current.resetCount;
     previousMissionPhaseRef.current = missionSnapshot.missionPhase;
 
-    const preview = resolveWaterAndFireFrame(telemetryRef.current, commandRef.current);
+    const preview = resolveWaterAndFireFrame(
+      telemetryRef.current,
+      commandRef.current,
+      0,
+      0,
+      enabled,
+    );
     const clock = advanceWaterVfxClock({
       deltaSeconds: delta,
       resetEvent,
@@ -581,8 +591,8 @@ export function WaterAndFire({
         <boxGeometry args={[1, 1, 1]} />
         <meshLambertMaterial color="#f2fbff" />
       </instancedMesh>
-      {visualState.routeVisible ? <StaticVoxelBatch boxes={ROUTE_BOXES} color="#ffd23f" emissive="#d49d16" /> : null}
-      {visualState.celebrating ? (
+      {enabled && visualState.routeVisible ? <StaticVoxelBatch boxes={ROUTE_BOXES} color="#ffd23f" emissive="#d49d16" /> : null}
+      {enabled && visualState.celebrating ? (
         <group>
           <StaticVoxelBatch boxes={YELLOW_STAR_BOXES} color="#ffd23f" emissive="#d49d16" />
           <StaticVoxelBatch boxes={WHITE_STAR_BOXES} color="#fff8dc" />

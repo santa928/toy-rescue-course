@@ -3,9 +3,15 @@ import type { MutableRefObject, ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
 import type { DriveCommand } from '../input/controlState';
-import type { VehicleId } from '../domain/vehicleDefinitions';
 import {
-  advanceRuntimeFrame,
+  canSwitchVehicle,
+  type VehicleId,
+} from '../domain/vehicleDefinitions';
+import {
+  advanceVehicleMissionFrame,
+  type VehicleMissionCoordinator,
+} from '../domain/VehicleMissionCoordinator';
+import {
   syncBlockClearance,
   type VoxelGameRuntime,
 } from '../domain/VoxelGameRuntime';
@@ -21,19 +27,31 @@ import {
 } from './BreakableBlockPlaza';
 import { VoxelWorld } from './VoxelWorld';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
+import {
+  BulldozerDebrisMission,
+  type BulldozerMissionSnapshotRef,
+  type BulldozerMissionTelemetryRef,
+} from './BulldozerDebrisMission';
 import { WorldFixedCamera, type WorldCameraTelemetryRef } from './WorldFixedCamera';
 import { WORLD_GROUND_BOX, scaleToHalfExtents } from './worldCollisionLayout';
-import { BREAKABLE_BLOCKS, isInsideGarageRestartArea } from './worldLayout';
+import {
+  BREAKABLE_BLOCKS,
+  isInsideGarageRestartArea,
+  resolveVehicleDistrict,
+} from './worldLayout';
 
 interface VoxelGameSceneProps {
   readonly breakablePoolHandleRef: BreakablePoolHandleRef;
   readonly breakableTelemetryRef: BreakableTelemetryRef;
+  readonly bulldozerMissionSnapshotRef: BulldozerMissionSnapshotRef;
+  readonly bulldozerMissionTelemetryRef: BulldozerMissionTelemetryRef;
   readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
   readonly commandRef: RefObject<DriveCommand>;
+  readonly coordinator: VehicleMissionCoordinator;
   readonly controllerRef: RefObject<VehicleControllerHandle | null>;
   readonly manualClockRef: React.MutableRefObject<boolean>;
   readonly missionTelemetryRef: MissionTelemetryRef;
-  readonly runtime: VoxelGameRuntime;
+  readonly onVehicleSwitchAvailabilityChange: (available: boolean) => void;
   readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
   readonly telemetryRef: VehicleTelemetryRef;
   readonly vehicleId: VehicleId;
@@ -53,6 +71,18 @@ export function syncRuntimeSpatialSignals(
 ): void {
   syncBlockClearance(runtime, BREAKABLE_BLOCKS, vehiclePosition);
   runtime.setSignals({ atGarage: isInsideGarageRestartArea(vehiclePosition) });
+}
+
+/** 最新位置を共有積み木と選択中車種の車庫・仕事地区signalへ同期する。 */
+export function syncVehicleMissionSpatialSignals(
+  coordinator: VehicleMissionCoordinator,
+  vehiclePosition: readonly [number, number, number],
+): void {
+  syncBlockClearance(coordinator.fireRuntime, BREAKABLE_BLOCKS, vehiclePosition);
+  coordinator.setSpatialSignals({
+    atBulldozerWorksite: resolveVehicleDistrict(vehiclePosition) === 'blocks',
+    atGarage: isInsideGarageRestartArea(vehiclePosition),
+  });
 }
 
 /** 最新draw call数を保持しながら実描画frame数を1増やす。 */
@@ -95,24 +125,35 @@ function SceneReadySignal({ renderTelemetryRef }: {
 
 interface RuntimeClockProps {
   readonly breakablePoolHandleRef: BreakablePoolHandleRef;
+  readonly coordinator: VehicleMissionCoordinator;
   readonly manualClockRef: React.MutableRefObject<boolean>;
-  readonly runtime: VoxelGameRuntime;
+  readonly onVehicleSwitchAvailabilityChange: (available: boolean) => void;
   readonly telemetryRef: VehicleTelemetryRef;
 }
 
 /** 最新車両位置を復元判定へ同期してから通常clockを進める。 */
 function RuntimeClock({
   breakablePoolHandleRef,
+  coordinator,
   manualClockRef,
-  runtime,
+  onVehicleSwitchAvailabilityChange,
   telemetryRef,
 }: RuntimeClockProps): null {
+  const previousSwitchAvailabilityRef = useRef<boolean | null>(null);
   const syncLatestBlockClearance = useCallback(() => {
-    syncRuntimeSpatialSignals(runtime, telemetryRef.current.position);
-  }, [runtime, telemetryRef]);
+    syncVehicleMissionSpatialSignals(coordinator, telemetryRef.current.position);
+  }, [coordinator, telemetryRef]);
 
   useFrame((_state, delta) => {
-    advanceRuntimeFrame(runtime, manualClockRef, delta, syncLatestBlockClearance);
+    const switchAvailable = canSwitchVehicle({
+      atGarage: isInsideGarageRestartArea(telemetryRef.current.position),
+      speed: telemetryRef.current.speed,
+    });
+    if (switchAvailable !== previousSwitchAvailabilityRef.current) {
+      previousSwitchAvailabilityRef.current = switchAvailable;
+      onVehicleSwitchAvailabilityChange(switchAvailable);
+    }
+    advanceVehicleMissionFrame(coordinator, manualClockRef, delta, syncLatestBlockClearance);
     breakablePoolHandleRef.current?.syncAfterRuntimeAdvance();
   });
   return null;
@@ -122,13 +163,16 @@ function RuntimeClock({
 export function VoxelGameScene({
   breakablePoolHandleRef,
   breakableTelemetryRef,
+  bulldozerMissionSnapshotRef,
+  bulldozerMissionTelemetryRef,
   cameraTelemetryRef,
   commandRef,
+  coordinator,
   controllerRef,
   manualClockRef,
   missionTelemetryRef,
   renderTelemetryRef,
-  runtime,
+  onVehicleSwitchAvailabilityChange,
   telemetryRef,
   vehicleId,
 }: VoxelGameSceneProps): ReactElement {
@@ -139,8 +183,9 @@ export function VoxelGameScene({
       <SceneReadySignal renderTelemetryRef={renderTelemetryRef} />
       <RuntimeClock
         breakablePoolHandleRef={breakablePoolHandleRef}
+        coordinator={coordinator}
         manualClockRef={manualClockRef}
-        runtime={runtime}
+        onVehicleSwitchAvailabilityChange={onVehicleSwitchAvailabilityChange}
         telemetryRef={telemetryRef}
       />
       <ambientLight intensity={1.5} />
@@ -151,14 +196,24 @@ export function VoxelGameScene({
         <BreakableBlockPlaza
           breakablePoolHandleRef={breakablePoolHandleRef}
           breakableTelemetryRef={breakableTelemetryRef}
-          runtime={runtime}
+          runtime={coordinator.fireRuntime}
           telemetryRef={telemetryRef}
         />
         <WaterAndFire
           commandRef={commandRef}
+          enabled={vehicleId === 'fire-truck'}
           missionTelemetryRef={missionTelemetryRef}
-          runtime={runtime}
+          runtime={coordinator.fireRuntime}
           telemetryRef={telemetryRef}
+        />
+        <BulldozerDebrisMission
+          commandRef={commandRef}
+          coordinator={coordinator}
+          enabled={vehicleId === 'bulldozer'}
+          missionTelemetryRef={bulldozerMissionTelemetryRef}
+          snapshotRef={bulldozerMissionSnapshotRef}
+          vehicleId={vehicleId}
+          vehicleTelemetryRef={telemetryRef}
         />
         <RigidBody colliders={false} type="fixed">
           <CuboidCollider
@@ -168,6 +223,7 @@ export function VoxelGameScene({
         </RigidBody>
         <VehicleController
           commandRef={commandRef}
+          key={vehicleId}
           ref={controllerRef}
           telemetryRef={telemetryRef}
           vehicleId={vehicleId}

@@ -1,5 +1,7 @@
 import {
+  advanceInFixedSteps,
   VoxelGameRuntime,
+  type ManualClockFlag,
   type MissionPhase,
   type VoxelGameSignals,
   type VoxelGameSnapshot,
@@ -15,6 +17,9 @@ import {
   type VehicleMissionId,
   type VehicleSwitchContext,
 } from './vehicleDefinitions';
+
+/** 車種coordinatorのadvance直前に最新空間signalを同期するcallback。 */
+export type VehicleMissionBeforeAdvance = () => void;
 
 /** HUDとtelemetryが車種に依存せず読む現在仕事。 */
 export interface VehicleMissionSnapshot {
@@ -193,4 +198,32 @@ export class VehicleMissionCoordinator {
     this.observableSignature = signature;
     for (const listener of this.listeners) listener(snapshot);
   }
+}
+
+/** 正の有限時間を固定stepで進め、直後の通常frame skipを予約する。 */
+export function advanceVehicleMissionManualClock(
+  coordinator: VehicleMissionCoordinator,
+  manualClockFlag: ManualClockFlag,
+  milliseconds: number,
+  beforeAdvance?: VehicleMissionBeforeAdvance,
+): void {
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return;
+  manualClockFlag.current = true;
+  beforeAdvance?.();
+  advanceInFixedSteps(milliseconds, (deltaMs) => coordinator.advance(deltaMs));
+}
+
+/** 手動clock直後だけskipし、通常frameを最大50msで進める。 */
+export function advanceVehicleMissionFrame(
+  coordinator: VehicleMissionCoordinator,
+  manualClockFlag: ManualClockFlag,
+  deltaSeconds: number,
+  beforeAdvance?: VehicleMissionBeforeAdvance,
+): void {
+  if (manualClockFlag.current) {
+    manualClockFlag.current = false;
+    return;
+  }
+  beforeAdvance?.();
+  coordinator.advance(Math.min(Math.max(0, deltaSeconds), 0.05) * 1_000);
 }
