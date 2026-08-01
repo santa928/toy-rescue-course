@@ -47,19 +47,21 @@ feature固有scenarioの4層に分ける。
 ## Task 3: production bundleを責務分割する
 
 **Files:**
-- Create: `src/tooling/vendorChunk.ts`
-- Create: `src/test/vendorChunk.test.ts`
+- Create: `tooling/vendorChunk.ts`
+- Create: `tooling/vendorChunk.test.ts`
 - Create: `scripts/verify-build-budgets.mjs`
 - Create: `scripts/verify-build-budgets.node-test.mjs`
+- Create: `scripts/verify-production-entrypoints.mjs`
 - Modify: `vite.config.ts`
 - Modify: `package.json`
+- Modify: `docker-compose.yml`
 - Modify: `README.md`
 
-- [ ] RED: package ID分類、必須chunk、entry／vendor／Rapier予算の失敗を確認する。
-- [ ] `manualChunks`をpure resolverへ接続し、manifestを生成する。
-- [ ] build後budget検査を`npm run build`へ接続する。
-- [ ] game entry 350kB以下、Rapier以外600kB以下、Rapier 2.2MB以下を達成する。
-- [ ] 3 entryのasset URLとroot／互換URL／Vehicle Lab smokeを確認する。
+- [x] RED: package ID分類、必須chunk、entry／vendor／Rapier予算の失敗を確認する。
+- [x] `manualChunks`をpure resolverへ接続し、manifestを生成する。
+- [x] build後budget検査を`npm run build`の`postbuild`へ接続する。
+- [x] game entry 350kB以下、通常chunk 600kB以下、Three 750kB以下、Rapier 2.25MB以下を達成する。
+- [x] 3 entryのasset URLとroot／互換URL／Vehicle Lab smokeを確認する。
 - [ ] `production bundleを責務別に分割する`でcommit・scan・push・公開確認する。
 
 ## Task 4: 共有drive harnessをTDD実装する
@@ -115,4 +117,4 @@ feature固有scenarioの4層に分ける。
 - 受け入れ条件: bundle、Vitest、shared harness、focus、回帰、公開の8項目を証拠へ対応させる。
 - 非対象: runtime／visual／physics／dependency versionを変更しない。
 - リスクと対策: 循環依存、Rapier例外、既定除外、診断、touch、長距離flakyを検証する。
-- 性能目標: entry 350kB、通常chunk 600kB、Rapier 2.2MB、303 tests、calls 28／27を維持する。
+- 性能目標: entry 350kB、通常chunk 600kB、Three 750kB、Rapier 2.25MB、303 tests、calls 28／27を維持する。

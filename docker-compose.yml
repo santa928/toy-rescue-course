@@ -98,5 +98,26 @@ services:
           exit 1
         }
 
+  production-smoke-e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    working_dir: /app
+    environment:
+      PRODUCTION_BASE_URL: http://127.0.0.1:4173
+    command:
+      - sh
+      - -lc
+      - |
+        npm run build
+        npm run preview -- --host 127.0.0.1 > /tmp/production-preview.log 2>&1 &
+        server_pid=$$!
+        trap 'kill "$$server_pid" 2>/dev/null || true' EXIT
+        node scripts/verify-production-entrypoints.mjs || {
+          sed -n '1,220p' /tmp/production-preview.log >&2
+          exit 1
+        }
+
 volumes:
   node_modules:

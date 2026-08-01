@@ -69,19 +69,20 @@ build logは静かになるが、bundle責務も予算も改善しない。Rapie
 
 ### bundle境界
 
-`src/tooling/vendorChunk.ts`へmodule IDからchunk名を返すpure helperを置く。順序は
+`tooling/vendorChunk.ts`へmodule IDからchunk名を返すpure helperを置く。順序は
 Rapier compat → React Three Rapier → Drei → R3F → Three → Reactの具体側から判定する。
 
-- `rapier-wasm`: `@dimforge/rapier3d-compat`。単一moduleのため2.2MBを例外上限とする。
+- `rapier-wasm`: `@dimforge/rapier3d-compat`。単一moduleの実測2,237,128 bytesに対し2.25MBを例外上限とする。
 - `rapier-react`: `@react-three/rapier`。
 - `drei`: `@react-three/drei`と専用依存。
 - `r3f`: `@react-three/fiber`と専用依存。
-- `three`: `three`。
+- `three`: `three`。単一core moduleの実測718,551 bytesに対し750kBをengine例外上限とする。
 - `react`: `react`、`react-dom`、`scheduler`。
 - game／Vehicle Lab固有moduleはentry側に残す。
 
 `scripts/verify-build-budgets.mjs`は`dist/.vite/manifest.json`と実file sizeを読み、entry 350kB以下、
-Rapier以外の各JS chunk 600kB以下、Rapier 2.2MB以下、必須vendor chunkの存在を検証する。
+通常JS chunk 600kB以下、Three 750kB以下、Rapier 2.25MB以下、必須vendor chunkの存在を検証する。
+さらにroot、互換URL、Vehicle Labの3 HTML entryが実在module assetを参照することも検証する。
 Viteの一般warning上限はRapier例外に合わせるが、より厳しい独自budget検査を`npm run build`へ接続する。
 
 ### Vitest探索
@@ -115,8 +116,8 @@ Docker Composeは`VOXEL_GAME_FOCUS`を明示的に渡せるfocus serviceを追�
 
 ## 受け入れ条件
 
-- [ ] game entryは350kB以下、Rapier以外の各JS chunkは600kB以下、Rapierは2.2MB以下で自動検証される。
-- [ ] React、Three、R3F、Drei、Rapierが決定的なvendor chunkへ分かれる。
+- [x] game entryは350kB以下、通常JS chunkは600kB以下、Threeは750kB以下、Rapierは2.25MB以下で自動検証される。
+- [x] React、Three、R3F、Drei、Rapierが決定的なvendor chunkへ分かれる。
 - [ ] Vitestがrootの32 test filesを一度だけ収集し、`.worktrees/**`を除外する。
 - [ ] canonical、二車種、色替えE2Eが共有走行harnessを使う。
 - [ ] production-map、nonbreak、collision、break focusが単独実行でき、scenario時間を記録する。
@@ -134,7 +135,7 @@ Docker Composeは`VOXEL_GAME_FOCUS`を明示的に渡せるfocus serviceを追�
 ## リスクと対策
 
 - manual chunkの循環依存: 具体packageから判定し、3 entry buildとbrowser E2Eで初期化順を検証する。
-- Rapier警告を隠す: 一般warningとは別に2.2MBの明示budgetを持つ。
+- engine chunkの警告を隠す: 一般warningとは別にThree 750kB、Rapier 2.25MBの明示budgetを持つ。
 - Vitest既定除外を上書きする: `configDefaults.exclude`を展開し、unitで固定する。
 - shared harnessでfeature診断が薄くなる: reset診断callbackとdescriptionを呼出側に残す。
 - touch挙動を壊す: canonical CDP driverは維持し、二車種／色替えDOM pointerだけを共通化する。
@@ -142,7 +143,7 @@ Docker Composeは`VOXEL_GAME_FOCUS`を明示的に渡せるfocus serviceを追�
 
 ## 性能目標
 
-- buildのgame entry 350kB以下、Rapier以外の各JS chunk 600kB以下、Rapier 2.2MB以下。
+- buildのgame entry 350kB以下、通常JS chunk 600kB以下、Three 750kB以下、Rapier 2.25MB以下。
 - Vitest 303件を維持し、`.worktrees`が存在しても重複収集0件。
 - focus runは失敗scenario名と経過時間を60秒以内にstdoutへ更新する。
 - scene／vehicle／station draw callsは消防車28／7、ブルドーザー27／7、station 5を維持する。

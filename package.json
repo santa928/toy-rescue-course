@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "postbuild": "node scripts/verify-build-budgets.mjs",
+    "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
   },

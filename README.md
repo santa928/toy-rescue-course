@@ -82,16 +82,24 @@ docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは32 files / 303 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは34 files / 315 testsです。
 
 ```bash
 docker compose run --rm web npm test
 docker compose run --rm web npm run build
+docker compose --profile e2e run --rm --build production-smoke-e2e
 docker compose --profile e2e run --rm --build e2e
 docker compose --profile e2e run --rm --build voxel-game-e2e
 docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 ```
+
+production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
+決定的なchunkへ分割します。`postbuild`が3つのHTML entryからのasset参照と、game entry 350kB、
+通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-01の実測は
+game 84,583 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
+`production-smoke-e2e`は生成済みbundleをVite previewで配信し、root、互換URL、Vehicle LabのWebGL起動と
+console／page／request errorがないことを実ブラウザで確認します。
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
