@@ -33,11 +33,11 @@
 - [x] renderer call、visual batch、solid count、移動時間をmanifestへ記録する。
 - [x] 96×96以下かつ構造予算内ならchunk streaming／LOD不要を記録し、最終物理GPUを再開条件にする。
 - [x] README、設計、計画へ実測を反映する。
-- [ ] staged差分と`origin/main..HEAD`をsecret scanする。
-- [ ] 日本語コミットを作成してmainへpushする。
-- [ ] remote SHA、ahead/behind 0/0、GitHub Actions／Pages successを確認する。
-- [ ] 公開URLで専用E2E、3 entrypoint、console cleanを確認する。
-- [ ] 公開結果を別の日本語コミットで記録し、再push・再公開確認する。
+- [x] staged差分と`origin/main..HEAD`をsecret scanする。
+- [x] 日本語コミットを作成してmainへpushする。
+- [x] remote SHA、ahead/behind 0/0、GitHub Actions／Pages successを確認する。
+- [x] 公開URLで専用E2E、3 entrypoint、console cleanを確認する。
+- [x] 公開結果を別の日本語コミットで記録し、再push・再公開確認する。
 
 ## 検証コマンド方針
 
@@ -48,4 +48,4 @@ Node.js、Vite、Vitest、PlaywrightはすべてDocker内で実行する。ホ�
 - [x] REQ-072〜REQ-079がunit、telemetry、E2E、実画面で対応する（公開・物理GPU確認を除くローカル範囲）。
 - [x] 既存REQ-001〜REQ-071の回帰がない。
 - [x] 非対象を暗黙に実装・削除していない。
-- [ ] 公開URLとremote mainが同じSHAを示す。
+- [x] 公開URLとremote mainが同じSHAを示す。
