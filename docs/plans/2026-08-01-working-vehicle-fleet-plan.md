@@ -44,7 +44,7 @@
 - [x] 南地区の3巡回仕事、走行中サイレンgate、coordinator、HUD、telemetryへ接続する。
 - [x] PC／touchで選択、3地点巡回、成功、帰庫、次仕事を実走する。
 - [x] 3 viewport画像を原寸目視し、全車両と全HUDを確認する。
-- [ ] 日本語commit、secret scan、main push、Actions／Pages／公開E2Eを確認する。
+- [x] 日本語commit、secret scan、main push、Actions／Pages／公開E2Eを確認する。
 
 ## Task 6: 5台総合回帰と性能再認証
 

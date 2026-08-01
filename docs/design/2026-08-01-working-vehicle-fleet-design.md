@@ -179,6 +179,7 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - fresh Docker unitは43 files／425 tests、production buildは651 modulesで全budget内だった。game entryは129,376 bytes、Threeは718,551 bytes、Rapierは2,237,128 bytesだった。
 - desktop keyboard、tablet touch、mobile-landscape touchで3門、成功、帰庫、次仕事を連続実走した。sceneは30 calls、パトカー車体は7 calls、5ボタンselectorは3列2段・幅350px・高さ104pxで全親境界内に収まった。
 - fleet manifestは`2026-08-01T16:51:10.246Z`で全3 viewport成功し、ショベルカー6枚、救急車9枚、パトカー9枚の計24枚を原寸目視した。production smokeもroot、互換URL、Vehicle Labの3入口でPASSした。
+- commit `7d06baa`をmainへpushし、remote SHA一致、ahead／behind `0/0`、Pages run `30709255937`のunit／build／deploy successを確認した。公開manifestは`2026-08-01T17:04:52.716Z`で全3 viewport成功し、公開配信物の24枚を原寸目視した。公開root、互換URL、Vehicle Labもsmokeを通過した。
 
 - 受け入れ条件、非対象、リスクと対策、性能目標を明示した。
 - 保留項目は理由、影響、代替タスク、復帰条件を記載した。
