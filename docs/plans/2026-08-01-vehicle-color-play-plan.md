@@ -34,7 +34,7 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - [x] `ColorPlaySourceDefinition`とcanonical配置を実装し、map validatorへ接続する。
 - [x] 既存sign postをtrigger外へ移し、solidと走行経路の干渉を避ける。
 - [x] focused map testとproduction render test、buildを通す。
-- [ ] `色遊びの配置契約を追加する`でcommit・scan・push・公開確認する。
+- [x] `色遊びの配置契約を追加する`でcommit・scan・push・公開確認する。
 
 ## Task 2: 一時色のpure runtime
 
@@ -42,11 +42,11 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - Create: `src/voxel-game/domain/VehicleColorEffectRuntime.ts`
 - Create: `src/test/vehicleColorEffectRuntime.test.ts`
 
-- [ ] RED: 初回、接触保持、離脱減算、同source再接触、別色上書き、期限、切替、invalid入力を書く。
-- [ ] Docker focused testでmodule不存在FAILを確認する。
-- [ ] 12,000ms定数、snapshot、subscriber、秒境界signatureを実装する。
-- [ ] rejected切替は呼ばず、成功切替の別vehicleだけclearできるAPIにする。
-- [ ] focused testとfull unit、buildを通す。
+- [x] RED: 初回、接触保持、離脱減算、同source再接触、別色上書き、期限、切替、invalid入力を書く。
+- [x] Docker focused testでmodule不存在FAILを確認する。
+- [x] 12,000ms定数、snapshot、subscriber、秒境界signatureを実装する。
+- [x] rejected切替は呼ばず、成功切替の別vehicleだけclearできるAPIにする。
+- [x] focused testとfull unit、buildを通す。
 - [ ] `一時車体色の状態機械を追加する`でcommit・scan・push・公開確認する。
 
 ## Task 3: 二車種の限定palette tint
