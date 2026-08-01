@@ -57,4 +57,4 @@
 - [x] 3 viewportの代表画像を原寸目視し、対象、道しるべ、HUD、操作系を確認する。
 - [x] 物理／描画差分が性能再認証条件に該当する場合はApple M4で測定する（固定pool／draw call不変、Task 7はtest文書差分のみのため条件不成立）。
 - [x] README、設計、計画、progressへ実測値を同期する。
-- [ ] 日本語commit、全commit secret scan、push、remote／Actions／Pages／公開物を確認する。
+- [x] 日本語commit、全commit secret scan、push、remote／Actions／Pages／公開物を確認する。

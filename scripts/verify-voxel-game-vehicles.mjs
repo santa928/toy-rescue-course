@@ -8,11 +8,16 @@ import {
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/voxel-game-vehicles';
-const viewports = [
+const allViewports = [
   { height: 720, name: 'desktop', touch: false, width: 1_280 },
   { height: 768, name: 'tablet', touch: true, width: 1_024 },
   { height: 390, name: 'mobile-landscape', touch: true, width: 844 },
 ];
+const viewportFilter = process.env.VOXEL_GAME_VEHICLE_VIEWPORT ?? null;
+const viewports = viewportFilter === null
+  ? allViewports
+  : allViewports.filter(({ name }) => name === viewportFilter);
+assert(viewports.length > 0, `Unknown VOXEL_GAME_VEHICLE_VIEWPORT: ${viewportFilter}.`);
 
 const driveHarness = createDriveHarness({
   alignAttemptLimit: 28,
@@ -195,9 +200,6 @@ async function clearCurrentDebrisJob(page, viewport, touchDriver) {
       touchDriver,
       0.35,
     );
-    if (targetIndex === 0) {
-      await page.screenshot({ path: `${outputDirectory}/${viewport.name}-cycle-2-worksite.png` });
-    }
     await setPrimaryAction(page, viewport.touch, true);
     try {
       const expectedClearedCount = clearedCount + 1;
@@ -209,6 +211,10 @@ async function clearCurrentDebrisJob(page, viewport, touchDriver) {
         touchDriver,
       );
       clearedCount = expectedClearedCount;
+      if (targetIndex === 0) {
+        await waitForFrames(page, 2);
+        await page.screenshot({ path: `${outputDirectory}/${viewport.name}-cycle-2-worksite.png` });
+      }
     } finally {
       await setPrimaryAction(page, viewport.touch, false);
     }
@@ -274,7 +280,6 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(await page.locator('.primary-action-button').getAttribute('aria-label'), 'ブレードを動かす');
     assert.equal(await bulldozerButton.getAttribute('aria-pressed'), 'true');
     const layout = await measureHudLayout(page, viewport);
-    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-bulldozer.png` });
 
     const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-gate-post');
     assert(hubGate, `${viewport.name}: hub gate telemetry is unavailable.`);
@@ -287,6 +292,8 @@ async function verifyViewport(browser, viewport, errors) {
       activeTouchDriver,
       0.5,
     );
+    await waitForFrames(page, 3);
+    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-bulldozer.png` });
     const crate = selected.landmarks.bulldozerDebris.find(({ id }) => id === 'debris-crate');
     assert(crate, `${viewport.name}: crate debris telemetry is unavailable.`);
     const crateApproachX = crate.position[0] + 1.45;

@@ -167,4 +167,8 @@ React stateは車種、phase、進捗、job IDの離散変更だけを購読す�
 - 色シャワー直後は3 frameの描画安定待ちと実寸HUD検査を撮影前へ追加した。全viewportでmission上端12px、viewport余白8px以上、mission／color間10px以上を実測している。
 - 火災経路はjob telemetryから接近面を導出し、側面火災は東側、窓火災は北側道路から照準する。復元後のhazardも現在job座標と接近面で再取得し、古いjob座標への依存を除いた。
 - random job切替は既存の固定VFX pool、collider数、draw callを増やさず座標だけを低頻度更新する。Task 7の差分はE2E／文書だけでproduction renderer・physics・geometryを変えていないため、物理GPU再認証条件は成立しない。公開済みApple M4の消防車28 calls／ブルドーザー27 callsとmedian 59.88fps／p10 56.82fpsを性能基準として維持する。
-- ローカル本番smokeでは生成bundleのroot、互換URL、Vehicle Labを1280×720で起動し、3入口のCanvasとerror 0件を確認した。GitHub Actions／Pages／公開URLの結果はTask 7公開後に追記する。
+- ローカル本番smokeでは生成bundleのroot、互換URL、Vehicle Labを1280×720で起動し、3入口のCanvasとerror 0件を確認した。
+- commit `8a730b3`をmainへpushし、remote SHA一致・ahead／behind `0/0`を確認した。GitHub Pages run `30701194619`はunit、budget付きbuild、deployがすべてsuccessだった。
+- 公開URL `https://santa928.github.io/toy-rescue-course/`への`nonbreak`回帰は3 viewportで各2仕事を完了し、二車種回帰も全viewportでブルドーザー2仕事、3件目割当、消防車復帰、放水まで完走した。最終二車種manifestは`2026-08-01T13:49:20.838Z`。
+- 公開色遊び回帰は3 viewportでpool／shower、再接触、上書き、期限、乗り換え競合を完走した。最終manifestは`2026-08-01T13:55:57.228Z`で、配信物から撮った6 PNGすべてについてHUD背景・四辺・文字色を実画素検証し、mission文字の存在まで固定した。
+- 公開二車種9枚と色遊び6枚を原寸目視した。車庫外のブルドーザー、2周目の進捗`1/3`と作動中blade、青／黄の車体とstation、PC／touch HUDに欠け・意図しない重なり・はみ出しはない。黄色画像のmission文字はHUD切り出し画像でも目視確認した。

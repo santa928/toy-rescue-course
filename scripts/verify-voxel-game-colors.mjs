@@ -5,6 +5,11 @@ import {
   createDomTouchStickDriver,
   createDriveHarness,
 } from './voxel-game-e2e/drive-harness.mjs';
+import {
+  assertHudPixelProof,
+  readHudPixelProof,
+  waitForHudCaptureReadiness,
+} from './voxel-game-screenshot-proof.mjs';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/voxel-game-colors';
@@ -42,6 +47,31 @@ const {
   readGameState,
   waitForFrames,
 } = driveHarness;
+const screenshotProofs = {};
+
+/** 保存PNGのHUD文字・背景・四辺を実画素検証し、compositor遅延だけ再取得する。 */
+async function captureVerifiedScreenshot(page, path) {
+  let latestError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const readiness = await waitForHudCaptureReadiness(page);
+    const buffer = await page.screenshot();
+    const pixels = await readHudPixelProof(page, buffer, readiness);
+    try {
+      assertHudPixelProof(pixels);
+      fs.writeFileSync(path, buffer);
+      screenshotProofs[path.split('/').at(-1)] = {
+        controls: readiness.controls,
+        pixels: pixels.controls,
+        stableSamples: readiness.stableSamples,
+      };
+      return;
+    } catch (error) {
+      latestError = error;
+      if (attempt < 2) await waitForFrames(page, 3);
+    }
+  }
+  throw latestError;
+}
 
 /** 専用artifactを毎run初期化し、古い成功画像との取り違えを防ぐ。 */
 function resetArtifacts() {
@@ -326,7 +356,7 @@ async function verifyViewport(browser, viewport, errors) {
     );
     assert(blue.colorEffect.activationCount > secondRed.colorEffect.activationCount);
     assert.match(await page.locator('.color-effect-pill').innerText(), /あお 12びょう/);
-    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-blue-pool.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/${viewport.name}-blue-pool.png`);
 
     await driveToCoordinate(
       page,
@@ -392,7 +422,7 @@ async function verifyViewport(browser, viewport, errors) {
     assert.match(await page.locator('.color-effect-pill').innerText(), /きいろ 12びょう/);
     await waitForFrames(page, 3);
     const yellowLayout = await measureActiveHud(page, viewport, false);
-    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-yellow-shower.png` });
+    await captureVerifiedScreenshot(page, `${outputDirectory}/${viewport.name}-yellow-shower.png`);
 
     const rejectedSnapshot = { ...yellow.colorEffect };
     assert.equal(await page.evaluate(() => window.select_voxel_game_vehicle?.('bulldozer')), false,
@@ -475,6 +505,7 @@ try {
     generatedAt: new Date().toISOString(),
     note: 'Docker renderer values are diagnostic; physical GPU certification is separate.',
     results,
+    screenshotProofs,
     screenshots: viewports.flatMap(({ name }) => [
       `${name}-blue-pool.png`,
       `${name}-yellow-shower.png`,
@@ -483,7 +514,11 @@ try {
   };
   fs.writeFileSync(`${outputDirectory}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
   writeRunManifest('completed', null, { full: true, mode: 'colors' });
-  process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({
+    ...manifest,
+    screenshotProofCount: Object.keys(screenshotProofs).length,
+    screenshotProofs: undefined,
+  }, null, 2)}\n`);
 } catch (error) {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   writeRunManifest('failed', message, { full: true, mode: 'colors' });
