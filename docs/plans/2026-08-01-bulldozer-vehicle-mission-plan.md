@@ -790,7 +790,11 @@ Run: `git status --short`
 
 Expected: 旧入力名0件、diff check 0、意図したsource／test／README／Composeだけが変更される。
 
-- [ ] **Step 7: commit・全範囲scan・push・公開確認を行う**
+- [x] **Step 7: commit・全範囲scan・push・公開確認を行う**
+
+実績: `1daff2b`と`c6f1eed`を`origin/main`へpushし、remote SHA一致・ahead/behind `0/0`、
+GitHub Pages run `30686242548` successを確認した。公開URLへの専用E2Eも3 viewportすべてPASSし、
+ブルドーザー完遂、帰庫reset、消防車復帰、放水、browser error 0件を確認した。
 
 ```bash
 git add scripts/verify-voxel-game-vehicles.mjs docker-compose.yml README.md
