@@ -10,6 +10,7 @@ import {
   canSwitchVehicle,
   type VehicleId,
 } from '../domain/vehicleDefinitions';
+import type { VehicleColorEffectRuntime } from '../domain/VehicleColorEffectRuntime';
 import {
   advanceVehicleMissionFrame,
   type VehicleMissionCoordinator,
@@ -51,11 +52,13 @@ interface VoxelGameSceneProps {
   readonly bulldozerMissionTelemetryRef: BulldozerMissionTelemetryRef;
   readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
   readonly commandRef: RefObject<DriveCommand>;
+  readonly colorEffectRuntime: VehicleColorEffectRuntime;
   readonly coordinator: VehicleMissionCoordinator;
   readonly controllerRef: RefObject<VehicleControllerHandle | null>;
   readonly manualClockRef: React.MutableRefObject<boolean>;
   readonly missionTelemetryRef: MissionTelemetryRef;
   readonly onVehicleSwitchAvailabilityChange: (available: boolean) => void;
+  readonly paintColor: string | null;
   readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
   readonly telemetryRef: VehicleTelemetryRef;
   readonly vehicleId: VehicleId;
@@ -90,6 +93,22 @@ export function syncVehicleMissionSpatialSignals(
     atBulldozerWorksite: resolveVehicleDistrict(vehiclePosition) === 'blocks',
     atGarage: isInsideGarageRestartArea(vehiclePosition),
   });
+}
+
+/** 色source接触を同期し、手動clock直後以外は通常frameを50ms上限で進める。 */
+export function advanceVehicleColorEffectFrame(
+  runtime: VehicleColorEffectRuntime,
+  vehicleId: VehicleId,
+  vehiclePosition: readonly [number, number, number],
+  deltaSeconds: number,
+  skipAdvance: boolean,
+): void {
+  runtime.syncVehiclePosition(vehicleId, vehiclePosition);
+  if (skipAdvance) return;
+  const safeDeltaSeconds = Number.isFinite(deltaSeconds)
+    ? Math.min(Math.max(0, deltaSeconds), 0.05)
+    : 0;
+  runtime.advance(safeDeltaSeconds * 1_000);
 }
 
 /** 最新draw call数を保持しながら実描画frame数を1増やす。 */
@@ -165,19 +184,23 @@ function SceneReadySignal({ renderTelemetryRef, vehicleId }: {
 
 interface RuntimeClockProps {
   readonly breakablePoolHandleRef: BreakablePoolHandleRef;
+  readonly colorEffectRuntime: VehicleColorEffectRuntime;
   readonly coordinator: VehicleMissionCoordinator;
   readonly manualClockRef: React.MutableRefObject<boolean>;
   readonly onVehicleSwitchAvailabilityChange: (available: boolean) => void;
   readonly telemetryRef: VehicleTelemetryRef;
+  readonly vehicleId: VehicleId;
 }
 
 /** 最新車両位置を復元判定へ同期してから通常clockを進める。 */
 function RuntimeClock({
   breakablePoolHandleRef,
+  colorEffectRuntime,
   coordinator,
   manualClockRef,
   onVehicleSwitchAvailabilityChange,
   telemetryRef,
+  vehicleId,
 }: RuntimeClockProps): null {
   const previousSwitchAvailabilityRef = useRef<boolean | null>(null);
   const syncLatestBlockClearance = useCallback(() => {
@@ -185,14 +208,23 @@ function RuntimeClock({
   }, [coordinator, telemetryRef]);
 
   useFrame((_state, delta) => {
+    const manualClockPending = manualClockRef.current;
+    const vehiclePosition = telemetryRef.current.position;
     const switchAvailable = canSwitchVehicle({
-      atGarage: isInsideGarageRestartArea(telemetryRef.current.position),
+      atGarage: isInsideGarageRestartArea(vehiclePosition),
       speed: telemetryRef.current.speed,
     });
     if (switchAvailable !== previousSwitchAvailabilityRef.current) {
       previousSwitchAvailabilityRef.current = switchAvailable;
       onVehicleSwitchAvailabilityChange(switchAvailable);
     }
+    advanceVehicleColorEffectFrame(
+      colorEffectRuntime,
+      vehicleId,
+      vehiclePosition,
+      delta,
+      manualClockPending,
+    );
     advanceVehicleMissionFrame(coordinator, manualClockRef, delta, syncLatestBlockClearance);
     breakablePoolHandleRef.current?.syncAfterRuntimeAdvance();
   });
@@ -207,12 +239,14 @@ export function VoxelGameScene({
   bulldozerMissionTelemetryRef,
   cameraTelemetryRef,
   commandRef,
+  colorEffectRuntime,
   coordinator,
   controllerRef,
   manualClockRef,
   missionTelemetryRef,
   renderTelemetryRef,
   onVehicleSwitchAvailabilityChange,
+  paintColor,
   telemetryRef,
   vehicleId,
 }: VoxelGameSceneProps): ReactElement {
@@ -223,10 +257,12 @@ export function VoxelGameScene({
       <SceneReadySignal renderTelemetryRef={renderTelemetryRef} vehicleId={vehicleId} />
       <RuntimeClock
         breakablePoolHandleRef={breakablePoolHandleRef}
+        colorEffectRuntime={colorEffectRuntime}
         coordinator={coordinator}
         manualClockRef={manualClockRef}
         onVehicleSwitchAvailabilityChange={onVehicleSwitchAvailabilityChange}
         telemetryRef={telemetryRef}
+        vehicleId={vehicleId}
       />
       <ambientLight intensity={1.5} />
       <directionalLight intensity={2.1} position={[20, 34, 18]} />
@@ -265,6 +301,7 @@ export function VoxelGameScene({
         <VehicleController
           commandRef={commandRef}
           key={vehicleId}
+          paintColor={paintColor}
           ref={controllerRef}
           telemetryRef={telemetryRef}
           vehicleId={vehicleId}

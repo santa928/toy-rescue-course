@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import type { VehicleMissionSnapshot } from '../domain/VehicleMissionCoordinator';
+import type { VehicleColorEffectSnapshot } from '../domain/VehicleColorEffectRuntime';
 import {
   getVehicleDefinition,
   VEHICLE_DEFINITIONS,
@@ -11,6 +12,7 @@ import { TouchJoystick } from './TouchJoystick';
 
 interface VoxelGameHudProps {
   readonly canSwitchVehicle: boolean;
+  readonly colorEffect: VehicleColorEffectSnapshot;
   readonly controls: VoxelGameControls;
   readonly fullscreen: boolean;
   readonly fullscreenAvailable: boolean;
@@ -20,9 +22,16 @@ interface VoxelGameHudProps {
   readonly selectedVehicleId: VehicleId;
 }
 
+const COLOR_EFFECT_LABELS = {
+  blue: 'あお',
+  red: 'あか',
+  yellow: 'きいろ',
+} as const;
+
 /** 車両選択、仕事、運転、主操作、fullscreenをsafe-areaへ固定する玩具操作HUD。 */
 export function VoxelGameHud({
   canSwitchVehicle,
+  colorEffect,
   controls,
   fullscreen,
   fullscreenAvailable,
@@ -96,9 +105,19 @@ export function VoxelGameHud({
     : fullscreen
       ? '全画面をおわる'
       : '全画面であそぶ';
+  const visibleColorId = colorEffect.active && colorEffect.vehicleId === selectedVehicleId
+    ? colorEffect.colorId
+    : null;
+  const colorEffectLabel = visibleColorId === null
+    ? null
+    : `${COLOR_EFFECT_LABELS[visibleColorId]} ${colorEffect.remainingSeconds}びょう`;
 
   return (
-    <aside aria-label="働く車の操作パネル" className="voxel-game-hud">
+    <aside
+      aria-label="働く車の操作パネル"
+      className="voxel-game-hud"
+      data-color-effect-active={colorEffectLabel !== null}
+    >
       {canSwitchVehicle ? (
         <nav aria-label="のりものをえらぶ" className="vehicle-selector">
           {VEHICLE_DEFINITIONS.map((definition) => (
@@ -117,19 +136,31 @@ export function VoxelGameHud({
           ))}
         </nav>
       ) : null}
-      <p
-        aria-live="polite"
-        className="mission-pill"
-        data-phase={mission.phase}
-        data-vehicle={selectedVehicleId}
-      >
-        <span aria-hidden="true" className="mission-pill__vehicle">
-          <span />
-          <span />
-          <span />
-        </span>
-        <span className="mission-pill__label">{mission.objectiveLabel}</span>
-      </p>
+      <div className="status-stack">
+        <p
+          aria-live="polite"
+          className="mission-pill"
+          data-phase={mission.phase}
+          data-vehicle={selectedVehicleId}
+        >
+          <span aria-hidden="true" className="mission-pill__vehicle">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span className="mission-pill__label">{mission.objectiveLabel}</span>
+        </p>
+        {colorEffectLabel === null ? null : (
+          <p
+            aria-live="polite"
+            className="color-effect-pill"
+            data-color={visibleColorId}
+          >
+            <span aria-hidden="true" className="color-effect-pill__swatch" />
+            <span>{colorEffectLabel}</span>
+          </p>
+        )}
+      </div>
       <button
         aria-label={fullscreenLabel}
         aria-pressed={fullscreen}

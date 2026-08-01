@@ -78,7 +78,7 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - [x] 3色batch＋白frame＋濃灰baseを固定`InstancedMesh`で描画する。
 - [x] frame loopで新規配列／geometry／materialを作らない。
 - [x] focused/full unit、build、renderer call差分を確認する。
-- [ ] `色水プールとシャワーを描画する`でcommit・scan・push・公開確認する。
+- [x] `色水プールとシャワーを描画する`でcommit・scan・push・公開確認する。
 
 ## Task 5: runtime、Scene、HUD、telemetry統合
 
@@ -93,12 +93,12 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - Modify: `src/test/voxelGameHud.test.tsx`
 - Modify: `src/test/hudLayout.test.ts`
 
-- [ ] RED: colorEffect telemetry、manual clock、成功／拒否切替、HUD文言、4矩形安全条件を書く。
-- [ ] Scene clockで位置同期後にeffectを進め、manual `advanceTime`との二重進行を防ぐ。
-- [ ] App subscriptionをactivation／秒境界だけReactへ反映する。
-- [ ] active paint色をVehicleControllerへ渡し、成功した別車種切替だけclearする。
-- [ ] mission pill下へ`.color-effect-pill`をアンカーし、aria-liveを同期する。
-- [ ] focused/full unit、build、canonical nonbreak回帰を通す。
+- [x] RED: colorEffect telemetry、manual clock、成功／拒否切替、HUD文言、4矩形安全条件を書く。
+- [x] Scene clockで位置同期後にeffectを進め、manual `advanceTime`との二重進行を防ぐ。
+- [x] App subscriptionをactivation／秒境界だけReactへ反映する。
+- [x] active paint色をVehicleControllerへ渡し、成功した別車種切替だけclearする。
+- [x] mission pill下へ`.color-effect-pill`をアンカーし、aria-liveを同期する。
+- [x] focused/full unit、build、canonical nonbreak回帰を通す。
 - [ ] `色替え状態をゲーム本体へ統合する`でcommit・scan・push・公開確認する。
 
 ## Task 6: 3 viewport E2E、目視、性能、ドキュメント

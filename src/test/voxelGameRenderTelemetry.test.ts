@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorldTelemetry } from '../voxel-game/VoxelGameApp';
 import {
+  buildWorldTelemetry,
+  selectVehicleWithColorEffect,
+} from '../voxel-game/VoxelGameApp';
+import {
+  advanceVehicleColorEffectFrame,
   advanceRenderTelemetry,
   syncVehicleMissionSpatialSignals,
 } from '../voxel-game/scene/VoxelGameScene';
 import { VehicleMissionCoordinator } from '../voxel-game/domain/VehicleMissionCoordinator';
+import { VehicleColorEffectRuntime } from '../voxel-game/domain/VehicleColorEffectRuntime';
 import {
   createInitialVehicleTelemetry,
   resolveVehicleControllerConfig,
 } from '../voxel-game/scene/VehicleController';
+import { COLOR_PLAY_SOURCES } from '../voxel-game/scene/worldLayout';
 
 describe('vehicle controller config', () => {
   it('消防車の既存controller値をregistryから解決する', () => {
@@ -88,5 +94,41 @@ describe('syncVehicleMissionSpatialSignals', () => {
     coordinator.advance(1);
 
     expect(coordinator.getSnapshot().mission.phase).toBe('active');
+  });
+});
+
+describe('vehicle color integration', () => {
+  it('手動clock直後frameは位置だけ同期して二重減算せず、次frameを50ms上限で進める', () => {
+    const runtime = new VehicleColorEffectRuntime(COLOR_PLAY_SOURCES);
+    runtime.syncVehiclePosition('fire-truck', COLOR_PLAY_SOURCES[0].position);
+    runtime.syncVehiclePosition('fire-truck', [0, 0.8, 6]);
+
+    advanceVehicleColorEffectFrame(runtime, 'fire-truck', [0, 0.8, 6], 0.2, true);
+    expect(runtime.getSnapshot().remainingMilliseconds).toBe(12_000);
+
+    advanceVehicleColorEffectFrame(runtime, 'fire-truck', [0, 0.8, 6], 0.2, false);
+    expect(runtime.getSnapshot().remainingMilliseconds).toBe(11_950);
+  });
+
+  it('拒否切替では色を維持し、成功した別車種切替だけ解除する', () => {
+    const coordinator = new VehicleMissionCoordinator([], ['debris-a']);
+    const runtime = new VehicleColorEffectRuntime(COLOR_PLAY_SOURCES);
+    runtime.syncVehiclePosition('fire-truck', COLOR_PLAY_SOURCES[1].position);
+
+    expect(selectVehicleWithColorEffect(
+      coordinator,
+      runtime,
+      'bulldozer',
+      { atGarage: false, speed: 0 },
+    )).toBe(false);
+    expect(runtime.getSnapshot()).toMatchObject({ active: true, colorId: 'blue' });
+
+    expect(selectVehicleWithColorEffect(
+      coordinator,
+      runtime,
+      'bulldozer',
+      { atGarage: true, speed: 0 },
+    )).toBe(true);
+    expect(runtime.getSnapshot()).toMatchObject({ active: false, colorId: null });
   });
 });

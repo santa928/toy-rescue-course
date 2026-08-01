@@ -17,6 +17,7 @@ declare global {
       readonly targetCount: number;
     };
     readonly camera: import('./voxel-game/scene/WorldFixedCamera').WorldCameraTelemetry;
+    readonly colorEffect: import('./voxel-game/domain/VehicleColorEffectRuntime').VehicleColorEffectSnapshot;
     readonly controls: import('./voxel-game/input/controlState').DriveCommand;
     readonly coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south';
     readonly fire: {
@@ -38,6 +39,7 @@ declare global {
         readonly position: readonly [number, number, number];
         readonly radius: number;
       }[];
+      readonly colorPlaySources: readonly import('./voxel-game/scene/productionWorldMap').ColorPlaySourceDefinition[];
       readonly fire: readonly [number, number, number];
       readonly fireSprayTarget: readonly [number, number, number];
       readonly garage: readonly [number, number, number];
@@ -75,6 +77,10 @@ declare global {
     readonly visuals: {
       readonly bulldozerChipCubeCount: number;
       readonly bulldozerDebrisCubeCount: number;
+      readonly colorPoolCubeCount: number;
+      readonly colorShowerCubeCount: number;
+      readonly colorStationCubeCount: number;
+      readonly colorStationDrawCalls: number;
       readonly fireHazardEnabled: boolean;
       readonly fireLayerCount: number;
       readonly fireVoxelCount: number;

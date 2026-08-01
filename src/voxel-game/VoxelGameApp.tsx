@@ -10,7 +10,12 @@ import {
   canSwitchVehicle,
   getVehicleDefinition,
   type VehicleId,
+  type VehicleSwitchContext,
 } from './domain/vehicleDefinitions';
+import {
+  VehicleColorEffectRuntime,
+  type VehicleColorEffectSnapshot,
+} from './domain/VehicleColorEffectRuntime';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
 import {
   bindFullscreenControls,
@@ -51,11 +56,18 @@ import {
 } from './scene/BreakableBlockPlaza';
 import { CHIP_POOL_SIZE } from './scene/breakableVfx';
 import { PRODUCTION_WORLD_MAP } from './scene/productionWorldMap';
+import {
+  COLOR_PLAY_POOL_SLOT_COUNT,
+  COLOR_PLAY_SHOWER_SLOT_COUNT,
+  COLOR_PLAY_STATION_DRAW_CALLS,
+  COLOR_PLAY_TOTAL_CUBE_COUNT,
+} from './scene/colorPlayVfx';
 import { WORLD_SOLID_BOXES } from './scene/worldCollisionLayout';
 import {
   BLOCK_PLAZA,
   BULLDOZER_DEBRIS,
   BREAKABLE_BLOCKS,
+  COLOR_PLAY_SOURCES,
   FIRE_POSITION,
   FIRE_SPRAY_TARGET_POSITION,
   GARAGE_POSITION,
@@ -80,6 +92,18 @@ export function buildWorldTelemetry(
     destinationDistrict,
     districts: PRODUCTION_WORLD_MAP.districts.map(({ id, label }) => ({ id, label })),
   };
+}
+
+/** 車種選択成功時だけ一時色runtimeへ所有車両変更を通知する。 */
+export function selectVehicleWithColorEffect(
+  coordinator: VehicleMissionCoordinator,
+  colorEffectRuntime: VehicleColorEffectRuntime,
+  vehicleId: VehicleId,
+  context: VehicleSwitchContext,
+): boolean {
+  const switched = coordinator.selectVehicle(vehicleId, context);
+  if (switched) colorEffectRuntime.handleSuccessfulVehicleSwitch(vehicleId);
+  return switched;
 }
 
 /** 運転可能な箱庭Canvas、入力、段階的な自動検証hookを構成する。 */
@@ -149,6 +173,11 @@ export function VoxelGameApp(): ReactElement {
     );
   }
   const coordinator = coordinatorRef.current;
+  const colorEffectRuntimeRef = useRef<VehicleColorEffectRuntime | null>(null);
+  if (colorEffectRuntimeRef.current === null) {
+    colorEffectRuntimeRef.current = new VehicleColorEffectRuntime(COLOR_PLAY_SOURCES);
+  }
+  const colorEffectRuntime = colorEffectRuntimeRef.current;
   const bulldozerMissionSnapshotRef = useRef(coordinator.getSnapshot().bulldozer);
   const bulldozerMissionTelemetryRef = useRef<BulldozerMissionTelemetry>(
     createBulldozerMissionTelemetry(),
@@ -185,6 +214,9 @@ export function VoxelGameApp(): ReactElement {
   const [coordinatorSnapshot, setCoordinatorSnapshot] = useState<VehicleMissionCoordinatorSnapshot>(
     () => coordinator.getSnapshot(),
   );
+  const [colorEffectSnapshot, setColorEffectSnapshot] = useState<VehicleColorEffectSnapshot>(
+    () => colorEffectRuntime.getSnapshot(),
+  );
   const [vehicleSwitchAvailable, setVehicleSwitchAvailable] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const fullscreenAvailable = isFullscreenAvailable(document);
@@ -196,7 +228,7 @@ export function VoxelGameApp(): ReactElement {
   /** 実際の車庫・速度条件を再確認し、成功時だけ車体と入力を選択車両へ同期する。 */
   const handleSelectVehicle = useCallback((vehicleId: VehicleId): boolean => {
     const vehicle = telemetryRef.current;
-    const switched = coordinator.selectVehicle(vehicleId, {
+    const switched = selectVehicleWithColorEffect(coordinator, colorEffectRuntime, vehicleId, {
       atGarage: isInsideGarageRestartArea(vehicle.position),
       speed: vehicle.speed,
     });
@@ -208,7 +240,7 @@ export function VoxelGameApp(): ReactElement {
     bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
     setCoordinatorSnapshot(snapshot);
     return true;
-  }, [controls.reset, coordinator]);
+  }, [colorEffectRuntime, controls.reset, coordinator]);
 
   /** physics frameから届く切替可否を境界変化時だけReact HUDへ反映する。 */
   const handleVehicleSwitchAvailabilityChange = useCallback((available: boolean): void => {
@@ -231,6 +263,9 @@ export function VoxelGameApp(): ReactElement {
       bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
       setCoordinatorSnapshot(snapshot);
     });
+    const unsubscribeColorEffect = colorEffectRuntime.subscribe((snapshot) => {
+      setColorEffectSnapshot(snapshot);
+    });
     window.render_game_to_text = () => {
       const coordinatorState = coordinator.getSnapshot();
       const runtime = coordinatorState.fire;
@@ -248,6 +283,7 @@ export function VoxelGameApp(): ReactElement {
       const vehicle = telemetryRef.current;
       const fireLayerCount = getFireLayerCount(runtime.fireIntensity);
       const vehicleDefinition = getVehicleDefinition(coordinatorState.selectedVehicleId);
+      const colorEffect = colorEffectRuntime.getSnapshot();
       const breakables = breakablePoolHandleRef.current?.readActualTelemetry()
         ?? breakableTelemetryRef.current;
       const payload: VoxelGameTextState = {
@@ -264,6 +300,7 @@ export function VoxelGameApp(): ReactElement {
           targetCount: coordinatorState.bulldozer.targetCount,
         },
         coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south',
+        colorEffect,
         controls: { ...command },
         fire: {
           intensity: runtime.fireIntensity,
@@ -277,6 +314,11 @@ export function VoxelGameApp(): ReactElement {
             id,
             position,
             radius,
+          })),
+          colorPlaySources: COLOR_PLAY_SOURCES.map((source) => ({
+            ...source,
+            position: [...source.position],
+            triggerBounds: { ...source.triggerBounds },
           })),
           fire: FIRE_POSITION,
           fireSprayTarget: FIRE_SPRAY_TARGET_POSITION,
@@ -340,6 +382,10 @@ export function VoxelGameApp(): ReactElement {
           })),
         },
         visuals: {
+          colorPoolCubeCount: COLOR_PLAY_POOL_SLOT_COUNT * 3,
+          colorShowerCubeCount: COLOR_PLAY_SHOWER_SLOT_COUNT * 3,
+          colorStationCubeCount: COLOR_PLAY_TOTAL_CUBE_COUNT,
+          colorStationDrawCalls: COLOR_PLAY_STATION_DRAW_CALLS,
           fireHazardEnabled: isFireHazardEnabled(runtime.fireIntensity),
           fireLayerCount,
           fireVoxelCount: getActiveFireVoxelCount(fireLayerCount),
@@ -380,6 +426,11 @@ export function VoxelGameApp(): ReactElement {
     window.reset_voxel_game_vehicle = () => controllerRef.current?.resetVehicle();
     window.select_voxel_game_vehicle = handleSelectVehicle;
     window.advanceTime = (milliseconds: number) => {
+      colorEffectRuntime.syncVehiclePosition(
+        coordinator.getSnapshot().selectedVehicleId,
+        telemetryRef.current.position,
+      );
+      colorEffectRuntime.advance(milliseconds);
       advanceVehicleMissionManualClock(
         coordinator,
         manualClockRef,
@@ -391,12 +442,13 @@ export function VoxelGameApp(): ReactElement {
 
     return () => {
       unsubscribe();
+      unsubscribeColorEffect();
       delete window.render_game_to_text;
       delete window.reset_voxel_game_vehicle;
       delete window.select_voxel_game_vehicle;
       delete window.advanceTime;
     };
-  }, [controls.commandRef, coordinator, handleSelectVehicle]);
+  }, [colorEffectRuntime, controls.commandRef, coordinator, handleSelectVehicle]);
 
   return (
     <main className="voxel-game-shell">
@@ -409,11 +461,16 @@ export function VoxelGameApp(): ReactElement {
             bulldozerMissionTelemetryRef={bulldozerMissionTelemetryRef}
             cameraTelemetryRef={cameraTelemetryRef}
             commandRef={controls.commandRef}
+            colorEffectRuntime={colorEffectRuntime}
             coordinator={coordinator}
             controllerRef={controllerRef}
             manualClockRef={manualClockRef}
             missionTelemetryRef={missionTelemetryRef}
             onVehicleSwitchAvailabilityChange={handleVehicleSwitchAvailabilityChange}
+            paintColor={colorEffectSnapshot.active
+              && colorEffectSnapshot.vehicleId === coordinatorSnapshot.selectedVehicleId
+              ? colorEffectSnapshot.colorHex
+              : null}
             renderTelemetryRef={renderTelemetryRef}
             telemetryRef={telemetryRef}
             vehicleId={coordinatorSnapshot.selectedVehicleId}
@@ -422,6 +479,7 @@ export function VoxelGameApp(): ReactElement {
       </section>
       <VoxelGameHud
         canSwitchVehicle={vehicleSwitchAvailable}
+        colorEffect={colorEffectSnapshot}
         controls={controls}
         fullscreen={fullscreen}
         fullscreenAvailable={fullscreenAvailable}

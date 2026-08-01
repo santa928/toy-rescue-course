@@ -72,14 +72,23 @@ button {
   touch-action: none;
 }
 
-.mission-pill {
+.status-stack {
   position: absolute;
   top: calc(env(safe-area-inset-top) + 12px);
   left: 50%;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: min(70vw, 360px);
+  transform: translateX(-50%);
+}
+
+.mission-pill {
+  display: flex;
   align-items: center;
   width: max-content;
-  max-width: min(70vw, 360px);
+  max-width: 100%;
   min-height: 52px;
   margin: 0;
   padding: 8px 16px 8px 12px;
@@ -92,7 +101,39 @@ button {
   font-weight: 900;
   letter-spacing: 0.045em;
   line-height: 1.1;
-  transform: translateX(-50%);
+}
+
+.color-effect-pill {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  margin: 0;
+  padding: 5px 12px 5px 8px;
+  border: 3px solid #27344c;
+  border-radius: 8px;
+  color: #243044;
+  background: var(--toy-white);
+  box-shadow: 0 4px 0 #27344c;
+  font-size: clamp(0.76rem, 1.8vw, 0.9rem);
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.color-effect-pill__swatch {
+  width: 18px;
+  height: 18px;
+  margin-right: 7px;
+  border: 2px solid #27344c;
+  background: #3b82f6;
+}
+
+.color-effect-pill[data-color='red'] .color-effect-pill__swatch {
+  background: #ef4444;
+}
+
+.color-effect-pill[data-color='yellow'] .color-effect-pill__swatch {
+  background: #facc15;
 }
 
 .mission-pill[data-phase='celebrating'] {
@@ -462,6 +503,19 @@ button {
     transform: scale(0.86);
   }
 
+  .color-effect-pill {
+    min-height: 28px;
+    padding: 4px 9px 4px 7px;
+    box-shadow: 0 3px 0 #27344c;
+    font-size: 0.72rem;
+  }
+
+  .color-effect-pill__swatch {
+    width: 15px;
+    height: 15px;
+    margin-right: 5px;
+  }
+
   .fullscreen-button {
     min-width: 84px;
     min-height: 44px;
@@ -478,16 +532,21 @@ button {
 }
 
 @media (max-width: 640px) {
-  .mission-pill {
+  .status-stack {
     right: auto;
     left: calc(env(safe-area-inset-left) + 14px);
     max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 132px);
+    align-items: flex-start;
     transform: none;
   }
 
   .vehicle-selector {
     top: calc(env(safe-area-inset-top) + 76px);
     width: min(232px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 28px));
+  }
+
+  .voxel-game-hud[data-color-effect-active='true'] .vehicle-selector {
+    top: calc(env(safe-area-inset-top) + 124px);
   }
 }
 
