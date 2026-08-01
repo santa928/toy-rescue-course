@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import type { VehicleMissionSnapshot } from '../domain/VehicleMissionCoordinator';
 import type { VehicleColorEffectSnapshot } from '../domain/VehicleColorEffectRuntime';
+import type { ToyAudioUiState } from '../audio/useToyAudioFeedback';
 import {
   getVehicleDefinition,
   VEHICLE_DEFINITIONS,
@@ -11,6 +12,7 @@ import type { VoxelGameControls } from '../input/useVoxelGameControls';
 import { TouchJoystick } from './TouchJoystick';
 
 interface VoxelGameHudProps {
+  readonly audio: ToyAudioUiState;
   readonly canSwitchVehicle: boolean;
   readonly colorEffect: VehicleColorEffectSnapshot;
   readonly controls: VoxelGameControls;
@@ -18,6 +20,7 @@ interface VoxelGameHudProps {
   readonly fullscreenAvailable: boolean;
   readonly mission: VehicleMissionSnapshot;
   readonly onSelectVehicle: (vehicleId: VehicleId) => void;
+  readonly onToggleAudio: () => void;
   readonly onToggleFullscreen: () => void;
   readonly selectedVehicleId: VehicleId;
 }
@@ -30,6 +33,7 @@ const COLOR_EFFECT_LABELS = {
 
 /** 車両選択、仕事、運転、主操作、fullscreenをsafe-areaへ固定する玩具操作HUD。 */
 export function VoxelGameHud({
+  audio,
   canSwitchVehicle,
   colorEffect,
   controls,
@@ -37,6 +41,7 @@ export function VoxelGameHud({
   fullscreenAvailable,
   mission,
   onSelectVehicle,
+  onToggleAudio,
   onToggleFullscreen,
   selectedVehicleId,
 }: VoxelGameHudProps): ReactElement {
@@ -112,6 +117,18 @@ export function VoxelGameHud({
     ? null
     : `${COLOR_EFFECT_LABELS[visibleColorId]} ${colorEffect.remainingSeconds}びょう`;
   const missionProgressLabel = `${mission.jobCycle}しゅうめ・${mission.progress.current}/${mission.progress.target}`;
+  const audioLabel = !audio.available
+    ? 'おとは使えません'
+    : audio.pending
+      ? 'おとをきりかえています'
+      : audio.enabled
+        ? 'おとと振動をオフにする'
+        : 'おとと振動をオンにする';
+  const visibleAudioLabel = !audio.available
+    ? 'おと なし'
+    : audio.enabled
+      ? 'おと オン'
+      : 'おと オフ';
 
   return (
     <aside
@@ -181,6 +198,24 @@ export function VoxelGameHud({
       >
         <span aria-hidden="true" className="fullscreen-button__glyph" />
         <span>{fullscreenAvailable ? (fullscreen ? 'もどる' : '全画面') : '全画面なし'}</span>
+      </button>
+      <button
+        aria-busy={audio.pending || undefined}
+        aria-label={audioLabel}
+        aria-pressed={audio.enabled}
+        className="audio-toggle-button"
+        data-enabled={audio.enabled}
+        data-state={audio.contextState}
+        disabled={!audio.available || audio.pending}
+        onClick={onToggleAudio}
+        type="button"
+      >
+        <span aria-hidden="true" className="audio-toggle-button__glyph">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span>{visibleAudioLabel}</span>
       </button>
       <TouchJoystick controls={controls} />
       <button

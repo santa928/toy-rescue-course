@@ -38,12 +38,15 @@ docker compose up --build web
 - 画面左下レバー: 倒した画面方向へ移動
 - `Space` / 右下の主操作ボタン: 選んだ車の道具を使う
 - `F` / 右上ボタン: fullscreenの開始・終了
+- 右上の`おと オフ／オン`: 玩具BGM、走行音、車種別アクション音、成功音、対応端末の短い振動をまとめて切り替える
 
 中央車庫の中で停止すると「しょうぼうしゃ」「ブルドーザー」「ショベルカー」「きゅうきゅうしゃ」「パトカー」を選べます。選択に失敗や解除条件はなく、車庫へ戻れば何度でも乗り換えられます。消防車の主操作は放水、ブルドーザーは前面ブレード、ショベルカーはバケット、救急車は手当て、パトカーはサイレンです。
 
 放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。ブルドーザーでは西地区の道しるべをたどり、走りながらブレードを動かして3個の工事がれきへ触れると、ボクセル破片へ崩して片付けられます。ショベルカーでは西地区の土山へ近づいて停止し、バケットを0.7秒動かすと茶色いボクセル粒へ崩して掘れます。救急車では公園の患者の横へ停止し、手当てを1.2秒続けると、横たわった患者が起き上がります。パトカーでは南地区の赤青の巡回門へ向かい、サイレンを鳴らして走り抜けると巡回できます。各車種には3件の仕事があり、仕事を終えて自由走行から車庫へ戻ると、同じ仕事が連続しない次の依頼へ進みます。未完了の帰庫や乗り換えでは依頼を変えません。
 
 通常プレイの仕事順はページを開くたびに変わり、検証や再現ではURLへ`?job-seed=1`のような10進整数を付けると同じ順序になります。現在のjob ID、仕事名、巡回番号、seed、実判定対象座標は`render_game_to_text()`の`mission`へ公開します。
+
+音は初期状態ではオフで、右上の`おと オフ`を押した後だけ始まります。外部音源を読み込まず、木琴風の五音BGM、小さな速度連動エンジン音、放水・ブレード・バケット・手当て・赤青サイレンをWeb Audioで生成します。乗り換え、対象完了、仕事完了には短い合図が入り、touch対応端末では対象／仕事完了だけ短く振動します。非表示中とオフ中はAudioContextを停止し、設定は保存しません。現在の有効状態、context、車種、action kind、gain、cue／振動回数は`render_game_to_text()`の`audio`へ公開します。
 
 どちらの車でも赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。北の公園の木の幹と火災建物本体には進入できません。
 
@@ -73,6 +76,7 @@ docker compose --profile e2e run --rm --build voxel-game-e2e
 docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 docker compose --profile e2e run --rm --build voxel-game-fleet-e2e
+docker compose --profile e2e run --rm --build voxel-game-audio-e2e
 ```
 
 canonical E2Eはscenarioの開始、30秒ごとのheartbeat、成功／失敗、経過秒を`[voxel-e2e]`行へ出力し、
@@ -94,7 +98,7 @@ VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-ga
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは43 files / 425 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは46 files / 446 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -106,12 +110,13 @@ VOXEL_GAME_FOCUS=collision docker compose --profile e2e run --rm --build voxel-g
 docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 docker compose --profile e2e run --rm --build voxel-game-fleet-e2e
+docker compose --profile e2e run --rm --build voxel-game-audio-e2e
 ```
 
 production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
 決定的なchunkへ分割します。`postbuild`が3つのHTML entryからのasset参照と、game entry 350kB、
-通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-01の実測は
-game 129,376 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
+通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-01の音実装後の実測は
+game 140,509 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
 
 Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状態読取、keyboard／touch stick、
 制動、world軸走行、座標補正を`scripts/voxel-game-e2e/drive-harness.mjs`で共有します。canonicalの
@@ -135,6 +140,6 @@ console／page／request errorがないことを実ブラウザで確認しま�
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。ショベルカーの3土山、救急車の患者手当て、パトカーの3地点巡回について、成功、帰庫、次仕事までを3 viewportで実走した24枚は `output/voxel-game-fleet/` へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。ショベルカーの3土山、救急車の患者手当て、パトカーの3地点巡回について、成功、帰庫、次仕事までを3 viewportで実走した24枚は `output/voxel-game-fleet/` へ生成されます。実AudioContextのon/off、5車種action、速度連動engine、HUD実寸とオン／オフ6枚は`output/voxel-game-audio/`へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
 
 2026-08-01の色遊び込み実装を1280×720の `ANGLE Metal Renderer: Apple M4` で2秒warm-up＋12秒計測した結果、消防車はmedian 59.88fps／p10 56.82fps／平均59.92fps（scene 28 calls、車体7 calls）、ブルドーザーはmedian 59.88fps／p10 56.82fps／平均58.92fps（scene 27 calls、車体7 calls）でした。色遊びstationは78 cube／5 callsで、両車とも認証目標のmedian 55fps以上／p10 45fps以上を満たしています。72×72の現mapではchunk streaming／LODは不要と判定し、96×96超への拡張または性能未達時だけ再評価します。実機再認証時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。

@@ -86,15 +86,24 @@ const inactiveColorEffect: VehicleColorEffectSnapshot = {
   vehicleId: null,
 };
 
+const audioOff = {
+  available: true,
+  contextState: 'locked' as const,
+  enabled: false,
+  pending: false,
+};
+
 describe('VoxelGameHud', () => {
   it('車庫では5台の選択状態とブルドーザー固有の主操作を公開する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
+      audio={audioOff}
       canSwitchVehicle
       colorEffect={inactiveColorEffect}
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
       mission={bulldozerMission}
+      onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
@@ -116,12 +125,14 @@ describe('VoxelGameHud', () => {
 
   it('パトカー固有の巡回仕事、3地点進捗、サイレン操作を公開する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
+      audio={audioOff}
       canSwitchVehicle
       colorEffect={inactiveColorEffect}
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
       mission={policeMission}
+      onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="police"
@@ -136,12 +147,14 @@ describe('VoxelGameHud', () => {
 
   it('救急車固有の仕事、1体進捗、手当て操作を公開する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
+      audio={audioOff}
       canSwitchVehicle
       colorEffect={inactiveColorEffect}
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
       mission={ambulanceMission}
+      onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="ambulance"
@@ -156,12 +169,14 @@ describe('VoxelGameHud', () => {
 
   it('ショベルカー固有の仕事、進捗、バケット操作を公開する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
+      audio={audioOff}
       canSwitchVehicle
       colorEffect={inactiveColorEffect}
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
       mission={excavatorMission}
+      onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="excavator"
@@ -176,12 +191,14 @@ describe('VoxelGameHud', () => {
 
   it('車庫外では乗り換えUIを隠す', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
+      audio={audioOff}
       canSwitchVehicle={false}
       colorEffect={inactiveColorEffect}
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
       mission={bulldozerMission}
+      onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
@@ -193,6 +210,7 @@ describe('VoxelGameHud', () => {
 
   it('一時色が有効な間だけ色と残秒を仕事pill下のaria-liveへ表示する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
+      audio={audioOff}
       canSwitchVehicle={false}
       colorEffect={{
         ...inactiveColorEffect,
@@ -210,6 +228,7 @@ describe('VoxelGameHud', () => {
       fullscreen={false}
       fullscreenAvailable
       mission={bulldozerMission}
+      onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
@@ -220,5 +239,58 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain('あお 9びょう');
     expect(html).toContain('data-color="blue"');
+  });
+
+  it('音と振動を明示的にオン／オフでき、非対応時は安全にdisabledへする', () => {
+    const offHtml = renderToStaticMarkup(<VoxelGameHud
+      audio={audioOff}
+      canSwitchVehicle
+      colorEffect={inactiveColorEffect}
+      controls={createControls()}
+      fullscreen={false}
+      fullscreenAvailable
+      mission={bulldozerMission}
+      onSelectVehicle={vi.fn()}
+      onToggleAudio={vi.fn()}
+      onToggleFullscreen={vi.fn()}
+      selectedVehicleId="bulldozer"
+    />);
+    const onHtml = renderToStaticMarkup(<VoxelGameHud
+      audio={{ ...audioOff, contextState: 'running', enabled: true }}
+      canSwitchVehicle
+      colorEffect={inactiveColorEffect}
+      controls={createControls()}
+      fullscreen={false}
+      fullscreenAvailable
+      mission={bulldozerMission}
+      onSelectVehicle={vi.fn()}
+      onToggleAudio={vi.fn()}
+      onToggleFullscreen={vi.fn()}
+      selectedVehicleId="bulldozer"
+    />);
+    const unavailableHtml = renderToStaticMarkup(<VoxelGameHud
+      audio={{ ...audioOff, available: false, contextState: 'unavailable' }}
+      canSwitchVehicle
+      colorEffect={inactiveColorEffect}
+      controls={createControls()}
+      fullscreen={false}
+      fullscreenAvailable
+      mission={bulldozerMission}
+      onSelectVehicle={vi.fn()}
+      onToggleAudio={vi.fn()}
+      onToggleFullscreen={vi.fn()}
+      selectedVehicleId="bulldozer"
+    />);
+
+    expect(offHtml).toContain('class="audio-toggle-button"');
+    expect(offHtml).toContain('aria-label="おとと振動をオンにする"');
+    expect(offHtml).toContain('aria-pressed="false"');
+    expect(offHtml).toContain('おと オフ');
+    expect(onHtml).toContain('aria-label="おとと振動をオフにする"');
+    expect(onHtml).toContain('aria-pressed="true"');
+    expect(onHtml).toContain('おと オン');
+    expect(unavailableHtml).toContain('aria-label="おとは使えません"');
+    expect(unavailableHtml).toContain('disabled=""');
+    expect(unavailableHtml).toContain('おと なし');
   });
 });

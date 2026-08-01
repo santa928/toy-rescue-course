@@ -579,6 +579,15 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     const policeLayout = await measureFleetHud(page, viewport);
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-garage.png` });
 
+    const garageRightWall = policeSelected.visualLayout.worldSolids.find(
+      ({ id }) => id === 'garage-right-wall',
+    );
+    assert(garageRightWall, `${viewport.name}: garage right wall telemetry is unavailable.`);
+    const policeGarageBypassX = garageRightWall.position[0]
+      + garageRightWall.scale[0] / 2
+      + policeSelected.visualLayout.vehicleBounds.scale[0] / 2
+      + 1.5;
+
     await driveToCoordinate(page, {
       coordinateIndex: 2,
       description: `${viewport.name}: police leave garage`,
@@ -589,7 +598,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: police bypass garage wall`,
-      target: 6,
+      target: policeGarageBypassX,
       tolerance: 0.45,
       touchDriver,
     });

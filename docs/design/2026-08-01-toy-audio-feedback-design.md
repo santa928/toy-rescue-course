@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-01
 
-**状態:** 実装可（ユーザーから本番実装の判断委任済み）
+**状態:** 実装・local検証済み（公開URL検証待ち）
 
 **対象:** 5車種のBGM、走行音、専用アクション音、成功音、振動、HUD、telemetry
 
@@ -112,15 +112,15 @@ resumeに失敗した場合は`enabled=false`へ戻し、ボタンを再操作�
 
 ## 8. 受け入れ条件
 
-- [ ] 初期ロードでAudioContextを作らず、consoleにautoplay errorが出ない。
-- [ ] ボタン押下後にcontextがrunningとなり、再押下でsuspendedとなる。
-- [ ] 5車種の走行音とアクション音がpure mixとruntime telemetryで識別できる。
-- [ ] 対象完了、仕事完了、乗り換えcueがsnapshot差分ごとに1回だけ発火する。
-- [ ] touch対応時だけ短い振動patternを呼び、未対応時に例外を出さない。
-- [ ] Desktop 1280×720、Tablet 1024×768、Mobile landscape 844×390でHUDが重ならない。
-- [ ] keyboardとtouchの既存操作、5車種の仕事、色遊び、物理が回帰しない。
-- [ ] `render_game_to_text()`から音状態を検証できる。
-- [ ] Docker内の全unit、build、専用E2E、既存production smokeを通す。
+- [x] 初期ロードでAudioContextを作らず、consoleにautoplay errorが出ない。
+- [x] ボタン押下後にcontextがrunningとなり、再押下でsuspendedとなる。
+- [x] 5車種の走行音とアクション音がpure mixとruntime telemetryで識別できる。
+- [x] 対象完了、仕事完了、乗り換えcueがsnapshot差分ごとに1回だけ発火する。
+- [x] touch対応時だけ短い振動patternを呼び、未対応時に例外を出さない。
+- [x] Desktop 1280×720、Tablet 1024×768、Mobile landscape 844×390でHUDが重ならない。
+- [x] keyboardとtouchの既存操作、5車種の仕事、色遊び、物理が回帰しない。
+- [x] `render_game_to_text()`から音状態を検証できる。
+- [x] Docker内の全unit、build、専用E2E、既存production smokeを通す。
 - [ ] GitHub Pages公開URLでも専用E2Eとconsole cleanを確認する。
 
 ## 9. 非対象
@@ -156,3 +156,14 @@ resumeに失敗した場合は`enabled=false`へ戻し、ボタンを再操作�
 - [x] 非対象がある。
 - [x] リスクと対策がある。
 - [x] 性能目標がある。
+
+## 13. local実測
+
+- unit: 46 files / 446 tests、すべて成功。
+- production build: 656 modules、game 140,509B、React 192,532B、Three 718,551B、Rapier 2,237,128B。全budget内。
+- production smoke: root、`/voxel-game.html`、`/vehicle-lab.html`のWebGL起動とconsole／page／request errorなし。
+- 音専用E2E: manifest `2026-08-01T17:45:44.578Z`。3 viewportすべてでactual AudioContextの`locked → running → suspended`、5 action kind、4 vehicle-switch cue、速度連動engineを確認。
+- HUD: 全画面ボタンとの右端anchor一致、上下8px以上、主要HUD間8px以上、内部2子要素の親内収まりを3 viewportで数値確認。オン／オフ6枚を目視し、状態差、重なり、はみ出し、盤面遮蔽なし。
+- fleet回帰: manifest `2026-08-01T17:43:03.991Z`。3 viewportでショベル、救急、パトカーの仕事完了、帰庫、次仕事へ進行。24画像中、長い仕事名の代表3枚を追加目視して音ボタンとの干渉なし。
+- fresh回帰で発見したパトカーの車庫右壁迂回は、固定`x=6`を壁外縁＋車体外接幅＋1.5unitの計算値へ変更し、Desktop単独と全3 viewportの双方で完走した。
+- Docker software rendererのfpsは物理GPU性能認証へ使用しない。音実装は3D sceneを変更しないため、物理GPU再認証は最終goalで実施する。

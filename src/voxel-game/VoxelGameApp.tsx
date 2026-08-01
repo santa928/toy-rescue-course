@@ -82,6 +82,7 @@ import {
   resolveVehicleDistrict,
 } from './scene/worldLayout';
 import { VoxelGameHud } from './ui/VoxelGameHud';
+import { useToyAudioFeedback } from './audio/useToyAudioFeedback';
 import { PhysicalGpuProbe } from './performance/PhysicalGpuCertificationProbe';
 import { isPhysicalGpuProbeEnabled } from './performance/physicalGpuProbe';
 
@@ -265,6 +266,11 @@ export function VoxelGameApp(): ReactElement {
   const telemetryRef = useRef<VehicleTelemetry>(
     createInitialVehicleTelemetry(INITIAL_VEHICLE_ID),
   );
+  const { audioState, audioTelemetryRef, toggleAudio } = useToyAudioFeedback({
+    commandRef: controls.commandRef,
+    coordinator,
+    telemetryRef,
+  });
   const physicalGpuProbeEnabled = isPhysicalGpuProbeEnabled(window.location.search);
 
   /** 実際の車庫・速度条件を再確認し、成功時だけ車体と入力を選択車両へ同期する。 */
@@ -340,6 +346,7 @@ export function VoxelGameApp(): ReactElement {
       const breakables = breakablePoolHandleRef.current?.readActualTelemetry()
         ?? breakableTelemetryRef.current;
       const payload: VoxelGameTextState = {
+        audio: { ...audioTelemetryRef.current },
         ambulance: {
           activeParticleCount: ambulanceActionActive
             ? actionTargetTelemetry.activeParticleCount
@@ -636,6 +643,7 @@ export function VoxelGameApp(): ReactElement {
         </Canvas>
       </section>
       <VoxelGameHud
+        audio={audioState}
         canSwitchVehicle={vehicleSwitchAvailable}
         colorEffect={colorEffectSnapshot}
         controls={controls}
@@ -643,6 +651,7 @@ export function VoxelGameApp(): ReactElement {
         fullscreenAvailable={fullscreenAvailable}
         mission={coordinatorSnapshot.mission}
         onSelectVehicle={handleSelectVehicle}
+        onToggleAudio={toggleAudio}
         onToggleFullscreen={handleToggleFullscreen}
         selectedVehicleId={coordinatorSnapshot.selectedVehicleId}
       />

@@ -385,6 +385,72 @@ button {
   cursor: not-allowed;
 }
 
+.audio-toggle-button {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 68px);
+  right: calc(env(safe-area-inset-right) + 14px);
+  display: flex;
+  align-items: center;
+  min-width: 94px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 4px solid var(--toy-road-deep);
+  border-radius: 8px;
+  color: var(--toy-white);
+  background: var(--toy-road);
+  box-shadow: 0 5px 0 #11151a;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.audio-toggle-button[data-enabled='true'] {
+  border-color: var(--toy-construction-deep);
+  color: #33210a;
+  background: var(--toy-construction);
+  box-shadow: 0 5px 0 var(--toy-construction-deep);
+}
+
+.audio-toggle-button__glyph {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 24px;
+  height: 22px;
+  margin-right: 6px;
+}
+
+.audio-toggle-button__glyph > span {
+  display: block;
+  width: 4px;
+  background: currentcolor;
+}
+
+.audio-toggle-button__glyph > span:first-child {
+  width: 10px;
+  height: 12px;
+  box-shadow: 4px -3px 0 currentcolor, 4px 3px 0 currentcolor;
+}
+
+.audio-toggle-button__glyph > span:nth-child(2) {
+  height: 10px;
+}
+
+.audio-toggle-button__glyph > span:nth-child(3) {
+  height: 17px;
+}
+
+.audio-toggle-button:disabled {
+  color: #bfc0bd;
+  background: #66686a;
+  box-shadow: 0 3px 0 #3a3c3e;
+  cursor: not-allowed;
+}
+
 .touch-joystick {
   position: absolute;
   bottom: calc(env(safe-area-inset-bottom) + 18px);
@@ -690,11 +756,13 @@ button {
 }
 
 .fullscreen-button:hover:not(:disabled),
+.audio-toggle-button:hover:not(:disabled),
 .primary-action-button:hover {
   filter: brightness(1.06);
 }
 
 .fullscreen-button:focus-visible,
+.audio-toggle-button:focus-visible,
 .primary-action-button:focus-visible,
 .vehicle-selector__button:focus-visible {
   outline: 4px solid var(--toy-safety-yellow);
@@ -703,6 +771,11 @@ button {
 
 .fullscreen-button:active:not(:disabled) {
   top: calc(env(safe-area-inset-top) + 16px);
+  box-shadow: 0 1px 0 #11151a;
+}
+
+.audio-toggle-button:active:not(:disabled) {
+  top: calc(env(safe-area-inset-top) + 72px);
   box-shadow: 0 1px 0 #11151a;
 }
 
@@ -751,6 +824,21 @@ button {
     font-size: 0.7rem;
   }
 
+  .audio-toggle-button {
+    min-width: 84px;
+    min-height: 44px;
+    padding: 6px 7px;
+    font-size: 0.65rem;
+  }
+
+  .audio-toggle-button__glyph {
+    width: 20px;
+    height: 18px;
+    margin-right: 4px;
+    transform: scale(0.84);
+    transform-origin: center;
+  }
+
   .fullscreen-button__glyph {
     width: 18px;
     height: 18px;
@@ -791,6 +879,7 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .touch-joystick__thumb,
   .fullscreen-button,
+  .audio-toggle-button,
   .primary-action-button {
     transition: none;
   }

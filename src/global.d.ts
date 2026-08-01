@@ -3,6 +3,7 @@ export {};
 declare global {
   /** 自動操作と目視状態を一致させるVoxel Gameの完成版text-state契約。 */
   interface VoxelGameTextState {
+    readonly audio: import('./voxel-game/audio/ToyAudioDirector').ToyAudioTelemetry;
     readonly ambulance: {
       readonly activeParticleCount: number;
       readonly completedCount: number;
