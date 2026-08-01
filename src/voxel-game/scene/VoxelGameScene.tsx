@@ -3,6 +3,7 @@ import type { MutableRefObject, ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
 import type { DriveCommand } from '../input/controlState';
+import type { VehicleId } from '../domain/vehicleDefinitions';
 import {
   advanceRuntimeFrame,
   syncBlockClearance,
@@ -35,6 +36,7 @@ interface VoxelGameSceneProps {
   readonly runtime: VoxelGameRuntime;
   readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
   readonly telemetryRef: VehicleTelemetryRef;
+  readonly vehicleId: VehicleId;
 }
 
 export interface VoxelGameRenderTelemetry {
@@ -128,6 +130,7 @@ export function VoxelGameScene({
   renderTelemetryRef,
   runtime,
   telemetryRef,
+  vehicleId,
 }: VoxelGameSceneProps): ReactElement {
   return (
     <>
@@ -163,7 +166,12 @@ export function VoxelGameScene({
             position={WORLD_GROUND_BOX.position}
           />
         </RigidBody>
-        <VehicleController commandRef={commandRef} ref={controllerRef} telemetryRef={telemetryRef} />
+        <VehicleController
+          commandRef={commandRef}
+          ref={controllerRef}
+          telemetryRef={telemetryRef}
+          vehicleId={vehicleId}
+        />
       </Physics>
     </>
   );

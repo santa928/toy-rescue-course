@@ -4,13 +4,20 @@ import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, RigidBody, type RapierRigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 import { VoxelFireTruck } from '../../vehicle-lab/scene/VoxelFireTruck';
+import { VoxelBulldozer } from '../../vehicle-lab/scene/VoxelBulldozer';
+import {
+  getVehicleDefinition,
+  type VehicleColliderDefinition,
+  type VehicleId,
+  type VehiclePhysicsDefinition,
+} from '../domain/vehicleDefinitions';
 import type { DriveCommand } from '../input/controlState';
-import { VEHICLE_COLLIDER_HALF_EXTENTS } from './worldCollisionLayout';
 import { GARAGE_POSITION, WORLD_BOUNDS } from './worldLayout';
 import { resolveScreenRelativeMovement, shortestAngleDelta } from './screenRelativeMovement';
 
 export interface VehicleTelemetry {
   readonly forward: readonly [number, number, number];
+  readonly id: VehicleId;
   readonly mass: number;
   readonly position: readonly [number, number, number];
   readonly resetCount: number;
@@ -27,11 +34,42 @@ export interface VehicleControllerHandle {
 interface VehicleControllerProps {
   readonly commandRef: RefObject<DriveCommand>;
   readonly telemetryRef: VehicleTelemetryRef;
+  readonly vehicleId: VehicleId;
+}
+
+/** controllerが毎frameとRapierへ渡す車種別設定。 */
+export interface VehicleControllerConfig {
+  readonly collider: VehicleColliderDefinition;
+  readonly physics: VehiclePhysicsDefinition;
+  readonly vehicleId: VehicleId;
 }
 
 const BASE_FORWARD = new THREE.Vector3(0, 0, 1);
 const quaternion = new THREE.Quaternion();
 const forward = new THREE.Vector3();
+
+/** 任意IDを既知車種へ解決し、controllerが使う設定だけを返す。 */
+export function resolveVehicleControllerConfig(id: unknown): VehicleControllerConfig {
+  const definition = getVehicleDefinition(id);
+  return {
+    collider: definition.collider,
+    physics: definition.physics,
+    vehicleId: definition.id,
+  };
+}
+
+/** 指定車種を車庫へ置いた初期telemetryを返す。 */
+export function createInitialVehicleTelemetry(vehicleId: VehicleId): VehicleTelemetry {
+  const config = resolveVehicleControllerConfig(vehicleId);
+  return {
+    forward: [0, 0, 1],
+    id: config.vehicleId,
+    mass: config.physics.mass,
+    position: [...GARAGE_POSITION],
+    resetCount: 0,
+    speed: 0,
+  };
+}
 
 /** Rapierの回転quaternionから水平yaw角を返す。 */
 function getYaw(rotation: { readonly w: number; readonly x: number; readonly y: number; readonly z: number }): number {
@@ -60,6 +98,7 @@ function updateTelemetry(
 ): void {
   telemetryRef.current = {
     forward: [direction.x, direction.y, direction.z],
+    id: telemetryRef.current.id,
     mass,
     position: [position.x, position.y, position.z],
     resetCount: telemetryRef.current.resetCount,
@@ -69,14 +108,17 @@ function updateTelemetry(
 
 /** 入力refを毎frame読み、消防車の速度・旋回・resetをRapierへ反映する。 */
 export const VehicleController = forwardRef<VehicleControllerHandle, VehicleControllerProps>(
-  function VehicleController({ commandRef, telemetryRef }, ref): ReactElement {
+  function VehicleController({ commandRef, telemetryRef, vehicleId }, ref): ReactElement {
     const bodyRef = useRef<RapierRigidBody>(null);
+    const actionActiveRef = useRef(false);
+    const config = resolveVehicleControllerConfig(vehicleId);
 
     /** 剛体とtelemetryを車庫の初期状態へ戻す。 */
     const resetVehicle = useCallback((): void => {
       const body = bodyRef.current;
       telemetryRef.current = {
         forward: [0, 0, 1],
+        id: config.vehicleId,
         mass: body?.mass() ?? telemetryRef.current.mass,
         position: [...GARAGE_POSITION],
         resetCount: telemetryRef.current.resetCount + 1,
@@ -87,11 +129,12 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       body.setRotation({ w: 1, x: 0, y: 0, z: 0 }, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    }, [telemetryRef]);
+    }, [config.vehicleId, telemetryRef]);
 
     useImperativeHandle(ref, () => ({ resetVehicle }), [resetVehicle]);
 
     useFrame((_state, delta) => {
+      actionActiveRef.current = commandRef.current.spray;
       const body = bodyRef.current;
       if (!body) return;
 
@@ -110,11 +153,15 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       const movement = resolveScreenRelativeMovement(command);
       const velocity = body.linvel();
       const moving = movement.magnitude > 0 && movement.targetYaw !== null;
-      const response = moving ? 7.5 : 4.8;
+      const response = moving ? config.physics.movingResponse : config.physics.idleResponse;
       const nextVelocityX = THREE.MathUtils.damp(velocity.x, movement.velocity[0], response, delta);
       const nextVelocityZ = THREE.MathUtils.damp(velocity.z, movement.velocity[2], response, delta);
       const targetYawVelocity = moving
-        ? THREE.MathUtils.clamp(shortestAngleDelta(yaw, movement.targetYaw) * 8, -5.2, 5.2)
+        ? THREE.MathUtils.clamp(
+          shortestAngleDelta(yaw, movement.targetYaw) * 8,
+          -config.physics.yawClamp,
+          config.physics.yawClamp,
+        )
         : 0;
 
       body.setLinvel({ x: nextVelocityX, y: velocity.y, z: nextVelocityZ }, true);
@@ -132,12 +179,14 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
         ref={bodyRef}
       >
         <CuboidCollider
-          args={[...VEHICLE_COLLIDER_HALF_EXTENTS]}
-          mass={1.4}
-          position={[0, 0.95, 0]}
+          args={[...config.collider.halfExtents]}
+          mass={config.physics.mass}
+          position={config.collider.offset}
         />
         <group rotation={[0, Math.PI, 0]}>
-          <VoxelFireTruck />
+          {config.vehicleId === 'fire-truck'
+            ? <VoxelFireTruck />
+            : <VoxelBulldozer actionActiveRef={actionActiveRef} />}
         </group>
       </RigidBody>
     );

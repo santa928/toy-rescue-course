@@ -490,8 +490,7 @@ git push origin main
 - Modify: `src/voxel-game/scene/VehicleController.tsx`
 - Modify: `src/voxel-game/scene/VoxelGameScene.tsx`
 - Modify: `src/voxel-game/VoxelGameApp.tsx`
-- Modify: `src/voxel-game/scene/worldCollisionLayout.ts`
-- Modify: `src/test/screenRelativeMovement.test.ts`
+- Modify: `src/test/waterAndFire.test.ts`（VehicleTelemetry fixtureの車種ID同期）
 - Modify: `src/test/voxelGameRenderTelemetry.test.ts`
 
 **Interfaces:**
@@ -555,8 +554,8 @@ Expected: 全unit PASS、build exit 0。
 
 ```bash
 git add src/voxel-game/scene/VehicleController.tsx src/voxel-game/scene/VoxelGameScene.tsx \
-  src/voxel-game/scene/worldCollisionLayout.ts src/test/screenRelativeMovement.test.ts \
-  src/test/voxelGameRenderTelemetry.test.ts src/voxel-game/VoxelGameApp.tsx
+  src/test/waterAndFire.test.ts src/test/voxelGameRenderTelemetry.test.ts \
+  src/voxel-game/VoxelGameApp.tsx
 git commit -m "車両controllerを車種定義へ接続する"
 git push origin main
 ```

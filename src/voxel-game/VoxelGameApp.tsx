@@ -5,6 +5,10 @@ import {
   advanceManualClock,
   VoxelGameRuntime,
 } from './domain/VoxelGameRuntime';
+import {
+  getVehicleDefinition,
+  type VehicleId,
+} from './domain/vehicleDefinitions';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
 import {
   bindFullscreenControls,
@@ -20,6 +24,7 @@ import type {
   VehicleControllerHandle,
   VehicleTelemetry,
 } from './scene/VehicleController';
+import { createInitialVehicleTelemetry } from './scene/VehicleController';
 import {
   CELEBRATION_STAR_GROUPS,
   FIRE_HAZARD_BOX,
@@ -52,11 +57,8 @@ import {
 } from './scene/worldLayout';
 import { VoxelGameHud } from './ui/VoxelGameHud';
 
-const VEHICLE_VISUAL_BOUNDS = {
-  // 承認済み12×8×14 voxelを0.24 world unitで配置した実描画外接寸法。
-  offset: [0, 0.84, 0] as const,
-  scale: [2.88, 1.92, 3.36] as const,
-};
+const INITIAL_VEHICLE_ID: VehicleId = 'fire-truck';
+const VEHICLE_VISUAL_BOUNDS = getVehicleDefinition(INITIAL_VEHICLE_ID).visualBounds;
 
 /** 車両位置と静的map定義からE2E向けの簡潔なworld状態を返す。 */
 export function buildWorldTelemetry(
@@ -159,13 +161,9 @@ export function VoxelGameApp(): ReactElement {
   const [missionPhase, setMissionPhase] = useState(runtimeRef.current.getSnapshot().missionPhase);
   const [fullscreen, setFullscreen] = useState(false);
   const fullscreenAvailable = isFullscreenAvailable(document);
-  const telemetryRef = useRef<VehicleTelemetry>({
-    forward: [0, 0, 1],
-    mass: 0,
-    position: [...GARAGE_POSITION],
-    resetCount: 0,
-    speed: 0,
-  });
+  const telemetryRef = useRef<VehicleTelemetry>(
+    createInitialVehicleTelemetry(INITIAL_VEHICLE_ID),
+  );
 
   /** click user activation内でfullscreen切替を開始し、拒否はhelper内で安全に吸収する。 */
   const handleToggleFullscreen = useCallback((): void => {
@@ -323,6 +321,7 @@ export function VoxelGameApp(): ReactElement {
             renderTelemetryRef={renderTelemetryRef}
             runtime={runtimeRef.current}
             telemetryRef={telemetryRef}
+            vehicleId={INITIAL_VEHICLE_ID}
           />
         </Canvas>
       </section>

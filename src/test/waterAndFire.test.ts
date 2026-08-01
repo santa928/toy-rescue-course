@@ -314,6 +314,7 @@ describe('WaterAndFire', () => {
     const forgiving = resolveWaterAndFireFrame(
       {
         forward: [0, 0, -1],
+        id: 'fire-truck',
         mass: 1.4,
         position: [29.5, 0.8, -10.2],
         resetCount: 0,
@@ -326,6 +327,7 @@ describe('WaterAndFire', () => {
     const outside = resolveWaterAndFireFrame(
       {
         forward: [0, 0, -1],
+        id: 'fire-truck',
         mass: 1.4,
         position: [29.5, 0.8, -7],
         resetCount: 0,
@@ -336,6 +338,7 @@ describe('WaterAndFire', () => {
     const behind = resolveWaterAndFireFrame(
       {
         forward: [0, 0, 1],
+        id: 'fire-truck',
         mass: 1.4,
         position: [29.5, 0.8, -10.2],
         resetCount: 0,
@@ -361,6 +364,7 @@ describe('WaterAndFire', () => {
     const frame = resolveWaterAndFireFrame(
       {
         forward: [0, 0, -1],
+        id: 'fire-truck',
         mass: 1.4,
         position: [29.5, 0.8, -10.2],
         resetCount: 0,
