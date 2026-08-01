@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import {
+  createDomTouchStickDriver,
+  createDriveHarness,
+} from './voxel-game-e2e/drive-harness.mjs';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
 const outputDirectory = 'output/voxel-game-vehicles';
@@ -10,35 +14,12 @@ const viewports = [
   { height: 390, name: 'mobile-landscape', touch: true, width: 844 },
 ];
 
-const worldAxisInputs = {
-  negativeX: { keys: ['KeyA', 'KeyW'], stick: [-0.803, -0.595] },
-  negativeZ: { keys: ['KeyD', 'KeyW'], stick: [0.595, -0.803] },
-  positiveX: { keys: ['KeyD', 'KeyS'], stick: [0.803, 0.595] },
-  positiveZ: { keys: ['KeyA', 'KeyS'], stick: [-0.595, 0.803] },
-};
-
-fs.rmSync(outputDirectory, { force: true, recursive: true });
-fs.mkdirSync(outputDirectory, { recursive: true });
-
-/** R3FとRapierを通常clockで指定frame数進める。 */
-async function waitForFrames(page, frameCount) {
-  await page.evaluate((count) => new Promise((resolve) => {
-    let remaining = count;
-    const tick = () => {
-      remaining -= 1;
-      if (remaining <= 0) resolve();
-      else requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }), frameCount);
-}
-
-/** 公開hookから二車種のactual text stateを読む。 */
-async function readGameState(page) {
-  const rendered = await page.evaluate(() => window.render_game_to_text?.());
-  assert(rendered, 'render_game_to_text is unavailable.');
-  const state = JSON.parse(rendered);
-  for (const field of [
+const driveHarness = createDriveHarness({
+  alignAttemptLimit: 28,
+  brakeFrameLimit: 180,
+  defaultMaxBursts: 420,
+  pulseDistanceMultiplier: 1.4,
+  requiredFields: [
     'bulldozer',
     'controls',
     'landmarks',
@@ -47,11 +28,23 @@ async function readGameState(page) {
     'vehicleSelection',
     'visuals',
     'world',
-  ]) {
-    assert(Object.hasOwn(state, field), `text state lacks ${field}.`);
-  }
-  return state;
-}
+  ],
+  resetContext: (latest, previous) => ({
+    current: latest.vehicle,
+    previous: previous?.vehicle,
+    previousBladeCenter: previous?.bulldozer?.bladeCenter,
+    previousControls: previous?.controls,
+  }),
+  sampleBeforeBurst: false,
+});
+const {
+  brakeVehicle,
+  readGameState,
+  waitForFrames,
+} = driveHarness;
+
+fs.rmSync(outputDirectory, { force: true, recursive: true });
+fs.mkdirSync(outputDirectory, { recursive: true });
 
 /** Playwrightの矩形をedge座標へ変換する。 */
 function toEdges(box) {
@@ -108,156 +101,42 @@ async function measureHudLayout(page, viewport) {
   return boxes;
 }
 
-/** keyboard集合を同時押下または全解除する。 */
-async function setKeyboardKeys(page, heldKeys, nextKeys) {
-  const next = new Set(nextKeys);
-  for (const key of heldKeys) if (!next.has(key)) await page.keyboard.up(key);
-  for (const key of next) if (!heldKeys.has(key)) await page.keyboard.down(key);
-  heldKeys.clear();
-  for (const key of next) heldKeys.add(key);
-}
-
-/** 実DOM pointer eventでstickを操作するtouch driverを作る。 */
+/** 二車種E2E用pointer identityで共有DOM touch driverを作る。 */
 async function createTouchDriver(page) {
-  const joystick = page.locator('.touch-joystick');
-  const box = await joystick.boundingBox();
-  assert(box, 'touch joystick bounding box is unavailable.');
-  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  const radius = Math.min(box.width, box.height) * 0.38;
-  let active = false;
-
-  return {
-    async releaseStick() {
-      if (!active) return;
-      await joystick.dispatchEvent('pointerup', {
-        button: 0,
-        clientX: center.x,
-        clientY: center.y,
-        pointerId: 71,
-        pointerType: 'touch',
-      });
-      active = false;
-    },
-    async setStick(x, y) {
-      const length = Math.hypot(x, y) || 1;
-      if (!active) {
-        await joystick.dispatchEvent('pointerdown', {
-          button: 0,
-          clientX: center.x,
-          clientY: center.y,
-          pointerId: 71,
-          pointerType: 'touch',
-        });
-        active = true;
-      }
-      await joystick.dispatchEvent('pointermove', {
-        button: 0,
-        clientX: center.x + x / length * radius,
-        clientY: center.y + y / length * radius,
-        pointerId: 71,
-        pointerType: 'touch',
-      });
-    },
-  };
+  return createDomTouchStickDriver(page, { pointerId: 71 });
 }
 
-/** 車両が自然減速して切替・微調整可能になるまで待つ。 */
-async function brakeVehicle(page) {
-  for (let frame = 0; frame < 180; frame += 1) {
-    await waitForFrames(page, 1);
-    if ((await readGameState(page)).vehicle.speed < 0.24) return;
-  }
-  throw new Error('vehicle did not stop within 180 frames.');
-}
-
-/** world cardinal入力でtelemetry predicateまで走る。 */
+/** 二車種固有reset診断を足して共有world cardinal走行を呼ぶ。 */
 async function driveAlongWorldAxis(page, axis, predicate, description, touchDriver, maxBursts = 420) {
-  const input = worldAxisInputs[axis];
-  assert(input, `${description}: unknown world axis ${axis}.`);
-  const heldKeys = new Set();
-  const resetCount = (await readGameState(page)).vehicle.resetCount;
-  let latest = null;
-  let previous = null;
-  try {
-    if (touchDriver) await touchDriver.setStick(...input.stick);
-    else await setKeyboardKeys(page, heldKeys, input.keys);
-    for (let burst = 0; burst < maxBursts; burst += 1) {
-      await waitForFrames(page, 2);
-      latest = await readGameState(page);
-      if (predicate(latest)) {
-        await touchDriver?.releaseStick();
-        await setKeyboardKeys(page, heldKeys, []);
-        await brakeVehicle(page);
-        return readGameState(page);
-      }
-      assert.equal(latest.vehicle.resetCount, resetCount,
-        `${description}: vehicle reset unexpectedly: ${JSON.stringify({
-          current: latest.vehicle,
-          previous: previous?.vehicle,
-          previousBladeCenter: previous?.bulldozer?.bladeCenter,
-          previousControls: previous?.controls,
-        })}.`);
-      previous = latest;
-    }
-  } finally {
-    await touchDriver?.releaseStick();
-    await setKeyboardKeys(page, heldKeys, []);
-  }
-  throw new Error(`${description}: destination was not reached: ${JSON.stringify(latest?.vehicle)}.`);
+  return driveHarness.driveAlongWorldAxis(page, {
+    axis,
+    description,
+    maxBursts,
+    predicate,
+    touchDriver,
+  });
 }
 
-/** world cardinal方向へ短いpulseを入れてから停止する。 */
-async function pulseWorldAxis(page, axis, frameCount, touchDriver) {
-  const input = worldAxisInputs[axis];
-  const heldKeys = new Set();
-  try {
-    if (touchDriver) await touchDriver.setStick(...input.stick);
-    else await setKeyboardKeys(page, heldKeys, input.keys);
-    await waitForFrames(page, frameCount);
-  } finally {
-    await touchDriver?.releaseStick();
-    await setKeyboardKeys(page, heldKeys, []);
-  }
-  await brakeVehicle(page);
-}
-
-/** XまたはZを短い実入力で指定値へ揃える。 */
+/** 既存の引数順を保って共有X/Z alignを呼ぶ。 */
 async function alignWorldCoordinate(page, coordinateIndex, target, description, touchDriver, tolerance = 0.4) {
-  const positive = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
-  const negative = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
-  let latest = null;
-  for (let attempt = 0; attempt < 28; attempt += 1) {
-    latest = await readGameState(page);
-    const delta = target - latest.vehicle.position[coordinateIndex];
-    if (Math.abs(delta) <= tolerance) return latest;
-    await pulseWorldAxis(
-      page,
-      delta > 0 ? positive : negative,
-      Math.max(1, Math.min(7, Math.ceil(Math.abs(delta) * 1.4))),
-      touchDriver,
-    );
-  }
-  throw new Error(`${description}: alignment failed: ${JSON.stringify({ actual: latest?.vehicle.position, target })}.`);
+  return driveHarness.alignWorldCoordinate(page, {
+    coordinateIndex,
+    description,
+    target,
+    tolerance,
+    touchDriver,
+  });
 }
 
-/** 粗いcardinal走行後に座標をpulseで正確に揃える。 */
+/** 既存の引数順を保って共有coarse+precise走行を呼ぶ。 */
 async function driveToCoordinate(page, coordinateIndex, target, description, touchDriver, tolerance = 0.4) {
-  const state = await readGameState(page);
-  const delta = target - state.vehicle.position[coordinateIndex];
-  if (Math.abs(delta) > tolerance) {
-    const positive = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
-    const negative = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
-    await driveAlongWorldAxis(
-      page,
-      delta > 0 ? positive : negative,
-      (current) => delta > 0
-        ? current.vehicle.position[coordinateIndex] >= target
-        : current.vehicle.position[coordinateIndex] <= target,
-      description,
-      touchDriver,
-    );
-  }
-  return alignWorldCoordinate(page, coordinateIndex, target, `${description} precise`, touchDriver, tolerance);
+  return driveHarness.driveToCoordinate(page, {
+    coordinateIndex,
+    description,
+    target,
+    tolerance,
+    touchDriver,
+  });
 }
 
 /** Spaceまたはtouch pointerで車種別主操作を押下・解除する。 */

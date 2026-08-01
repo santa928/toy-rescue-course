@@ -119,7 +119,7 @@ Docker Composeは`VOXEL_GAME_FOCUS`を明示的に渡せるfocus serviceを追�
 - [x] game entryは350kB以下、通常JS chunkは600kB以下、Threeは750kB以下、Rapierは2.25MB以下で自動検証される。
 - [x] React、Three、R3F、Drei、Rapierが決定的なvendor chunkへ分かれる。
 - [x] Vitestがrootのtest filesを一度だけ収集し、`.worktrees/**`を除外する。
-- [ ] canonical、二車種、色替えE2Eが共有走行harnessを使う。
+- [x] canonical、二車種、色替えE2Eが共有走行harnessを使う。
 - [ ] production-map、nonbreak、collision、break focusが単独実行でき、scenario時間を記録する。
 - [ ] canonical full、二車種、色替え、Vehicle Labの回帰がPASSする。
 - [ ] 公開画面、操作、物理、telemetry、renderer callsが変更前と一致する。

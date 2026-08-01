@@ -98,6 +98,15 @@ production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier comp
 決定的なchunkへ分割します。`postbuild`が3つのHTML entryからのasset参照と、game entry 350kB、
 通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-01の実測は
 game 84,583 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
+
+Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状態読取、keyboard／touch stick、
+制動、world軸走行、座標補正を`scripts/voxel-game-e2e/drive-harness.mjs`で共有します。canonicalの
+放水との同時押しに使うCDP touch driverと、各feature固有のassert・reset診断は個別scriptに残します。
+共有境界のpure／fake page契約はDocker内のNode testで単独確認できます。
+
+```bash
+docker compose run --rm web node --test scripts/voxel-game-e2e/drive-harness.node-test.mjs
+```
 `production-smoke-e2e`は生成済みbundleをVite previewで配信し、root、互換URL、Vehicle LabのWebGL起動と
 console／page／request errorがないことを実ブラウザで確認します。
 

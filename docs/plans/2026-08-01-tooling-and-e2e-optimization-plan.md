@@ -73,11 +73,11 @@ feature固有scenarioの4層に分ける。
 - Modify: `scripts/verify-voxel-game-vehicles.mjs`
 - Modify: `scripts/verify-voxel-game-colors.mjs`
 
-- [ ] RED: world軸、pulse frame、有限座標、reset伝播、入力cleanupをpure／fake page testで固定する。
-- [ ] frame、state、keyboard、DOM touch、brake、drive、pulse、alignを共有moduleへ実装する。
-- [ ] canonicalはCDP同時touch driverを維持し、共有drive APIだけを使う。
-- [ ] 二車種と色替えから重複helperを削除し、feature固有assertを残す。
-- [ ] node test、focus、二車種、色替えE2Eを通す。
+- [x] RED: world軸、pulse frame、有限座標、reset伝播、入力cleanupをpure／fake page testで固定する。
+- [x] frame、state、keyboard、DOM touch、brake、drive、pulse、alignを共有moduleへ実装する。
+- [x] canonicalはCDP同時touch driverを維持し、共有drive APIだけを使う。
+- [x] 二車種と色替えから重複helperを削除し、feature固有assertを残す。
+- [x] node test、focus、二車種、色替えE2Eを通す。
 - [ ] `E2Eの走行harnessを共有する`でcommit・scan・push・公開確認する。
 
 ## Task 5: focus責務と進捗記録を分離する

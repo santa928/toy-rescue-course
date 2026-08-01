@@ -12,6 +12,12 @@ import {
 import {
   evaluateConservativeFirstObservedAxisOverflow,
 } from './voxel-game-break-physics-contract.mjs';
+import {
+  WORLD_AXIS_INPUTS,
+  createDriveHarness,
+  releaseKeyboardKeys,
+  syncKeyboardKeys,
+} from './voxel-game-e2e/drive-harness.mjs';
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
@@ -32,6 +38,19 @@ if (focusMode !== null) {
 const outputDirectory = focusMode === null
   ? canonicalOutputDirectory
   : `${canonicalOutputDirectory}/focus/${focusMode}`;
+const driveHarness = createDriveHarness({
+  alignAttemptLimit: 24,
+  brakeFrameLimit: 150,
+  defaultMaxBursts: 360,
+  pulseDistanceMultiplier: 1.5,
+  requiredFields: ['breakables', 'renderer', 'runtime', 'vehicle', 'world'],
+  sampleBeforeBurst: true,
+});
+const {
+  brakeVehicle,
+  readGameState,
+  waitForFrames,
+} = driveHarness;
 const screenshotProofs = {};
 const targets = [
   { hasTouch: false, height: 720, minimumFps: 60, name: 'desktop', width: 1_280 },
@@ -191,29 +210,6 @@ async function runRegressionScript(scriptPath) {
     const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
     throw new Error(`${scriptPath} failed:\n${stderr}\n${stdout.slice(-8_000)}`);
   }
-}
-
-/** R3F/Rapierを通常clockで指定frame数進める。 */
-async function waitForFrames(page, frameCount) {
-  await page.evaluate((count) => new Promise((resolve) => {
-    let remaining = count;
-    const tick = () => {
-      remaining -= 1;
-      if (remaining <= 0) resolve();
-      else requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }), frameCount);
-}
-
-/** 公開text hookから現在の完全snapshotを読む。 */
-async function readGameState(page) {
-  const rendered = await page.evaluate(() => window.render_game_to_text?.());
-  assert(rendered, 'Voxel Game text state is unavailable.');
-  const state = JSON.parse(rendered);
-  assert(state.renderer && state.vehicle && state.runtime && state.breakables && state.world,
-    `Final telemetry is incomplete: ${rendered}`);
-  return state;
 }
 
 /** worldSolids telemetryから一意なsolidを取得し、欠落時はscenarioを停止する。 */
@@ -930,34 +926,6 @@ async function measurePerformance(page, target) {
   };
 }
 
-/** 入力を離した自然減速を待つ。 */
-async function brakeVehicle(page) {
-  for (let frame = 0; frame < 150; frame += 1) {
-    await waitForFrames(page, 1);
-    if ((await readGameState(page)).vehicle.speed < 0.24) return;
-  }
-  throw new Error('Vehicle did not stop within 150 frames.');
-}
-
-/** 押下中keyboard集合を次のscreen方向へ同期する。 */
-async function syncKeyboardKeys(page, heldKeys, nextKeys) {
-  const next = new Set(nextKeys);
-  for (const key of heldKeys) {
-    if (!next.has(key)) await page.keyboard.up(key);
-  }
-  for (const key of next) {
-    if (!heldKeys.has(key)) await page.keyboard.down(key);
-  }
-  heldKeys.clear();
-  for (const key of next) heldKeys.add(key);
-}
-
-/** keyboard集合を必ず全解除する。 */
-async function releaseKeyboardKeys(page, heldKeys) {
-  for (const key of heldKeys) await page.keyboard.up(key);
-  heldKeys.clear();
-}
-
 /** CDP実touchで任意screen方向のstickと放水を操作する。 */
 async function createTouchDriver(page) {
   const cdp = await page.context().newCDPSession(page);
@@ -1016,14 +984,7 @@ async function createTouchDriver(page) {
   };
 }
 
-const WORLD_AXIS_INPUTS = {
-  negativeX: { keys: ['KeyA', 'KeyW'], stick: [-0.803, -0.595] },
-  negativeZ: { keys: ['KeyD', 'KeyW'], stick: [0.595, -0.803] },
-  positiveX: { keys: ['KeyD', 'KeyS'], stick: [0.803, 0.595] },
-  positiveZ: { keys: ['KeyA', 'KeyS'], stick: [-0.595, 0.803] },
-};
-
-/** 直接操作のscreen対角入力でworld cardinal方向へ走り、座標条件で停止する。 */
+/** 既存の引数順とbrake任意契約を保って共有cardinal走行を呼ぶ。 */
 async function driveAlongWorldAxis(
   page,
   axis,
@@ -1033,40 +994,14 @@ async function driveAlongWorldAxis(
   maxBursts = 360,
   brakeAfterArrival = true,
 ) {
-  const input = WORLD_AXIS_INPUTS[axis];
-  assert(input, `${description}: unknown world axis ${axis}.`);
-  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
-  const heldKeys = new Set();
-  let latestState = null;
-  let previousState = null;
-  try {
-    if (touchDriver) await touchDriver.setStick(...input.stick);
-    else await syncKeyboardKeys(page, heldKeys, input.keys);
-    for (let burst = 0; burst < maxBursts; burst += 1) {
-      const state = await readGameState(page);
-      latestState = state;
-      if (predicate(state)) {
-        await touchDriver?.releaseStick();
-        await releaseKeyboardKeys(page, heldKeys);
-        if (brakeAfterArrival) await brakeVehicle(page);
-        return readGameState(page);
-      }
-      assert.equal(state.vehicle.resetCount, initialResetCount,
-        `${description}: vehicle reset unexpectedly: ${JSON.stringify({
-          current: state.vehicle,
-          previous: previousState?.vehicle,
-        })}`);
-      previousState = state;
-      await waitForFrames(page, 2);
-    }
-    throw new Error(`${description}: axis destination was not reached: ${JSON.stringify({
-      controls: latestState?.controls,
-      position: latestState?.vehicle.position,
-    })}`);
-  } finally {
-    await touchDriver?.releaseStick();
-    await releaseKeyboardKeys(page, heldKeys);
-  }
+  return driveHarness.driveAlongWorldAxis(page, {
+    axis,
+    brakeAfterArrival,
+    description,
+    maxBursts,
+    predicate,
+    touchDriver,
+  });
 }
 
 /** telemetryの照準点から旧6unit外かつ照準済みになる東側道路位置へ微調整する。 */
@@ -1114,22 +1049,16 @@ async function driveToForgivingSprayTarget(page) {
   })}`);
 }
 
-/** world cardinal方向へ短く入力し、停止後のheadingを同方向へ揃える。 */
+/** 既存の引数順を保って共有cardinal pulseを呼ぶ。 */
 async function pulseAlongWorldAxis(page, axis, frameCount, touchDriver) {
-  const input = WORLD_AXIS_INPUTS[axis];
-  const heldKeys = new Set();
-  try {
-    if (touchDriver) await touchDriver.setStick(...input.stick);
-    else await syncKeyboardKeys(page, heldKeys, input.keys);
-    await waitForFrames(page, frameCount);
-  } finally {
-    await touchDriver?.releaseStick();
-    await releaseKeyboardKeys(page, heldKeys);
-  }
-  await brakeVehicle(page);
+  return driveHarness.pulseWorldAxis(page, {
+    axis,
+    frameCount,
+    touchDriver,
+  });
 }
 
-/** 短いcardinal pulseを反復し、world X/Zを安全なwaypointへ揃える。 */
+/** canonical固有のtolerance-first引数順を保って共有alignを呼ぶ。 */
 async function alignWorldCoordinate(
   page,
   coordinateIndex,
@@ -1138,23 +1067,13 @@ async function alignWorldCoordinate(
   tolerance = 0.32,
   touchDriver = null,
 ) {
-  assert(coordinateIndex === 0 || coordinateIndex === 2, `${description}: only X/Z can be aligned.`);
-  const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
-  const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
-  const initialResetCount = (await readGameState(page)).vehicle.resetCount;
-  let latest = null;
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    latest = await readGameState(page);
-    const delta = targetValue - latest.vehicle.position[coordinateIndex];
-    if (Math.abs(delta) <= tolerance) return latest;
-    assert.equal(latest.vehicle.resetCount, initialResetCount, `${description}: vehicle reset unexpectedly.`);
-    const frameCount = Math.max(1, Math.min(7, Math.ceil(Math.abs(delta) * 1.5)));
-    await pulseAlongWorldAxis(page, delta > 0 ? positiveAxis : negativeAxis, frameCount, touchDriver);
-  }
-  throw new Error(`${description}: coordinate did not align: ${JSON.stringify({
-    actual: latest?.vehicle.position[coordinateIndex],
-    targetValue,
-  })}`);
+  return driveHarness.alignWorldCoordinate(page, {
+    coordinateIndex,
+    description,
+    target: targetValue,
+    tolerance,
+    touchDriver,
+  });
 }
 
 /** 中央車庫から東幹線と火災地区道路を通って炎の照準距離へ進む。 */
