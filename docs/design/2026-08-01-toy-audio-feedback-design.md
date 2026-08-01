@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-01
 
-**状態:** 実装・local検証済み（公開URL検証待ち）
+**状態:** 実装・公開検証済み
 
 **対象:** 5車種のBGM、走行音、専用アクション音、成功音、振動、HUD、telemetry
 
@@ -121,7 +121,7 @@ resumeに失敗した場合は`enabled=false`へ戻し、ボタンを再操作�
 - [x] keyboardとtouchの既存操作、5車種の仕事、色遊び、物理が回帰しない。
 - [x] `render_game_to_text()`から音状態を検証できる。
 - [x] Docker内の全unit、build、専用E2E、既存production smokeを通す。
-- [ ] GitHub Pages公開URLでも専用E2Eとconsole cleanを確認する。
+- [x] GitHub Pages公開URLでも専用E2Eとconsole cleanを確認する。
 
 ## 9. 非対象
 
@@ -167,3 +167,11 @@ resumeに失敗した場合は`enabled=false`へ戻し、ボタンを再操作�
 - fleet回帰: manifest `2026-08-01T17:43:03.991Z`。3 viewportでショベル、救急、パトカーの仕事完了、帰庫、次仕事へ進行。24画像中、長い仕事名の代表3枚を追加目視して音ボタンとの干渉なし。
 - fresh回帰で発見したパトカーの車庫右壁迂回は、固定`x=6`を壁外縁＋車体外接幅＋1.5unitの計算値へ変更し、Desktop単独と全3 viewportの双方で完走した。
 - Docker software rendererのfpsは物理GPU性能認証へ使用しない。音実装は3D sceneを変更しないため、物理GPU再認証は最終goalで実施する。
+
+## 14. 公開実測
+
+- implementation commit: `20df536c9f8c730e2a3f1acf121a992dcbf7a98e`。push後にremote SHA一致、ahead/behind `0/0`、working tree cleanを確認。
+- GitHub Pages: workflow run `30711121835`のbuild／deployが成功。
+- 公開音専用E2E: manifest `2026-08-01T17:49:55.318Z`。3 viewportすべてでactual AudioContextの`locked → running → suspended`、5 action kind、4 vehicle-switch cue、速度連動engine、HUD安全余白を確認。
+- 公開entrypoint smoke: root、`/voxel-game.html`、`/vehicle-lab.html`のWebGL起動とconsole／page／request errorなし。
+- 公開スクリーンショット: Desktop、Tablet、Mobile landscapeのオン／オフ6枚を目視し、状態差、重なり、はみ出し、盤面・操作阻害なし。

@@ -39,11 +39,11 @@
 - [x] 変更関連unit、全unit、production build、bundle budgetをDocker内で実行する。
 - [x] production smokeと音専用E2EをDocker内のproduction previewで実行する。
 - [x] README、設計、計画、manifestへ実測結果を記録する。
-- [ ] staged差分と`origin/main..HEAD`をsecret scanする。
-- [ ] 日本語コミットを作成しmainへpushする。
-- [ ] remote SHA、ahead/behind 0/0、GitHub Actions／Pages successを確認する。
-- [ ] 公開URLで音専用E2E、root／compat／Vehicle Lab smoke、console cleanを確認する。
-- [ ] 公開結果を別の日本語コミットで記録し、再push・再公開確認する。
+- [x] staged差分と`origin/main..HEAD`をsecret scanする。
+- [x] 日本語コミットを作成しmainへpushする。
+- [x] remote SHA、ahead/behind 0/0、GitHub Actions／Pages successを確認する。
+- [x] 公開URLで音専用E2E、root／compat／Vehicle Lab smoke、console cleanを確認する。
+- [x] 公開結果を別の日本語コミットで記録し、再push・再公開確認する。
 
 ## 検証コマンド方針
 
@@ -54,4 +54,4 @@
 - [x] REQ-063〜REQ-071がunit、telemetry、E2E、実画面で対応する。
 - [x] 既存REQ-001〜REQ-062の回帰がない。
 - [x] 非対象を暗黙に実装・削除していない。
-- [ ] 公開URLとremote mainが同じSHAを示す。
+- [x] 公開URLとremote mainが同じSHAを示す。
