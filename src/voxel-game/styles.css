@@ -224,6 +224,21 @@ button {
   background: var(--toy-construction);
 }
 
+.mission-pill[data-vehicle='excavator'] {
+  border-color: #8a430c;
+  color: #5b300b;
+  box-shadow: 0 6px 0 #5d6268;
+}
+
+.mission-pill[data-vehicle='excavator'] .mission-pill__vehicle span {
+  border-color: #8a430c;
+  background: #e87918;
+}
+
+.mission-pill[data-vehicle='excavator'] .mission-pill__vehicle span:nth-child(2) {
+  background: #858b94;
+}
+
 .vehicle-selector {
   position: absolute;
   top: calc(env(safe-area-inset-top) + 12px);
@@ -233,6 +248,7 @@ button {
   gap: 6px;
   width: min(232px, 38vw);
   min-width: 206px;
+  padding-bottom: 2px;
   pointer-events: auto;
 }
 
@@ -274,6 +290,11 @@ button {
 .vehicle-selector__button[data-vehicle='bulldozer'] .vehicle-selector__swatch {
   border-color: var(--toy-construction-deep);
   background: var(--toy-construction);
+}
+
+.vehicle-selector__button[data-vehicle='excavator'] .vehicle-selector__swatch {
+  border-color: #8a430c;
+  background: #e87918;
 }
 
 .fullscreen-button {
@@ -498,6 +519,46 @@ button {
 .primary-action-button[data-vehicle='bulldozer'][data-pressed='true'] {
   background: var(--toy-white);
   box-shadow: 0 3px 0 #68430b;
+}
+
+.primary-action-button[data-vehicle='excavator'] {
+  border-color: #8a430c;
+  color: #4b2c0b;
+  background: #e87918;
+  box-shadow: 0 8px 0 #713709;
+}
+
+.primary-action-button[data-vehicle='excavator'] .primary-action-button__glyph span {
+  border-color: var(--toy-road-deep);
+  background: #c7ccd0;
+}
+
+.primary-action-button[data-vehicle='excavator'] .primary-action-button__glyph span:nth-child(1) {
+  top: 2px;
+  left: 19px;
+  width: 10px;
+  height: 24px;
+  background: #e87918;
+}
+
+.primary-action-button[data-vehicle='excavator'] .primary-action-button__glyph span:nth-child(2) {
+  top: 20px;
+  left: 8px;
+  width: 25px;
+  height: 9px;
+  transform: rotate(-24deg);
+}
+
+.primary-action-button[data-vehicle='excavator'] .primary-action-button__glyph span:nth-child(3) {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 14px;
+}
+
+.primary-action-button[data-vehicle='excavator'][data-pressed='true'] {
+  background: var(--toy-white);
+  box-shadow: 0 3px 0 #713709;
 }
 
 .fullscreen-button:hover:not(:disabled),

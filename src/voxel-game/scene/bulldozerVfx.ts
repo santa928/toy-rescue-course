@@ -84,6 +84,14 @@ export function hideBulldozerTransform(transform: BulldozerVoxelTransform): void
   transform.scale[2] = 0;
 }
 
+/** 別車種選択中に重ならないよう、がれき本体を含む全固定slotを非表示へ戻す。 */
+export function hideBulldozerMissionFrame(frame: BulldozerVfxFrame): void {
+  for (const transform of frame.debris) hideBulldozerTransform(transform);
+  for (const transform of frame.chips) hideBulldozerTransform(transform);
+  for (const transform of frame.routeMarkers) hideBulldozerTransform(transform);
+  for (const transform of frame.stars) hideBulldozerTransform(transform);
+}
+
 /** 全slotを一度だけ確保した非active frameを返す。 */
 export function createBulldozerVfxFrame(): BulldozerVfxFrame {
   return {

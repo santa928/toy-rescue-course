@@ -121,6 +121,28 @@ services:
           exit 1
         }
 
+  voxel-game-fleet-e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    working_dir: /app
+    environment:
+      VOXEL_GAME_BASE_URL: http://127.0.0.1:5173
+    volumes:
+      - ./output:/app/output
+    command:
+      - sh
+      - -lc
+      - |
+        npm run dev -- --host 127.0.0.1 > /tmp/voxel-game-fleet-vite.log 2>&1 &
+        server_pid=$$!
+        trap 'kill "$$server_pid" 2>/dev/null || true' EXIT
+        node scripts/verify-voxel-game-fleet.mjs || {
+          cat /tmp/voxel-game-fleet-vite.log >&2
+          exit 1
+        }
+
   production-smoke-e2e:
     profiles: ["e2e"]
     build:

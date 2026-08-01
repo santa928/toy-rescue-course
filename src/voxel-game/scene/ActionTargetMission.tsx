@@ -241,7 +241,7 @@ export function ActionTargetMission({
       targetAccentRef.current,
       telemetry.frame.targetAccents,
       matrix,
-      ACCENT_INSTANCE_COLORS[job.kind],
+      ACCENT_INSTANCE_COLORS[job.targetKind],
     );
     applyTransforms(particleRef.current, telemetry.frame.particles, matrix);
     applyTransforms(routeRef.current, telemetry.frame.routeMarkers, matrix);
@@ -273,7 +273,7 @@ export function ActionTargetMission({
   return (
     <group>
       <VoxelPool
-        color={BODY_COLORS[job.kind]}
+        color={BODY_COLORS[job.targetKind]}
         count={ACTION_TARGET_BODY_POOL_SIZE}
         meshRef={targetBodyRef}
       />
@@ -284,12 +284,12 @@ export function ActionTargetMission({
         vertexColors
       />
       <VoxelPool
-        color={PARTICLE_COLORS[job.kind]}
+        color={PARTICLE_COLORS[job.targetKind]}
         count={ACTION_TARGET_PARTICLE_POOL_SIZE}
         meshRef={particleRef}
       />
       <VoxelPool
-        color={ROUTE_COLORS[job.kind]}
+        color={ROUTE_COLORS[job.targetKind]}
         count={ACTION_TARGET_ROUTE_POOL_SIZE}
         emissive
         meshRef={routeRef}

@@ -17,7 +17,9 @@ export function buildMissionJobTelemetry(
 ): MissionJobTelemetry {
   const targetPositions = snapshot.selectedVehicleId === 'fire-truck'
     ? [snapshot.currentJobs.fire.sprayTarget]
-    : snapshot.currentJobs.bulldozer.debris.map(({ position }) => position);
+    : snapshot.selectedVehicleId === 'bulldozer'
+      ? snapshot.currentJobs.bulldozer.debris.map(({ position }) => position)
+      : snapshot.currentJobs.excavator.targets.map(({ position }) => position);
   return {
     jobCycle: snapshot.mission.jobCycle,
     jobId: snapshot.mission.jobId,

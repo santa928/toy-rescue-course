@@ -34,6 +34,19 @@ const bulldozerMission: VehicleMissionSnapshot = {
   vehicleId: 'bulldozer',
 };
 
+const excavatorMission: VehicleMissionSnapshot = {
+  destinationDistrict: 'blocks',
+  id: 'soil-digging',
+  jobCycle: 1,
+  jobId: 'soil-north',
+  jobLabel: 'きたのつちをほろう',
+  objectiveLabel: 'つち あと3こ',
+  phase: 'active',
+  progress: { current: 0, target: 3 },
+  routeVisible: false,
+  vehicleId: 'excavator',
+};
+
 const inactiveColorEffect: VehicleColorEffectSnapshot = {
   active: false,
   activationCount: 0,
@@ -48,7 +61,7 @@ const inactiveColorEffect: VehicleColorEffectSnapshot = {
 };
 
 describe('VoxelGameHud', () => {
-  it('車庫では2台の選択状態とブルドーザー固有の主操作を公開する', () => {
+  it('車庫では3台の選択状態とブルドーザー固有の主操作を公開する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
       canSwitchVehicle
       colorEffect={inactiveColorEffect}
@@ -64,12 +77,33 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('aria-label="のりものをえらぶ"');
     expect(html).toContain('しょうぼうしゃ');
     expect(html).toContain('ブルドーザー');
+    expect(html).toContain('ショベルカー');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="ブレードを動かす"');
     expect(html).toContain('きたのがれきをかたづけよう');
     expect(html).toContain('こうじげんばへ いこう');
     expect(html).toContain('1しゅうめ・0/3');
     expect(html).toContain('aria-label="きたのがれきをかたづけよう。こうじげんばへ いこう。1しゅうめ・0/3"');
+  });
+
+  it('ショベルカー固有の仕事、進捗、バケット操作を公開する', () => {
+    const html = renderToStaticMarkup(<VoxelGameHud
+      canSwitchVehicle
+      colorEffect={inactiveColorEffect}
+      controls={createControls()}
+      fullscreen={false}
+      fullscreenAvailable
+      mission={excavatorMission}
+      onSelectVehicle={vi.fn()}
+      onToggleFullscreen={vi.fn()}
+      selectedVehicleId="excavator"
+    />);
+
+    expect(html).toContain('aria-label="バケットを動かす"');
+    expect(html).toContain('きたのつちをほろう');
+    expect(html).toContain('つち あと3こ');
+    expect(html).toContain('1しゅうめ・0/3');
+    expect(html).toContain('data-vehicle="excavator"');
   });
 
   it('車庫外では乗り換えUIを隠す', () => {

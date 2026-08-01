@@ -5,13 +5,18 @@ import type { WebGLRenderer } from 'three';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
 import { FIRE_TRUCK_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelFireTruck';
 import { BULLDOZER_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelBulldozer';
+import { EXCAVATOR_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelExcavator';
 import type { DriveCommand } from '../input/controlState';
 import {
   canSwitchVehicle,
   type VehicleId,
 } from '../domain/vehicleDefinitions';
 import type { VehicleColorEffectRuntime } from '../domain/VehicleColorEffectRuntime';
-import type { FireVehicleJobDefinition } from '../domain/vehicleJobs';
+import type {
+  ExcavatorVehicleJobDefinition,
+  FireVehicleJobDefinition,
+} from '../domain/vehicleJobs';
+import type { ActionTargetMissionSnapshot } from '../domain/ActionTargetMissionRuntime';
 import {
   advanceVehicleMissionFrame,
   type VehicleMissionCoordinator,
@@ -39,6 +44,10 @@ import {
   type BulldozerMissionSnapshotRef,
   type BulldozerMissionTelemetryRef,
 } from './BulldozerDebrisMission';
+import {
+  ActionTargetMission,
+  type ActionTargetMissionTelemetryRef,
+} from './ActionTargetMission';
 import { WorldFixedCamera, type WorldCameraTelemetryRef } from './WorldFixedCamera';
 import { WORLD_GROUND_BOX, scaleToHalfExtents } from './worldCollisionLayout';
 import {
@@ -48,6 +57,9 @@ import {
 } from './worldLayout';
 
 interface VoxelGameSceneProps {
+  readonly actionTargetJob: ExcavatorVehicleJobDefinition;
+  readonly actionTargetMissionSnapshotRef: MutableRefObject<ActionTargetMissionSnapshot>;
+  readonly actionTargetMissionTelemetryRef: ActionTargetMissionTelemetryRef;
   readonly breakablePoolHandleRef: BreakablePoolHandleRef;
   readonly breakableTelemetryRef: BreakableTelemetryRef;
   readonly bulldozerMissionSnapshotRef: BulldozerMissionSnapshotRef;
@@ -94,6 +106,8 @@ export function syncVehicleMissionSpatialSignals(
 ): void {
   syncBlockClearance(coordinator.fireRuntime, BREAKABLE_BLOCKS, vehiclePosition);
   coordinator.setSpatialSignals({
+    atActionTargetWorksite: resolveVehicleDistrict(vehiclePosition)
+      === coordinator.getSnapshot().mission.destinationDistrict,
     atBulldozerWorksite: resolveVehicleDistrict(vehiclePosition) === 'blocks',
     atGarage: isInsideGarageRestartArea(vehiclePosition),
   });
@@ -147,9 +161,9 @@ function readRendererIdentity(gl: WebGLRenderer): Pick<
 
 /** 選択車両を構成するpalette別InstancedMeshの実render plan数を返す。 */
 function readVehicleDrawCalls(vehicleId: VehicleId): number {
-  return vehicleId === 'fire-truck'
-    ? FIRE_TRUCK_RENDER_PLAN.drawCalls
-    : BULLDOZER_RENDER_PLAN.drawCalls;
+  if (vehicleId === 'fire-truck') return FIRE_TRUCK_RENDER_PLAN.drawCalls;
+  if (vehicleId === 'bulldozer') return BULLDOZER_RENDER_PLAN.drawCalls;
+  return EXCAVATOR_RENDER_PLAN.drawCalls;
 }
 
 /** 複数frameとdraw callを確認してから自動検証へscene readyを通知する。 */
@@ -237,6 +251,9 @@ function RuntimeClock({
 
 /** 箱庭の照明、世界方向固定camera、物理空間、運転可能な消防車を構成する。 */
 export function VoxelGameScene({
+  actionTargetJob,
+  actionTargetMissionSnapshotRef,
+  actionTargetMissionTelemetryRef,
   breakablePoolHandleRef,
   breakableTelemetryRef,
   bulldozerJobRef,
@@ -298,6 +315,16 @@ export function VoxelGameScene({
           missionTelemetryRef={bulldozerMissionTelemetryRef}
           snapshotRef={bulldozerMissionSnapshotRef}
           vehicleId={vehicleId}
+          vehicleTelemetryRef={telemetryRef}
+        />
+        <ActionTargetMission
+          commandRef={commandRef}
+          enabled={vehicleId === 'excavator'}
+          job={actionTargetJob}
+          registerTargetCompletion={(id) => coordinator.registerActionTargetCompletion(id)}
+          runtime={coordinator.excavatorRuntime}
+          snapshotRef={actionTargetMissionSnapshotRef}
+          telemetryRef={actionTargetMissionTelemetryRef}
           vehicleTelemetryRef={telemetryRef}
         />
         <RigidBody colliders={false} type="fixed">

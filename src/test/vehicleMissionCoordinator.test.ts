@@ -8,6 +8,7 @@ import { VEHICLE_JOBS } from '../voxel-game/domain/vehicleJobs';
 
 const BLOCK_IDS = ['block-a'] as const;
 const DEBRIS_IDS = VEHICLE_JOBS.bulldozer[0].debris.map(({ id }) => id);
+const SOIL_IDS = VEHICLE_JOBS.excavator[0].targets.map(({ id }) => id);
 
 /** 消防仕事を完了して車庫へ戻し、次のassigned仕事まで進める。 */
 function completeFireJobAndReturn(coordinator: VehicleMissionCoordinator): void {
@@ -96,6 +97,30 @@ describe('VehicleMissionCoordinator', () => {
       progress: { current: 1, target: 3 },
       routeVisible: true,
       vehicleId: 'bulldozer',
+    });
+  });
+
+  it('ショベルカーの土山進捗を共通仕事snapshotへ変換する', () => {
+    const coordinator = new VehicleMissionCoordinator(BLOCK_IDS, { jobSeed: 1 });
+    coordinator.selectVehicle('excavator', { atGarage: true, speed: 0 });
+    coordinator.registerActionTargetCompletion(SOIL_IDS[0]);
+
+    expect(coordinator.getSnapshot()).toMatchObject({
+      excavator: {
+        completedCount: 1,
+        missionPhase: 'active',
+        targetCount: 3,
+      },
+      mission: {
+        destinationDistrict: 'blocks',
+        id: 'soil-digging',
+        jobCycle: 1,
+        objectiveLabel: 'つち あと2こ',
+        phase: 'active',
+        progress: { current: 1, target: 3 },
+        vehicleId: 'excavator',
+      },
+      selectedVehicleId: 'excavator',
     });
   });
 

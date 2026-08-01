@@ -9,6 +9,7 @@ import {
 import {
   canSwitchVehicle,
   getVehicleDefinition,
+  VEHICLE_DEFINITIONS,
   type VehicleId,
   type VehicleSwitchContext,
 } from './domain/vehicleDefinitions';
@@ -38,6 +39,10 @@ import {
   createBulldozerMissionTelemetry,
   type BulldozerMissionTelemetry,
 } from './scene/BulldozerDebrisMission';
+import {
+  createActionTargetMissionTelemetry,
+  type ActionTargetMissionTelemetry,
+} from './scene/ActionTargetMission';
 import {
   createFireJobSceneLayout,
   getFireLayerCount,
@@ -80,7 +85,7 @@ const INITIAL_VEHICLE_ID: VehicleId = 'fire-truck';
 /** 車両位置と静的map定義からE2E向けの簡潔なworld状態を返す。 */
 export function buildWorldTelemetry(
   vehiclePosition: readonly [number, number, number],
-  destinationDistrict: 'fire' | 'blocks' = 'fire',
+  destinationDistrict: VehicleMissionCoordinatorSnapshot['mission']['destinationDistrict'] = 'fire',
 ): VoxelGameTextState['world'] {
   return {
     bounds: PRODUCTION_WORLD_MAP.bounds,
@@ -182,6 +187,10 @@ export function VoxelGameApp(): ReactElement {
   const bulldozerMissionTelemetryRef = useRef<BulldozerMissionTelemetry>(
     createBulldozerMissionTelemetry(),
   );
+  const actionTargetMissionSnapshotRef = useRef(coordinator.getSnapshot().excavator);
+  const actionTargetMissionTelemetryRef = useRef<ActionTargetMissionTelemetry>(
+    createActionTargetMissionTelemetry(),
+  );
   const manualClockRef = useRef(false);
   const missionTelemetryRef = useRef<MissionTelemetry>({
     direction: [0, 0, 1],
@@ -237,6 +246,7 @@ export function VoxelGameApp(): ReactElement {
     controls.reset();
     telemetryRef.current = createInitialVehicleTelemetry(vehicleId);
     const snapshot = coordinator.getSnapshot();
+    actionTargetMissionSnapshotRef.current = snapshot.excavator;
     bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
     bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
     setCoordinatorSnapshot(snapshot);
@@ -261,6 +271,7 @@ export function VoxelGameApp(): ReactElement {
 
   useEffect(() => {
     const unsubscribe = coordinator.subscribe((snapshot) => {
+      actionTargetMissionSnapshotRef.current = snapshot.excavator;
       bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
       bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
       setCoordinatorSnapshot(snapshot);
@@ -278,6 +289,7 @@ export function VoxelGameApp(): ReactElement {
       const command = controls.commandRef.current;
       const missionTelemetry = missionTelemetryRef.current;
       const bulldozerTelemetry = bulldozerMissionTelemetryRef.current;
+      const actionTargetTelemetry = actionTargetMissionTelemetryRef.current;
       const waterFrame = createWaterFlowFrame({
         path: missionTelemetry.waterPath,
         splashElapsedSeconds: missionTelemetry.splashElapsedSeconds,
@@ -304,6 +316,19 @@ export function VoxelGameApp(): ReactElement {
           starVoxelCount: bulldozerTelemetry.starVoxelCount,
           targetCount: coordinatorState.bulldozer.targetCount,
         },
+        excavator: {
+          activeParticleCount: actionTargetTelemetry.activeParticleCount,
+          completedCount: coordinatorState.excavator.completedCount,
+          contactPoint: [...actionTargetTelemetry.contactPoint],
+          holdMilliseconds: [...actionTargetTelemetry.holdMilliseconds],
+          missionPhase: coordinatorState.excavator.missionPhase,
+          routeMarkerCount: actionTargetTelemetry.routeMarkerCount,
+          starVoxelCount: actionTargetTelemetry.starVoxelCount,
+          targetAccentVoxelCount: actionTargetTelemetry.targetAccentVoxelCount,
+          targetBodyVoxelCount: actionTargetTelemetry.targetBodyVoxelCount,
+          targetCount: coordinatorState.excavator.targetCount,
+          targets: coordinatorState.excavator.targets.map((target) => ({ ...target })),
+        },
         coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south',
         colorEffect,
         controls: { ...command },
@@ -316,6 +341,9 @@ export function VoxelGameApp(): ReactElement {
           breakableBlocks: BREAKABLE_BLOCKS.map(({ id, position }) => ({ id, position })),
           blockPlaza: BLOCK_PLAZA,
           bulldozerDebris: coordinatorState.currentJobs.bulldozer.debris.map(
+            ({ id, position, radius }) => ({ id, position, radius }),
+          ),
+          excavatorTargets: coordinatorState.currentJobs.excavator.targets.map(
             ({ id, position, radius }) => ({ id, position, radius }),
           ),
           colorPlaySources: COLOR_PLAY_SOURCES.map((source) => ({
@@ -395,12 +423,19 @@ export function VoxelGameApp(): ReactElement {
           fireVoxelCount: getActiveFireVoxelCount(fireLayerCount),
           bulldozerChipCubeCount: bulldozerTelemetry.activeChipCount,
           bulldozerDebrisCubeCount: bulldozerTelemetry.debrisVisibleVoxelCount,
+          actionTargetParticleCubeCount: actionTargetTelemetry.activeParticleCount,
+          actionTargetTargetCubeCount: actionTargetTelemetry.targetBodyVoxelCount
+            + actionTargetTelemetry.targetAccentVoxelCount,
           routeCubeCount: coordinatorState.selectedVehicleId === 'fire-truck'
             ? (runtime.routeVisible ? fireSceneLayout.routeBoxes.length : 0)
-            : bulldozerTelemetry.routeMarkerCount,
+            : coordinatorState.selectedVehicleId === 'bulldozer'
+              ? bulldozerTelemetry.routeMarkerCount
+              : actionTargetTelemetry.routeMarkerCount,
           starCubeCount: coordinatorState.selectedVehicleId === 'fire-truck'
             ? (runtime.missionPhase === 'celebrating' ? 30 : 0)
-            : bulldozerTelemetry.starVoxelCount,
+            : coordinatorState.selectedVehicleId === 'bulldozer'
+              ? bulldozerTelemetry.starVoxelCount
+              : actionTargetTelemetry.starVoxelCount,
           waterCubeCount: waterFrame.instances.filter(({ active }) => active).length,
           waterInstances: waterFrame.instances.map(({ active, kind, position, scale, slot }) => ({
             active,
@@ -415,7 +450,7 @@ export function VoxelGameApp(): ReactElement {
           fragmentPoolSlotCount: breakables.poolSlotCount,
         },
         vehicleSelection: {
-          available: ['fire-truck', 'bulldozer'],
+          available: VEHICLE_DEFINITIONS.map(({ id }) => id),
           canSwitch: canSwitchVehicle({
             atGarage: isInsideGarageRestartArea(vehicle.position),
             speed: vehicle.speed,
@@ -459,6 +494,9 @@ export function VoxelGameApp(): ReactElement {
       <section className="voxel-game-canvas" aria-label="純ボクセル働く車の箱庭">
         <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}>
           <VoxelGameScene
+            actionTargetJob={coordinatorSnapshot.currentJobs.excavator}
+            actionTargetMissionSnapshotRef={actionTargetMissionSnapshotRef}
+            actionTargetMissionTelemetryRef={actionTargetMissionTelemetryRef}
             breakablePoolHandleRef={breakablePoolHandleRef}
             breakableTelemetryRef={breakableTelemetryRef}
             bulldozerJobRef={bulldozerJobRef}

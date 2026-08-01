@@ -4,6 +4,7 @@ import type { VehicleId } from '../../voxel-game/domain/vehicleDefinitions';
 export const VEHICLE_PAINTABLE_PALETTE_IDS = {
   'fire-truck': ['red'],
   bulldozer: ['yellow'],
+  excavator: ['orange'],
 } as const satisfies Record<VehicleId, readonly string[]>;
 
 interface ResolveVehiclePaintColorOptions {

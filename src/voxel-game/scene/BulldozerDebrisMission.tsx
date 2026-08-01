@@ -11,7 +11,7 @@ import type { VehicleTelemetryRef } from './VehicleController';
 import type { WorldPoint } from './productionWorldMap';
 import {
   createBulldozerVfxFrame,
-  hideBulldozerTransform,
+  hideBulldozerMissionFrame,
   updateBulldozerVfxFrame,
   type BulldozerVfxFrame,
   type BulldozerVfxPaletteId,
@@ -238,11 +238,7 @@ export function BulldozerDebrisMission({
 
     const frame = missionTelemetryRef.current.frame;
     updateBulldozerVfxFrame(frame, snapshot, clearTimes, elapsedSeconds, job);
-    if (!enabled) {
-      for (const transform of frame.chips) hideBulldozerTransform(transform);
-      for (const transform of frame.routeMarkers) hideBulldozerTransform(transform);
-      for (const transform of frame.stars) hideBulldozerTransform(transform);
-    }
+    if (!enabled) hideBulldozerMissionFrame(frame);
 
     const matrix = matrixRef.current;
     if (!matrix) return;

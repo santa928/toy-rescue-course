@@ -16,8 +16,8 @@ import {
 } from '../voxel-game/scene/ActionTargetMission';
 
 const JOB: ActionTargetVfxJob = {
-  kind: 'soil',
   routeMarkers: Array.from({ length: 7 }, (_, index) => [index, 0.25, 0] as const),
+  targetKind: 'soil',
   targets: [
     { id: 'soil-a', position: [2, 0.7, 3], radius: 1.1 },
     { id: 'soil-b', position: [5, 0.7, 3], radius: 1.1 },

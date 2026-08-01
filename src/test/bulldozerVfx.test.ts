@@ -9,6 +9,7 @@ import {
   BULLDOZER_DEBRIS_VOXEL_POOL_SIZE,
   BULLDOZER_STAR_POOL_SIZE,
   createBulldozerVfxFrame,
+  hideBulldozerMissionFrame,
   updateBulldozerVfxFrame,
 } from '../voxel-game/scene/bulldozerVfx';
 import { BULLDOZER_ROUTE_MARKER_POSITIONS } from '../voxel-game/scene/worldLayout';
@@ -36,6 +37,26 @@ function createJobSnapshot(job: BulldozerVehicleJobDefinition): BulldozerMission
 }
 
 describe('bulldozer VFX frame', () => {
+  it('別車種選択中はがれき本体を含む全固定slotを隠す', () => {
+    const frame = createBulldozerVfxFrame();
+    updateBulldozerVfxFrame(
+      frame,
+      createJobSnapshot(VEHICLE_JOBS.bulldozer[0]),
+      new Float64Array([-1, -1, -1]),
+      0,
+      VEHICLE_JOBS.bulldozer[0],
+    );
+
+    hideBulldozerMissionFrame(frame);
+
+    expect([
+      ...frame.debris,
+      ...frame.chips,
+      ...frame.routeMarkers,
+      ...frame.stars,
+    ].some(({ active }) => active)).toBe(false);
+  });
+
   it.each(VEHICLE_JOBS.bulldozer)(
     '$idの3対象・palette・7 routeを同じ固定frameへin-place転送する',
     (job) => {

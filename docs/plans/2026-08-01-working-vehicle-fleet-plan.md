@@ -20,15 +20,15 @@
 - [x] 距離、速度、継続時間の接触gateと50ms clampをRED→GREENにする。
 - [x] target／particle／route／starの固定slot frameをRED→GREENにする。
 - [x] disabled時count 0、job切替in-place、telemetry一致を固定する。
-- [ ] 日本語commit、secret scan、main push、Actions／Pagesを確認する。
+- [x] 日本語commit、secret scan、main push、Actions／Pagesを確認する。
 
 ## Task 3: ショベルカー
 
-- [ ] model data、外接寸法、7 batch上限、paint palette、bucket animationをTDD実装する。
-- [ ] 3つの土掘り仕事、job deck、coordinator、HUD、telemetryへ接続する。
-- [ ] PC／touchで選択、土3山、成功、帰庫、次仕事を実走する。
-- [ ] 3 viewport画像を原寸目視し、selector境界を数値確認する。
-- [ ] 日本語commit、secret scan、main push、Actions／Pages／公開E2Eを確認する。
+- [x] model data、外接寸法、7 batch上限、paint palette、bucket animationをTDD実装する。
+- [x] 3つの土掘り仕事、job deck、coordinator、HUD、telemetryへ接続する。
+- [x] PC／touchで選択、土3山、成功、帰庫、次仕事を実走する。
+- [x] 3 viewport画像を原寸目視し、selector境界を数値確認する。
+- [x] 日本語commit、secret scan、main push、Actions／Pages／公開E2Eを確認する。
 
 ## Task 4: 救急車
 

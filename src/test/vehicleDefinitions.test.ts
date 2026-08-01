@@ -8,8 +8,12 @@ import {
 } from '../voxel-game/domain/vehicleDefinitions';
 
 describe('vehicle definitions', () => {
-  it('消防車とブルドーザーを一意な利用可能車種として公開する', () => {
-    expect(VEHICLE_DEFINITIONS.map(({ id }) => id)).toEqual(['fire-truck', 'bulldozer']);
+  it('消防車、ブルドーザー、ショベルカーを一意な利用可能車種として公開する', () => {
+    expect(VEHICLE_DEFINITIONS.map(({ id }) => id)).toEqual([
+      'fire-truck',
+      'bulldozer',
+      'excavator',
+    ]);
     expect(validateVehicleDefinitions(VEHICLE_DEFINITIONS)).toEqual([]);
   });
 
@@ -33,6 +37,28 @@ describe('vehicle definitions', () => {
       visualBounds: {
         offset: [0, 0.84, 0],
         scale: [2.88, 1.92, 3.36],
+      },
+    });
+  });
+
+  it('ショベルカーへ遅めで小回りの利く物理と長い前方外接を割り当てる', () => {
+    expect(getVehicleDefinition('excavator')).toMatchObject({
+      action: { ariaLabel: 'バケットを動かす', label: 'バケット' },
+      collider: {
+        halfExtents: [1.6, 0.95, 1.75],
+        offset: [0, 0.95, 0],
+      },
+      label: 'ショベルカー',
+      missionId: 'soil-digging',
+      physics: {
+        idleResponse: 4.3,
+        mass: 2,
+        movingResponse: 6.4,
+        yawClamp: 4.9,
+      },
+      visualBounds: {
+        offset: [0, 0.84, -0.18],
+        scale: [3.12, 2.08, 3.72],
       },
     });
   });

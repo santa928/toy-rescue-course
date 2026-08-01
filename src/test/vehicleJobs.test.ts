@@ -45,8 +45,33 @@ describe('vehicle jobs', () => {
     ))).toBe(true);
   });
 
+  it('ショベルカーへ西地区の3つの土掘り仕事を定義する', () => {
+    const jobs = getVehicleJobs('excavator');
+
+    expect(jobs.map(({ id }) => id)).toEqual([
+      'soil-north',
+      'soil-south',
+      'soil-west',
+    ]);
+    expect(jobs.every((job) => (
+      job.kind === 'soil-digging'
+      && job.vehicleId === 'excavator'
+      && job.destinationDistrict === 'blocks'
+      && job.targetKind === 'soil'
+      && job.routeMarkers.length === 7
+      && job.targets.length === 3
+      && job.targets.every(({ position }) => resolveWorldDistrict(position) === 'blocks')
+      && job.interaction.holdDurationMs === 700
+      && job.interaction.maximumSpeed === 0.45
+    ))).toBe(true);
+  });
+
   it('全仕事を一意なIDと短い仕事札で公開し、canonical定義を検証する', () => {
-    const jobs = [...VEHICLE_JOBS['fire-truck'], ...VEHICLE_JOBS.bulldozer];
+    const jobs = [
+      ...VEHICLE_JOBS['fire-truck'],
+      ...VEHICLE_JOBS.bulldozer,
+      ...VEHICLE_JOBS.excavator,
+    ];
 
     expect(new Set(jobs.map(({ id }) => id)).size).toBe(jobs.length);
     expect(jobs.every(({ label }) => label.length > 0 && label.length <= 18)).toBe(true);
@@ -73,6 +98,7 @@ describe('vehicle jobs', () => {
           vehicleId: 'fire-truck',
         },
       ],
+      excavator: VEHICLE_JOBS.excavator,
     } as unknown as VehicleJobRegistry;
 
     expect(validateVehicleJobs(invalidRegistry)).toEqual([

@@ -11,6 +11,7 @@ import type {
   VehicleId,
   VehicleMissionId,
 } from './vehicleDefinitions';
+import type { ActionTargetInteraction } from './actionTargetContact';
 
 /** 1 session内で抽選する全仕事の識別子。 */
 export type VehicleJobId =
@@ -19,7 +20,10 @@ export type VehicleJobId =
   | 'fire-window-right'
   | 'debris-north'
   | 'debris-south'
-  | 'debris-west';
+  | 'debris-west'
+  | 'soil-north'
+  | 'soil-south'
+  | 'soil-west';
 
 /** HUD、scene、telemetryが共有する車種別仕事の共通定義。 */
 interface BaseVehicleJobDefinition {
@@ -48,12 +52,33 @@ export interface BulldozerVehicleJobDefinition extends BaseVehicleJobDefinition 
   readonly vehicleId: 'bulldozer';
 }
 
+/** ショベルカーの1つの土山と寛容な接触半径。 */
+export interface ExcavatorSoilTargetDefinition {
+  readonly id: string;
+  readonly position: WorldPoint;
+  readonly radius: number;
+}
+
+/** ショベルカーの3土山、接触条件、道しるべを同じ仕事へ束ねる。 */
+export interface ExcavatorVehicleJobDefinition extends BaseVehicleJobDefinition {
+  readonly destinationDistrict: 'blocks';
+  readonly interaction: ActionTargetInteraction;
+  readonly kind: 'soil-digging';
+  readonly targetKind: 'soil';
+  readonly targets: readonly ExcavatorSoilTargetDefinition[];
+  readonly vehicleId: 'excavator';
+}
+
 /** 全車種仕事を扱うdiscriminated union。 */
-export type VehicleJobDefinition = FireVehicleJobDefinition | BulldozerVehicleJobDefinition;
+export type VehicleJobDefinition =
+  | FireVehicleJobDefinition
+  | BulldozerVehicleJobDefinition
+  | ExcavatorVehicleJobDefinition;
 
 /** 車種ごとに型を保った仕事registry。 */
 export interface VehicleJobRegistry {
   readonly bulldozer: readonly BulldozerVehicleJobDefinition[];
+  readonly excavator: readonly ExcavatorVehicleJobDefinition[];
   readonly 'fire-truck': readonly FireVehicleJobDefinition[];
 }
 
@@ -73,6 +98,13 @@ function createFireCelebrationCenters([x, y, z]: WorldPoint): readonly WorldPoin
 
 const FIRE_WINDOW_LEFT_TARGET = [22.2, 1.45, -19.6] as const;
 const FIRE_WINDOW_RIGHT_TARGET = [24.8, 1.45, -19.6] as const;
+const EXCAVATOR_INTERACTION = {
+  contactRadius: 0.8,
+  forwardOffset: 1.65,
+  holdDurationMs: 700,
+  maximumSpeed: 0.45,
+  minimumSpeed: 0,
+} as const satisfies ActionTargetInteraction;
 
 /** 抽選対象となる各車種3件のcanonical仕事定義。 */
 export const VEHICLE_JOBS = {
@@ -171,13 +203,76 @@ export const VEHICLE_JOBS = {
       vehicleId: 'bulldozer',
     },
   ],
+  excavator: [
+    {
+      destinationDistrict: 'blocks',
+      id: 'soil-north',
+      interaction: EXCAVATOR_INTERACTION,
+      kind: 'soil-digging',
+      label: 'きたのつちをほろう',
+      routeMarkers: PRODUCTION_WORLD_MAP.landmarks.bulldozerRouteMarkers,
+      targetKind: 'soil',
+      targets: [
+        { id: 'soil-north-a', position: [-29.5, 0.65, 12.5], radius: 0.95 },
+        { id: 'soil-north-b', position: [-24, 0.65, 13], radius: 0.95 },
+        { id: 'soil-north-c', position: [-18.2, 0.65, 12], radius: 0.95 },
+      ],
+      vehicleId: 'excavator',
+    },
+    {
+      destinationDistrict: 'blocks',
+      id: 'soil-south',
+      interaction: EXCAVATOR_INTERACTION,
+      kind: 'soil-digging',
+      label: 'みなみのつちをほろう',
+      routeMarkers: [
+        [-3, 0.26, 0],
+        [-7, 0.26, 0],
+        [-11, 0.26, 0],
+        [-15, 0.26, 0],
+        [-18, 0.26, -2],
+        [-21, 0.26, -5],
+        [-24, 0.26, -7],
+      ],
+      targetKind: 'soil',
+      targets: [
+        { id: 'soil-south-a', position: [-29.5, 0.65, -6.5], radius: 0.95 },
+        { id: 'soil-south-b', position: [-24, 0.65, -7], radius: 0.95 },
+        { id: 'soil-south-c', position: [-18.5, 0.65, -6], radius: 0.95 },
+      ],
+      vehicleId: 'excavator',
+    },
+    {
+      destinationDistrict: 'blocks',
+      id: 'soil-west',
+      interaction: EXCAVATOR_INTERACTION,
+      kind: 'soil-digging',
+      label: 'にしのつちをほろう',
+      routeMarkers: [
+        [-3, 0.26, 0],
+        [-7, 0.26, 0],
+        [-11, 0.26, 0],
+        [-15, 0.26, 0],
+        [-20, 0.26, 0],
+        [-25, 0.26, 0],
+        [-30, 0.26, 0],
+      ],
+      targetKind: 'soil',
+      targets: [
+        { id: 'soil-west-a', position: [-32, 0.65, -6], radius: 0.95 },
+        { id: 'soil-west-b', position: [-32, 0.65, 2], radius: 0.95 },
+        { id: 'soil-west-c', position: [-32, 0.65, 10], radius: 0.95 },
+      ],
+      vehicleId: 'excavator',
+    },
+  ],
 } as const satisfies VehicleJobRegistry;
 
 /** registryの件数、ID、文言、車種、対象数、座標契約を決定的に列挙する。 */
 export function validateVehicleJobs(registry: VehicleJobRegistry): readonly string[] {
   const errors: string[] = [];
   const ids = new Set<string>();
-  const vehicleIds: readonly VehicleId[] = ['fire-truck', 'bulldozer'];
+  const vehicleIds: readonly VehicleId[] = ['fire-truck', 'bulldozer', 'excavator'];
 
   for (const vehicleId of vehicleIds) {
     const jobs: readonly VehicleJobDefinition[] = registry[vehicleId];
@@ -207,7 +302,7 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
           || job.celebrationStarCenters.some((position) => !position.every(Number.isFinite))) {
           errors.push(`Fire job ${job.id} must have exactly 6 finite star centers`);
         }
-      } else {
+      } else if (job.kind === 'debris-clearance') {
         if (job.debris.length !== 3) {
           errors.push(`Bulldozer job ${job.id} must have exactly 3 debris`);
         }
@@ -224,6 +319,37 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
           || job.debris.some(({ position }) => resolveWorldDistrict(position) !== 'blocks')) {
           errors.push(`Bulldozer job ${job.id} must stay in the blocks district`);
         }
+      } else {
+        if (job.targets.length !== 3) {
+          errors.push(`Excavator job ${job.id} must have exactly 3 soil targets`);
+        }
+        const targetIds = new Set(job.targets.map(({ id }) => id));
+        if (targetIds.size !== job.targets.length
+          || job.targets.some(({ id }) => id.trim().length === 0)) {
+          errors.push(`Excavator job ${job.id} must have unique non-empty target ids`);
+        }
+        if (job.targetKind !== 'soil'
+          || job.destinationDistrict !== 'blocks'
+          || job.targets.some(({ position }) => resolveWorldDistrict(position) !== 'blocks')) {
+          errors.push(`Excavator job ${job.id} must stay in the blocks district`);
+        }
+        const interaction = job.interaction;
+        if (
+          ![
+            interaction.contactRadius,
+            interaction.forwardOffset,
+            interaction.holdDurationMs,
+            interaction.maximumSpeed,
+            interaction.minimumSpeed,
+          ].every(Number.isFinite)
+          || interaction.contactRadius <= 0
+          || interaction.forwardOffset < 0
+          || interaction.holdDurationMs <= 0
+          || interaction.minimumSpeed < 0
+          || interaction.maximumSpeed < interaction.minimumSpeed
+        ) {
+          errors.push(`Excavator job ${job.id} has invalid interaction`);
+        }
       }
     }
   }
@@ -232,7 +358,9 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
 
 /** 外部車種IDを既知の仕事一覧へ解決し、不正値は初期消防車へ戻す。 */
 export function getVehicleJobs(vehicleId: unknown): readonly VehicleJobDefinition[] {
-  return vehicleId === 'bulldozer' ? VEHICLE_JOBS.bulldozer : VEHICLE_JOBS['fire-truck'];
+  if (vehicleId === 'bulldozer') return VEHICLE_JOBS.bulldozer;
+  if (vehicleId === 'excavator') return VEHICLE_JOBS.excavator;
+  return VEHICLE_JOBS['fire-truck'];
 }
 
 const VEHICLE_JOB_ERRORS = validateVehicleJobs(VEHICLE_JOBS);

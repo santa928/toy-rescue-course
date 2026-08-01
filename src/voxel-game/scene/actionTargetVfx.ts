@@ -19,8 +19,8 @@ export interface ActionTargetVfxSource {
 
 /** VFXが読む現在仕事の対象、形状、道しるべ。 */
 export interface ActionTargetVfxJob {
-  readonly kind: ActionTargetKind;
   readonly routeMarkers: readonly WorldPoint[];
+  readonly targetKind: ActionTargetKind;
   readonly targets: readonly ActionTargetVfxSource[];
 }
 
@@ -187,7 +187,7 @@ export function updateActionTargetVfxFrame(
   for (const transform of frame.targetBodies) {
     const source = job.targets[transform.sourceIndex];
     const state = snapshot.targets[transform.sourceIndex];
-    const shape = BODY_SHAPES[job.kind][transform.slot % BODY_VOXELS_PER_TARGET];
+    const shape = BODY_SHAPES[job.targetKind][transform.slot % BODY_VOXELS_PER_TARGET];
     if (!enabled || !source || !state || state.completed || !shape) {
       hideActionTargetTransform(transform);
       continue;
@@ -204,7 +204,7 @@ export function updateActionTargetVfxFrame(
   for (const transform of frame.targetAccents) {
     const source = job.targets[transform.sourceIndex];
     const state = snapshot.targets[transform.sourceIndex];
-    const shape = ACCENT_SHAPES[job.kind][transform.slot % ACCENT_VOXELS_PER_TARGET];
+    const shape = ACCENT_SHAPES[job.targetKind][transform.slot % ACCENT_VOXELS_PER_TARGET];
     if (!enabled || !source || !state || state.completed || !shape) {
       hideActionTargetTransform(transform);
       continue;

@@ -42,6 +42,22 @@ describe('vehicle controller config', () => {
       speed: 0,
     });
   });
+
+  it('ショベルカーのcontroller値と車種付き初期telemetryを解決する', () => {
+    expect(resolveVehicleControllerConfig('excavator')).toMatchObject({
+      collider: { halfExtents: [1.6, 0.95, 1.75], offset: [0, 0.95, 0] },
+      physics: { idleResponse: 4.3, mass: 2, movingResponse: 6.4, yawClamp: 4.9 },
+      vehicleId: 'excavator',
+    });
+    expect(createInitialVehicleTelemetry('excavator')).toEqual({
+      forward: [0, 0, 1],
+      id: 'excavator',
+      mass: 2,
+      position: [0, 0.8, 6],
+      resetCount: 0,
+      speed: 0,
+    });
+  });
 });
 
 describe('advanceRenderTelemetry', () => {
@@ -85,6 +101,11 @@ describe('buildWorldTelemetry', () => {
   it('選択中仕事に応じて工事地区を目的地へ公開する', () => {
     expect(buildWorldTelemetry([0, 0.8, 6], 'blocks').destinationDistrict).toBe('blocks');
   });
+
+  it('追加車両用の公園・南地区も目的地へ公開できる', () => {
+    expect(buildWorldTelemetry([0, 0.8, 6], 'park').destinationDistrict).toBe('park');
+    expect(buildWorldTelemetry([0, 0.8, 6], 'south').destinationDistrict).toBe('south');
+  });
 });
 
 describe('buildMissionJobTelemetry', () => {
@@ -112,6 +133,19 @@ describe('buildMissionJobTelemetry', () => {
       targetPositions: VEHICLE_JOBS.bulldozer[0].debris.map(({ position }) => position),
     });
   });
+
+  it('ショベル仕事では3つの実土山targetを公開する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+    coordinator.selectVehicle('excavator', { atGarage: true, speed: 0 });
+
+    expect(buildMissionJobTelemetry(coordinator.getSnapshot())).toEqual({
+      jobCycle: 1,
+      jobId: 'soil-north',
+      jobLabel: 'きたのつちをほろう',
+      jobSeed: 1,
+      targetPositions: VEHICLE_JOBS.excavator[0].targets.map(({ position }) => position),
+    });
+  });
 });
 
 describe('syncVehicleMissionSpatialSignals', () => {
@@ -123,6 +157,20 @@ describe('syncVehicleMissionSpatialSignals', () => {
     coordinator.advance(1);
 
     expect(coordinator.getSnapshot().mission.phase).toBe('active');
+  });
+
+  it('ショベルカーで工事地区へ着くと土掘り仕事を開始する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+    coordinator.selectVehicle('excavator', { atGarage: true, speed: 0 });
+
+    syncVehicleMissionSpatialSignals(coordinator, [-24, 0.8, 13]);
+    coordinator.advance(1);
+
+    expect(coordinator.getSnapshot().mission).toMatchObject({
+      id: 'soil-digging',
+      phase: 'active',
+      vehicleId: 'excavator',
+    });
   });
 });
 

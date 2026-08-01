@@ -10,18 +10,41 @@ import {
   FIRE_TRUCK_VOXELS,
 } from '../vehicle-lab/model/fireTruckVoxels';
 import {
+  EXCAVATOR_PALETTE,
+  EXCAVATOR_PALETTE_IDS,
+  EXCAVATOR_VOXELS,
+} from '../vehicle-lab/model/excavatorVoxels';
+import {
   VEHICLE_PAINTABLE_PALETTE_IDS,
   resolveVehiclePaintColor,
 } from '../vehicle-lab/model/vehiclePaint';
 import { BULLDOZER_RENDER_PLAN } from '../vehicle-lab/scene/VoxelBulldozer';
 import { FIRE_TRUCK_RENDER_PLAN } from '../vehicle-lab/scene/VoxelFireTruck';
+import { EXCAVATOR_RENDER_PLAN } from '../vehicle-lab/scene/VoxelExcavator';
 
 describe('vehicle paint palette', () => {
-  it('消防車redとブルドーザーyellowだけをpaint対象にする', () => {
+  it('3台のbody paletteだけをpaint対象にする', () => {
     expect(VEHICLE_PAINTABLE_PALETTE_IDS).toEqual({
       'fire-truck': ['red'],
       bulldozer: ['yellow'],
+      excavator: ['orange'],
     });
+  });
+
+  it.each([
+    ['#ef4444'],
+    ['#3b82f6'],
+    ['#facc15'],
+  ])('ショベルカーbodyへ%sを適用し、履帯・arm・bucket・窓・灯火は残す', (paintColor) => {
+    for (const paletteId of EXCAVATOR_PALETTE_IDS) {
+      const baseColor = EXCAVATOR_PALETTE[paletteId].color;
+      expect(resolveVehiclePaintColor({
+        baseColor,
+        paintColor,
+        paletteId,
+        vehicleId: 'excavator',
+      })).toBe(paletteId === 'orange' ? paintColor : baseColor);
+    }
   });
 
   it.each([
@@ -71,7 +94,9 @@ describe('vehicle paint palette', () => {
   it('一時塗装でvoxel数とvehicle draw callを増やさない', () => {
     expect(FIRE_TRUCK_RENDER_PLAN.voxelCount).toBe(FIRE_TRUCK_VOXELS.length);
     expect(BULLDOZER_RENDER_PLAN.voxelCount).toBe(BULLDOZER_VOXELS.length);
+    expect(EXCAVATOR_RENDER_PLAN.voxelCount).toBe(EXCAVATOR_VOXELS.length);
     expect(FIRE_TRUCK_RENDER_PLAN.drawCalls).toBe(7);
     expect(BULLDOZER_RENDER_PLAN.drawCalls).toBe(7);
+    expect(EXCAVATOR_RENDER_PLAN.drawCalls).toBe(7);
   });
 });

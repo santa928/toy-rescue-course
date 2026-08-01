@@ -16,6 +16,19 @@ declare global {
       readonly starVoxelCount: number;
       readonly targetCount: number;
     };
+    readonly excavator: {
+      readonly activeParticleCount: number;
+      readonly completedCount: number;
+      readonly contactPoint: readonly [number, number, number];
+      readonly holdMilliseconds: readonly number[];
+      readonly missionPhase: import('./voxel-game/domain/VoxelGameRuntime').MissionPhase;
+      readonly routeMarkerCount: number;
+      readonly starVoxelCount: number;
+      readonly targetAccentVoxelCount: number;
+      readonly targetBodyVoxelCount: number;
+      readonly targetCount: number;
+      readonly targets: readonly import('./voxel-game/domain/ActionTargetMissionRuntime').ActionTargetSnapshot[];
+    };
     readonly camera: import('./voxel-game/scene/WorldFixedCamera').WorldCameraTelemetry;
     readonly colorEffect: import('./voxel-game/domain/VehicleColorEffectRuntime').VehicleColorEffectSnapshot;
     readonly controls: import('./voxel-game/input/controlState').DriveCommand;
@@ -35,6 +48,11 @@ declare global {
         readonly scale: readonly [number, number, number];
       };
       readonly bulldozerDebris: readonly {
+        readonly id: string;
+        readonly position: readonly [number, number, number];
+        readonly radius: number;
+      }[];
+      readonly excavatorTargets: readonly {
         readonly id: string;
         readonly position: readonly [number, number, number];
         readonly radius: number;
@@ -76,6 +94,8 @@ declare global {
       }[];
     };
     readonly visuals: {
+      readonly actionTargetParticleCubeCount: number;
+      readonly actionTargetTargetCubeCount: number;
       readonly bulldozerChipCubeCount: number;
       readonly bulldozerDebrisCubeCount: number;
       readonly colorPoolCubeCount: number;
@@ -115,7 +135,7 @@ declare global {
       readonly bounds: import('./voxel-game/scene/productionWorldMap').WorldBounds2D;
       readonly currentDistrict:
         import('./voxel-game/scene/productionWorldMap').ResolvedWorldDistrictId;
-      readonly destinationDistrict: 'fire' | 'blocks';
+      readonly destinationDistrict: 'fire' | 'blocks' | 'park' | 'south';
       readonly districts: readonly {
         readonly id: import('./voxel-game/scene/productionWorldMap').WorldDistrictId;
         readonly label: string;

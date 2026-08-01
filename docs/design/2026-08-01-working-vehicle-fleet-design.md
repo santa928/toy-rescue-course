@@ -151,6 +151,15 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 
 ## 自己レビュー
 
+### 2026-08-01 Task 3 ショベルカー実測
+
+- 密度の高い橙車体、黒い履帯、青窓、黄橙アーム、灰色bucketを純voxel 7 batchで実装した。
+- 3仕事、各3土山、速度0.45以下、700ms保持、1800ms成功、帰庫再抽選を共通runtimeへ接続した。
+- Docker内fresh unitは41 files／394 tests、production buildは647 modulesで全bundle予算内だった。
+- desktop keyboard、tablet touch、mobile-landscape touchで土3山、成功、帰庫、次仕事を完走した。
+- 3 viewportとも主要HUDは画面内、3ボタンはselector境界内、主要UI間は8px以上だった。
+- Docker software rendererではscene 30 calls、ショベルカー車体7 calls。物理GPU再認証は5台総合回帰で行う。
+
 - 受け入れ条件、非対象、リスクと対策、性能目標を明示した。
 - 保留項目は理由、影響、代替タスク、復帰条件を記載した。
 - 既存機能の暗黙削除はなく、追加3台を段階公開できる境界に分けた。

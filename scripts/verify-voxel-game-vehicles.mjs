@@ -256,7 +256,7 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(initial.vehicle.id, 'fire-truck', `${viewport.name}: initial vehicle is not fire-truck.`);
     assert.equal(initial.vehicleSelection.selected, 'fire-truck');
     assert.equal(initial.vehicleSelection.canSwitch, true, `${viewport.name}: selector is unavailable at garage.`);
-    assert.deepEqual(initial.vehicleSelection.available, ['fire-truck', 'bulldozer']);
+    assert.deepEqual(initial.vehicleSelection.available, ['fire-truck', 'bulldozer', 'excavator']);
     assert.equal(initial.controls.primaryAction, false);
     assert.equal(await page.getByTestId('physical-gpu-probe').count(), 0,
       `${viewport.name}: opt-in physical GPU probe leaked into normal play.`);

@@ -5,6 +5,7 @@ import { CuboidCollider, RigidBody, type RapierRigidBody } from '@react-three/ra
 import * as THREE from 'three';
 import { VoxelFireTruck } from '../../vehicle-lab/scene/VoxelFireTruck';
 import { VoxelBulldozer } from '../../vehicle-lab/scene/VoxelBulldozer';
+import { VoxelExcavator } from '../../vehicle-lab/scene/VoxelExcavator';
 import {
   getVehicleDefinition,
   type VehicleColliderDefinition,
@@ -107,6 +108,23 @@ function updateTelemetry(
   };
 }
 
+/** 選択IDに対応する純voxel車体を1台だけ描画する。 */
+function SelectedVehicleModel({
+  actionActiveRef,
+  paintColor,
+  vehicleId,
+}: {
+  readonly actionActiveRef: RefObject<boolean>;
+  readonly paintColor: string | null;
+  readonly vehicleId: VehicleId;
+}): ReactElement {
+  if (vehicleId === 'fire-truck') return <VoxelFireTruck paintColor={paintColor} />;
+  if (vehicleId === 'bulldozer') {
+    return <VoxelBulldozer actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+  }
+  return <VoxelExcavator actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+}
+
 /** 入力refを毎frame読み、消防車の速度・旋回・resetをRapierへ反映する。 */
 export const VehicleController = forwardRef<VehicleControllerHandle, VehicleControllerProps>(
   function VehicleController({
@@ -190,9 +208,11 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
           position={config.collider.offset}
         />
         <group rotation={[0, Math.PI, 0]}>
-          {config.vehicleId === 'fire-truck'
-            ? <VoxelFireTruck paintColor={paintColor} />
-            : <VoxelBulldozer actionActiveRef={actionActiveRef} paintColor={paintColor} />}
+          <SelectedVehicleModel
+            actionActiveRef={actionActiveRef}
+            paintColor={paintColor}
+            vehicleId={config.vehicleId}
+          />
         </group>
       </RigidBody>
     );
