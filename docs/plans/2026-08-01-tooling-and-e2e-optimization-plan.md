@@ -109,8 +109,8 @@ feature固有scenarioの4層に分ける。
 - [x] renderer calls 28／27、vehicle calls 7、station calls 5を確認する。
 - [x] scene code／calls不変なら物理GPU再認証不要を根拠付きで記録する。
 - [x] README、要件台帳、受け入れ条件、非対象、リスク、性能目標、作業ログを同期する。
-- [ ] `最適化を本番検証する`でcommit・全範囲scan・pushする。
-- [ ] Actions／Pages、公開URL smoke、remote SHA 0/0を確認し、完了記録を追加pushする。
+- [x] `最適化を本番検証する`でcommit・全範囲scan・pushする。
+- [x] Actions／Pages、公開URL smoke、remote SHA 0/0を確認し、完了記録を追加pushする。
 
 ## Final checklist
 
