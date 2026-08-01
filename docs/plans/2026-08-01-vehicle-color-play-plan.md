@@ -63,7 +63,7 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - [x] modelへ`paintColor` propを追加し、material色だけを派生させる。
 - [x] vehicle draw callとvoxel countが不変であるtestを追加する。
 - [x] focused/full unit、buildを通す。
-- [ ] `二車種へ一時塗装を描画する`でcommit・scan・push・公開確認する。
+- [x] `二車種へ一時塗装を描画する`でcommit・scan・push・公開確認する。
 
 ## Task 4: pool／showerの固定slot VFX
 
@@ -73,11 +73,11 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - Create: `src/test/colorPlayVfx.test.ts`
 - Modify: `src/voxel-game/scene/VoxelGameScene.tsx`
 
-- [ ] RED: 3色、pool 8、shower 18、合計78、5 draw call以下、有限frameをtestする。
-- [ ] pool surface波動とshower drop循環のpure frame helperを実装する。
-- [ ] 3色batch＋白frame＋濃灰baseを固定`InstancedMesh`で描画する。
-- [ ] frame loopで新規配列／geometry／materialを作らない。
-- [ ] focused/full unit、build、renderer call差分を確認する。
+- [x] RED: 3色、pool 8、shower 18、合計78、5 draw call以下、有限frameをtestする。
+- [x] pool surface波動とshower drop循環のpure frame helperを実装する。
+- [x] 3色batch＋白frame＋濃灰baseを固定`InstancedMesh`で描画する。
+- [x] frame loopで新規配列／geometry／materialを作らない。
+- [x] focused/full unit、build、renderer call差分を確認する。
 - [ ] `色水プールとシャワーを描画する`でcommit・scan・push・公開確認する。
 
 ## Task 5: runtime、Scene、HUD、telemetry統合

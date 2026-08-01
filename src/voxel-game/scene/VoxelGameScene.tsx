@@ -29,6 +29,7 @@ import {
   type BreakableTelemetryRef,
 } from './BreakableBlockPlaza';
 import { VoxelWorld } from './VoxelWorld';
+import { VehicleColorPlayground } from './VehicleColorPlayground';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
 import {
   BulldozerDebrisMission,
@@ -232,6 +233,7 @@ export function VoxelGameScene({
       <directionalLight color="#cbe0ff" intensity={0.75} position={[-18, 20, -14]} />
       <Physics gravity={[0, -18, 0]}>
         <VoxelWorld />
+        <VehicleColorPlayground />
         <BreakableBlockPlaza
           breakablePoolHandleRef={breakablePoolHandleRef}
           breakableTelemetryRef={breakableTelemetryRef}
