@@ -17,6 +17,22 @@ export interface WorldBounds2D {
   readonly minZ: number;
 }
 
+/** 色遊びで車体へ適用できる3つの玩具色。 */
+export type VehicleColorId = 'red' | 'blue' | 'yellow';
+
+/** 色遊びsourceの通過方法。 */
+export type ColorPlaySourceKind = 'pool' | 'shower';
+
+/** 南地区に置く色遊びsourceと寛容なXZ trigger境界。 */
+export interface ColorPlaySourceDefinition {
+  readonly color: string;
+  readonly colorId: VehicleColorId;
+  readonly id: string;
+  readonly kind: ColorPlaySourceKind;
+  readonly position: WorldPoint;
+  readonly triggerBounds: WorldBounds2D;
+}
+
 /** 本番箱庭の目的地地区を表す定義。 */
 export interface WorldDistrictDefinition {
   readonly bounds: WorldBounds2D;
@@ -65,6 +81,7 @@ export interface WorldLandmarksDefinition {
   readonly bulldozerDebris: readonly BulldozerDebrisLandmarkDefinition[];
   readonly bulldozerRouteMarkers: readonly WorldPoint[];
   readonly celebrationStarCenters: readonly WorldPoint[];
+  readonly colorPlaySources: readonly ColorPlaySourceDefinition[];
   readonly fire: WorldPoint;
   readonly fireRouteMarkers: readonly WorldPoint[];
   readonly fireSprayTarget: WorldPoint;
@@ -105,6 +122,56 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
       position: [-24, 0.18, 6],
       scale: [14, 0.34, 16],
     },
+    colorPlaySources: [
+      {
+        color: '#ef4444',
+        colorId: 'red',
+        id: 'pool-red',
+        kind: 'pool',
+        position: [-9.4, 0.24, 18.5],
+        triggerBounds: { maxX: -7.1, maxZ: 20.3, minX: -11.7, minZ: 16.7 },
+      },
+      {
+        color: '#3b82f6',
+        colorId: 'blue',
+        id: 'pool-blue',
+        kind: 'pool',
+        position: [-9.4, 0.24, 24],
+        triggerBounds: { maxX: -7.1, maxZ: 25.8, minX: -11.7, minZ: 22.2 },
+      },
+      {
+        color: '#facc15',
+        colorId: 'yellow',
+        id: 'pool-yellow',
+        kind: 'pool',
+        position: [-9.4, 0.24, 29.5],
+        triggerBounds: { maxX: -7.1, maxZ: 31.3, minX: -11.7, minZ: 27.7 },
+      },
+      {
+        color: '#ef4444',
+        colorId: 'red',
+        id: 'shower-red',
+        kind: 'shower',
+        position: [9.4, 1.6, 18.5],
+        triggerBounds: { maxX: 11.7, maxZ: 20.3, minX: 7.1, minZ: 16.7 },
+      },
+      {
+        color: '#3b82f6',
+        colorId: 'blue',
+        id: 'shower-blue',
+        kind: 'shower',
+        position: [9.4, 1.6, 24],
+        triggerBounds: { maxX: 11.7, maxZ: 25.8, minX: 7.1, minZ: 22.2 },
+      },
+      {
+        color: '#facc15',
+        colorId: 'yellow',
+        id: 'shower-yellow',
+        kind: 'shower',
+        position: [9.4, 1.6, 29.5],
+        triggerBounds: { maxX: 11.7, maxZ: 31.3, minX: 7.1, minZ: 27.7 },
+      },
+    ],
     breakableBlocks: [
       { color: '#ef4444', id: 'plaza-red', position: [-26.7, 0.75, 9.5] },
       { color: '#facc15', id: 'plaza-yellow', position: [-21.5, 0.75, 0] },
@@ -190,10 +257,10 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#7ed1e6', id: 'fire-window-2', position: [24.8, 1.9, -19.05], scale: [1.5, 1.5, 0.18], solid: false },
     { color: '#e1c78c', id: 'block-plaza-ground', position: [-24, 0.18, 6], scale: [14, 0.34, 16], solid: false },
     { color: '#c83e34', id: 'hub-gate-post', position: [-6, 1.1, 0], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#86552f', id: 'south-sign-post-west', position: [-7, 1.1, 24], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#86552f', id: 'south-sign-post-east', position: [7, 1.1, 28], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#f2c94c', id: 'south-sign-board-west', position: [-7, 2.15, 24], scale: [3, 1, 0.4], solid: false },
-    { color: '#e24b3f', id: 'south-sign-board-east', position: [7, 2.15, 28], scale: [3, 1, 0.4], solid: false },
+    { color: '#86552f', id: 'south-sign-post-west', position: [-3.5, 1.1, 18.5], scale: [0.7, 2, 0.7], solid: true },
+    { color: '#86552f', id: 'south-sign-post-east', position: [3.5, 1.1, 29.5], scale: [0.7, 2, 0.7], solid: true },
+    { color: '#f2c94c', id: 'south-sign-board-west', position: [-3.5, 2.15, 18.5], scale: [3, 1, 0.4], solid: false },
+    { color: '#e24b3f', id: 'south-sign-board-east', position: [3.5, 2.15, 29.5], scale: [3, 1, 0.4], solid: false },
   ],
 } as const satisfies ProductionWorldMapDefinition;
 
@@ -306,6 +373,7 @@ export function validateProductionWorldMap(
     ...map.visualBoxes.map(({ id }) => id),
     ...map.landmarks.breakableBlocks.map(({ id }) => id),
     ...map.landmarks.bulldozerDebris.map(({ id }) => id),
+    ...map.landmarks.colorPlaySources.map(({ id }) => id),
   ];
   const seen = new Set<string>();
   for (const id of ids) {
@@ -352,6 +420,10 @@ export function validateProductionWorldMap(
     })),
     ...map.landmarks.bulldozerDebris.map(({ id, position }) => ({
       name: `bulldozerDebris:${id}`,
+      position,
+    })),
+    ...map.landmarks.colorPlaySources.map(({ id, position }) => ({
+      name: `colorPlaySource:${id}`,
       position,
     })),
   ];
@@ -425,6 +497,46 @@ export function validateProductionWorldMap(
       );
       if (distance < minimumBreakableClearance) {
         errors.push(`bulldozer debris overlaps breakable: ${debris.id}, ${block.id}`);
+      }
+    }
+  }
+
+  const southBounds = map.districts.find(({ id }) => id === 'south')?.bounds;
+  for (const [index, source] of map.landmarks.colorPlaySources.entries()) {
+    const boundsAreFinite = isFiniteBounds(source.triggerBounds);
+    const boundsAreOrdered = boundsAreFinite && isOrderedBounds(source.triggerBounds);
+    if (!boundsAreFinite) {
+      errors.push(`non-finite color source bounds: ${source.id}`);
+    } else if (!boundsAreOrdered) {
+      errors.push(`invalid color source bounds: ${source.id}`);
+    }
+
+    const positionIsSouth = source.position.every(Number.isFinite)
+      && resolveWorldDistrictInMap(map, source.position) === 'south';
+    const boundsAreInsideSouth = southBounds !== undefined
+      && isFiniteBounds(southBounds)
+      && isOrderedBounds(southBounds)
+      && boundsAreOrdered
+      && isBoundsInsideBounds(source.triggerBounds, southBounds);
+    if (!positionIsSouth || !boundsAreInsideSouth) {
+      errors.push(`color source outside south district: ${source.id}`);
+    }
+
+    if (!['red', 'blue', 'yellow'].includes(source.colorId)) {
+      errors.push(`invalid color source color: ${source.id}`);
+    }
+    if (!['pool', 'shower'].includes(source.kind)) {
+      errors.push(`invalid color source kind: ${source.id}`);
+    }
+    if (!/^#[0-9a-f]{6}$/i.test(source.color)) {
+      errors.push(`invalid color source hex: ${source.id}`);
+    }
+
+    if (!boundsAreOrdered) continue;
+    for (const other of map.landmarks.colorPlaySources.slice(index + 1)) {
+      if (!isFiniteBounds(other.triggerBounds) || !isOrderedBounds(other.triggerBounds)) continue;
+      if (doBoundsOverlapWithPositiveArea(source.triggerBounds, other.triggerBounds)) {
+        errors.push(`overlapping color sources: ${source.id}, ${other.id}`);
       }
     }
   }

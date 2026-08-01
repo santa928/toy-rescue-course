@@ -61,3 +61,6 @@ export const BULLDOZER_DEBRIS = PRODUCTION_WORLD_MAP.landmarks.bulldozerDebris;
 /** 中央車庫から西の工事現場へ導く非solid道しるべのworld座標。 */
 export const BULLDOZER_ROUTE_MARKER_POSITIONS =
   PRODUCTION_WORLD_MAP.landmarks.bulldozerRouteMarkers;
+
+/** 南の色遊び地区にある赤青黄のpool／shower source。 */
+export const COLOR_PLAY_SOURCES = PRODUCTION_WORLD_MAP.landmarks.colorPlaySources;

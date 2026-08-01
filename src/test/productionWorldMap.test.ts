@@ -12,6 +12,56 @@ const EXPECTED_LANDMARKS = {
     position: [-24, 0.18, 6] as const,
     scale: [14, 0.34, 16] as const,
   },
+  colorPlaySources: [
+    {
+      color: '#ef4444',
+      colorId: 'red',
+      id: 'pool-red',
+      kind: 'pool',
+      position: [-9.4, 0.24, 18.5] as const,
+      triggerBounds: { maxX: -7.1, maxZ: 20.3, minX: -11.7, minZ: 16.7 },
+    },
+    {
+      color: '#3b82f6',
+      colorId: 'blue',
+      id: 'pool-blue',
+      kind: 'pool',
+      position: [-9.4, 0.24, 24] as const,
+      triggerBounds: { maxX: -7.1, maxZ: 25.8, minX: -11.7, minZ: 22.2 },
+    },
+    {
+      color: '#facc15',
+      colorId: 'yellow',
+      id: 'pool-yellow',
+      kind: 'pool',
+      position: [-9.4, 0.24, 29.5] as const,
+      triggerBounds: { maxX: -7.1, maxZ: 31.3, minX: -11.7, minZ: 27.7 },
+    },
+    {
+      color: '#ef4444',
+      colorId: 'red',
+      id: 'shower-red',
+      kind: 'shower',
+      position: [9.4, 1.6, 18.5] as const,
+      triggerBounds: { maxX: 11.7, maxZ: 20.3, minX: 7.1, minZ: 16.7 },
+    },
+    {
+      color: '#3b82f6',
+      colorId: 'blue',
+      id: 'shower-blue',
+      kind: 'shower',
+      position: [9.4, 1.6, 24] as const,
+      triggerBounds: { maxX: 11.7, maxZ: 25.8, minX: 7.1, minZ: 22.2 },
+    },
+    {
+      color: '#facc15',
+      colorId: 'yellow',
+      id: 'shower-yellow',
+      kind: 'shower',
+      position: [9.4, 1.6, 29.5] as const,
+      triggerBounds: { maxX: 11.7, maxZ: 31.3, minX: 7.1, minZ: 27.7 },
+    },
+  ],
   breakableBlocks: [
     { color: '#ef4444', id: 'plaza-red', position: [-26.7, 0.75, 9.5] as const },
     { color: '#facc15', id: 'plaza-yellow', position: [-21.5, 0.75, 0] as const },
@@ -163,6 +213,87 @@ describe('PRODUCTION_WORLD_MAP', () => {
     expect(bulldozerDebris.every(({ position }) => resolveWorldDistrict(position) === 'blocks'))
       .toBe(true);
     expect(bulldozerRouteMarkers).toHaveLength(7);
+  });
+
+  it('南地区へ赤青黄のpoolとshowerを非重複sourceとして公開する', () => {
+    const sources = PRODUCTION_WORLD_MAP.landmarks.colorPlaySources;
+    const southBounds = PRODUCTION_WORLD_MAP.districts.find(({ id }) => id === 'south')?.bounds;
+
+    expect(southBounds).toBeDefined();
+    expect(sources).toHaveLength(6);
+    expect(sources.map(({ id }) => id)).toEqual([
+      'pool-red',
+      'pool-blue',
+      'pool-yellow',
+      'shower-red',
+      'shower-blue',
+      'shower-yellow',
+    ]);
+    expect(new Set(sources.map(({ colorId }) => colorId))).toEqual(
+      new Set(['red', 'blue', 'yellow']),
+    );
+    expect(sources.filter(({ kind }) => kind === 'pool')).toHaveLength(3);
+    expect(sources.filter(({ kind }) => kind === 'shower')).toHaveLength(3);
+    expect(sources.every(({ position, triggerBounds }) => (
+      resolveWorldDistrict(position) === 'south'
+      && triggerBounds.minX >= (southBounds?.minX ?? Number.POSITIVE_INFINITY)
+      && triggerBounds.maxX <= (southBounds?.maxX ?? Number.NEGATIVE_INFINITY)
+      && triggerBounds.minZ >= (southBounds?.minZ ?? Number.POSITIVE_INFINITY)
+      && triggerBounds.maxZ <= (southBounds?.maxZ ?? Number.NEGATIVE_INFINITY)
+    ))).toBe(true);
+
+    for (let leftIndex = 0; leftIndex < sources.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < sources.length; rightIndex += 1) {
+        const left = sources[leftIndex].triggerBounds;
+        const right = sources[rightIndex].triggerBounds;
+        const overlaps = Math.max(left.minX, right.minX) < Math.min(left.maxX, right.maxX)
+          && Math.max(left.minZ, right.minZ) < Math.min(left.maxZ, right.maxZ);
+        expect(overlaps, `${sources[leftIndex].id}/${sources[rightIndex].id}`).toBe(false);
+      }
+    }
+  });
+
+  it('color sourceの非有限bounds、南地区外、正面積重複を拒否する', () => {
+    const [first, second, ...remaining] = EXPECTED_LANDMARKS.colorPlaySources;
+    const invalidBounds = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      landmarks: {
+        ...MAP_WITH_LANDMARK_FIXTURE.landmarks,
+        colorPlaySources: [
+          { ...first, triggerBounds: { ...first.triggerBounds, minX: Number.NaN } },
+          second,
+          ...remaining,
+        ],
+      },
+    };
+    const outsideSouth = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      landmarks: {
+        ...MAP_WITH_LANDMARK_FIXTURE.landmarks,
+        colorPlaySources: [
+          { ...first, position: [20, 0.24, 18.5] as const },
+          second,
+          ...remaining,
+        ],
+      },
+    };
+    const overlapping = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      landmarks: {
+        ...MAP_WITH_LANDMARK_FIXTURE.landmarks,
+        colorPlaySources: [first, { ...second, triggerBounds: first.triggerBounds }, ...remaining],
+      },
+    };
+
+    expect(validateProductionWorldMap(invalidBounds)).toContain(
+      'non-finite color source bounds: pool-red',
+    );
+    expect(validateProductionWorldMap(outsideSouth)).toContain(
+      'color source outside south district: pool-red',
+    );
+    expect(validateProductionWorldMap(overlapping)).toContain(
+      'overlapping color sources: pool-red, pool-blue',
+    );
   });
 
   it('地区、道路、boxのIDと数値契約を検証する', () => {

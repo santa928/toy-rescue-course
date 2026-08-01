@@ -29,11 +29,11 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - Modify: `src/voxel-game/scene/worldLayout.ts`
 - Modify: `src/test/productionWorldMap.test.ts`
 
-- [ ] RED: 6 source、3色×2 kind、南地区包含、非重複、有限trigger boundsのtestを書く。
-- [ ] Docker focused testでsource不存在のFAILを確認する。
-- [ ] `ColorPlaySourceDefinition`とcanonical配置を実装し、map validatorへ接続する。
-- [ ] 既存sign postをtrigger外へ移し、solidと走行経路の干渉を避ける。
-- [ ] focused map testとproduction render test、buildを通す。
+- [x] RED: 6 source、3色×2 kind、南地区包含、非重複、有限trigger boundsのtestを書く。
+- [x] Docker focused testでsource不存在のFAILを確認する。
+- [x] `ColorPlaySourceDefinition`とcanonical配置を実装し、map validatorへ接続する。
+- [x] 既存sign postをtrigger外へ移し、solidと走行経路の干渉を避ける。
+- [x] focused map testとproduction render test、buildを通す。
 - [ ] `色遊びの配置契約を追加する`でcommit・scan・push・公開確認する。
 
 ## Task 2: 一時色のpure runtime
