@@ -1,22 +1,22 @@
-import { configDefaults, type UserConfig } from 'vitest/config';
+import { configDefaults } from 'vitest/config';
 import { describe, expect, it } from 'vitest';
-import viteConfig from '../../vite.config';
+import viteConfig from '../vite.config';
 import {
   shouldCollectWorkspaceTestPath,
   WORKTREE_TEST_EXCLUDE,
-} from '../tooling/vitestDiscovery';
+} from './vitestDiscovery';
 
-/** defineConfigへ渡した静的設定をtest可能なUserConfigとして読む。 */
-function readStaticViteConfig(): UserConfig {
+/** defineConfigへ渡した静的設定からtest除外だけを安全に読む。 */
+function readStaticTestExclude(): readonly string[] {
   if (typeof viteConfig === 'function' || viteConfig instanceof Promise) {
     throw new Error('Tooling config test requires a static Vite config.');
   }
-  return viteConfig;
+  return viteConfig.test?.exclude ?? [];
 }
 
 describe('Vitest test discovery', () => {
   it('既定除外を維持し、worktree配下を収集しない', () => {
-    const exclude = readStaticViteConfig().test?.exclude ?? [];
+    const exclude = readStaticTestExclude();
 
     expect(exclude).toEqual(expect.arrayContaining(configDefaults.exclude));
     expect(exclude).toContain(WORKTREE_TEST_EXCLUDE);

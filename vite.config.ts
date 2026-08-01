@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import { VITEST_EXCLUDE } from './src/tooling/vitestDiscovery';
+import { VITEST_EXCLUDE } from './tooling/vitestDiscovery';
 
 export default defineConfig({
   plugins: [react()],
