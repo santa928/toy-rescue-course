@@ -72,6 +72,15 @@ docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 ```
 
+canonical E2Eはscenarioの開始、30秒ごとのheartbeat、成功／失敗、経過秒を`[voxel-e2e]`行へ出力し、
+同じ進捗を`run-manifest.json`へ保存します。長い回帰をfocus単位で再現するときは、次の専用serviceへ
+`production-map`、`nonbreak`、`collision`、`break-red`、`break-yellow`、`break-blue`、`break-green`の
+いずれかを渡します。未指定または未対応値はbrowser起動前に拒否されます。
+
+```bash
+VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-game-focus-e2e
+```
+
 ## Vehicle Labの操作
 
 - マウスドラッグ／1本指ドラッグ: 消防車を回り込んで見る
@@ -90,6 +99,7 @@ docker compose run --rm web npm run build
 docker compose --profile e2e run --rm --build production-smoke-e2e
 docker compose --profile e2e run --rm --build e2e
 docker compose --profile e2e run --rm --build voxel-game-e2e
+VOXEL_GAME_FOCUS=collision docker compose --profile e2e run --rm --build voxel-game-focus-e2e
 docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e
 docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 ```

@@ -18,6 +18,7 @@ import {
   releaseKeyboardKeys,
   syncKeyboardKeys,
 } from './voxel-game-e2e/drive-harness.mjs';
+import { createScenarioProgress } from './voxel-game-e2e/scenario-progress.mjs';
 
 const execFileAsync = promisify(execFile);
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
@@ -164,16 +165,22 @@ function writeRunManifest(artifactDirectory, status, error = null, metadata = {}
   );
 }
 
-/** artifact初期化から成功/失敗manifestまでを必ず一続きで管理する。 */
+/** artifact初期化からscenario進捗と成功/失敗manifestまでを一続きで管理する。 */
 async function runWithManifest(artifactDirectory, verification, metadata = {}) {
   resetOutputArtifacts(artifactDirectory);
-  writeRunManifest(artifactDirectory, 'running', null, metadata);
+  const scenarioProgress = createScenarioProgress({
+    onUpdate: (snapshot) => {
+      writeRunManifest(artifactDirectory, 'running', null, { ...metadata, ...snapshot });
+    },
+  });
+  const readManifestMetadata = () => ({ ...metadata, ...scenarioProgress.snapshot() });
+  writeRunManifest(artifactDirectory, 'running', null, readManifestMetadata());
   try {
-    await verification();
-    writeRunManifest(artifactDirectory, 'completed', null, metadata);
+    await verification(scenarioProgress);
+    writeRunManifest(artifactDirectory, 'completed', null, readManifestMetadata());
   } catch (error) {
     const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    writeRunManifest(artifactDirectory, 'failed', errorMessage, metadata);
+    writeRunManifest(artifactDirectory, 'failed', errorMessage, readManifestMetadata());
     throw error;
   }
 }
@@ -1066,10 +1073,12 @@ async function alignWorldCoordinate(
   description,
   tolerance = 0.32,
   touchDriver = null,
+  options = {},
 ) {
   return driveHarness.alignWorldCoordinate(page, {
     coordinateIndex,
     description,
+    ...options,
     target: targetValue,
     tolerance,
     touchDriver,
@@ -2509,6 +2518,8 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     perpendicularTarget,
     `${obstacle.id} telemetry frontal alignment ${perpendicularAxis.toUpperCase()}`,
     0.12,
+    null,
+    { precisionCounterPulse: true },
   );
   const staged = await readGameState(page);
   return {
@@ -3366,62 +3377,75 @@ function assembleRepresentativeScreenshots() {
 }
 
 /** 新操作・完全mission・時系列VFX・3 viewportを1回のrelease runとして検証する。 */
-async function verifyVoxelGame() {
+async function verifyVoxelGame(scenarioProgress) {
+  const runScenario = scenarioProgress.run;
   verifyPerformancePolicySelfCheck();
-  await waitForServer();
+  await runScenario('server-ready', waitForServer);
   if (focusMode === 'production-map') {
     const browser = await chromium.launch({ headless: true });
     const errors = [];
     const contractFailures = [];
     try {
-      const productionMap = await verifyProductionMap(browser, errors);
-      const fire = await verifyCompleteMission(
-        browser,
-        errors,
-        'production-fire',
-        false,
-        { targetedScreenshot: `${outputDirectory}/desktop-production-fire.png` },
+      const productionMap = await runScenario(
+        'production-map-layout',
+        () => verifyProductionMap(browser, errors),
       );
-      const blocks = await verifyBreakTimeline(
-        browser,
-        errors,
-        contractFailures,
-        'plaza-green',
-        'green',
-      );
-      assert.equal(fire.arrival?.world.currentDistrict, 'fire',
-        `production-map fire scenario arrived in ${fire.arrival?.world.currentDistrict}.`);
-      assert((fire.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
-        `production-map fire scenario exceeded 35 seconds: ${JSON.stringify(fire.journey)}.`);
-      assert.equal(blocks.arrival?.world.currentDistrict, 'blocks',
-        `production-map blocks scenario arrived in ${blocks.arrival?.world.currentDistrict}.`);
-      assert((blocks.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
-        `production-map blocks scenario exceeded 35 seconds: ${JSON.stringify(blocks.journey)}.`);
-      copyVerifiedScreenshot(
-        `${outputDirectory}/desktop-break-green-first-observed.png`,
-        `${outputDirectory}/desktop-production-blocks.png`,
-      );
-      const errorCounts = {
-        console: errors.filter((error) => error.includes(': console:')).length,
-        page: errors.filter((error) => error.includes(': pageerror:')).length,
-        request: errors.filter((error) => error.includes(': requestfailed:')).length,
-      };
-      writeJsonArtifact('production-map.json', {
-        blocks,
-        contractFailures,
-        errorCounts,
-        errors,
-        fire,
-        productionMap,
-        screenshotProofs,
+      const fire = await runScenario('production-map-fire', async () => {
+        const result = await verifyCompleteMission(
+          browser,
+          errors,
+          'production-fire',
+          false,
+          { targetedScreenshot: `${outputDirectory}/desktop-production-fire.png` },
+        );
+        assert.equal(result.arrival?.world.currentDistrict, 'fire',
+          `production-map fire scenario arrived in ${result.arrival?.world.currentDistrict}.`);
+        assert((result.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
+          `production-map fire scenario exceeded 35 seconds: ${JSON.stringify(result.journey)}.`);
+        return result;
       });
-      for (const screenshot of productionMapScreenshots) {
-        assert(fs.existsSync(`${outputDirectory}/${screenshot}`),
-          `Missing production-map screenshot: ${screenshot}`);
-      }
-      assert.equal(errors.length, 0, `Focused production-map browser/request errors: ${errors.join(' | ')}`);
-      assert.equal(contractFailures.length, 0,
-        `Focused production-map contract failures: ${contractFailures.join(' | ')}`);
+      const blocks = await runScenario('production-map-blocks', async () => {
+        const result = await verifyBreakTimeline(
+          browser,
+          errors,
+          contractFailures,
+          'plaza-green',
+          'green',
+        );
+        assert.equal(result.arrival?.world.currentDistrict, 'blocks',
+          `production-map blocks scenario arrived in ${result.arrival?.world.currentDistrict}.`);
+        assert((result.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
+          `production-map blocks scenario exceeded 35 seconds: ${JSON.stringify(result.journey)}.`);
+        copyVerifiedScreenshot(
+          `${outputDirectory}/desktop-break-green-first-observed.png`,
+          `${outputDirectory}/desktop-production-blocks.png`,
+        );
+        return result;
+      });
+      const errorCounts = await runScenario('production-map-report', async () => {
+        const counts = {
+          console: errors.filter((error) => error.includes(': console:')).length,
+          page: errors.filter((error) => error.includes(': pageerror:')).length,
+          request: errors.filter((error) => error.includes(': requestfailed:')).length,
+        };
+        writeJsonArtifact('production-map.json', {
+          blocks,
+          contractFailures,
+          errorCounts: counts,
+          errors,
+          fire,
+          productionMap,
+          screenshotProofs,
+        });
+        for (const screenshot of productionMapScreenshots) {
+          assert(fs.existsSync(`${outputDirectory}/${screenshot}`),
+            `Missing production-map screenshot: ${screenshot}`);
+        }
+        assert.equal(errors.length, 0, `Focused production-map browser/request errors: ${errors.join(' | ')}`);
+        assert.equal(contractFailures.length, 0,
+          `Focused production-map contract failures: ${contractFailures.join(' | ')}`);
+        return counts;
+      });
       console.log(JSON.stringify({
         artifacts: productionMapScreenshots,
         blocks,
@@ -3439,29 +3463,54 @@ async function verifyVoxelGame() {
     const errors = [];
     const viewports = {};
     try {
-      const canonicalRoot = await verifyCanonicalRoot(browser, errors);
-      const directMovement = await verifyDirectMovement(browser, errors);
-      const forgivingSprayTargeting = await verifyForgivingSprayTargeting(browser, errors);
-      const missions = {
-        desktop: await verifyCompleteMission(browser, errors, 'desktop-mission', false),
-        touch: await verifyCompleteMission(browser, errors, 'touch-mission', true),
-      };
-      const waterTimeline = await verifyWaterTimeline(browser, errors);
-      for (const target of targets) viewports[target.name] = await verifyViewport(browser, target, errors);
-      assert.equal(errors.length, 0, `Focused non-break browser/request errors: ${errors.join(' | ')}`);
-      copyVerifiedScreenshot(
-        `${outputDirectory}/desktop-water-splash.png`,
-        `${outputDirectory}/desktop-water-fire.png`,
+      const canonicalRoot = await runScenario(
+        'nonbreak-canonical-root',
+        () => verifyCanonicalRoot(browser, errors),
       );
-      writeJsonArtifact('focused-nonbreak.json', {
-        canonicalRoot,
-        directMovement,
-        errors,
-        forgivingSprayTargeting,
-        missions,
-        screenshotProofs,
-        viewports,
-        waterTimeline,
+      const directMovement = await runScenario(
+        'nonbreak-direct-movement',
+        () => verifyDirectMovement(browser, errors),
+      );
+      const forgivingSprayTargeting = await runScenario(
+        'nonbreak-forgiving-spray',
+        () => verifyForgivingSprayTargeting(browser, errors),
+      );
+      const missions = {
+        desktop: await runScenario(
+          'nonbreak-desktop-mission',
+          () => verifyCompleteMission(browser, errors, 'desktop-mission', false),
+        ),
+        touch: await runScenario(
+          'nonbreak-touch-mission',
+          () => verifyCompleteMission(browser, errors, 'touch-mission', true),
+        ),
+      };
+      const waterTimeline = await runScenario(
+        'nonbreak-water-timeline',
+        () => verifyWaterTimeline(browser, errors),
+      );
+      for (const target of targets) {
+        viewports[target.name] = await runScenario(
+          `nonbreak-viewport-${target.name}`,
+          () => verifyViewport(browser, target, errors),
+        );
+      }
+      await runScenario('nonbreak-report', async () => {
+        assert.equal(errors.length, 0, `Focused non-break browser/request errors: ${errors.join(' | ')}`);
+        copyVerifiedScreenshot(
+          `${outputDirectory}/desktop-water-splash.png`,
+          `${outputDirectory}/desktop-water-fire.png`,
+        );
+        writeJsonArtifact('focused-nonbreak.json', {
+          canonicalRoot,
+          directMovement,
+          errors,
+          forgivingSprayTargeting,
+          missions,
+          screenshotProofs,
+          viewports,
+          waterTimeline,
+        });
       });
       console.log(JSON.stringify({
         canonicalRoot,
@@ -3480,18 +3529,21 @@ async function verifyVoxelGame() {
     const browser = await chromium.launch({ headless: true });
     const errors = [];
     try {
-      const collisions = await verifyWorldCollisions(browser, errors);
-      for (const screenshot of collisionScreenshots) {
-        assert(fs.existsSync(`${outputDirectory}/${screenshot}`),
-          `Missing focused collision screenshot: ${screenshot}`);
-      }
-      writeJsonArtifact('focused-collision.json', {
-        artifacts: collisionScreenshots,
-        collisions,
-        errors,
-        screenshotProofs,
+      const collisions = await runScenario('collision', async () => {
+        const result = await verifyWorldCollisions(browser, errors);
+        for (const screenshot of collisionScreenshots) {
+          assert(fs.existsSync(`${outputDirectory}/${screenshot}`),
+            `Missing focused collision screenshot: ${screenshot}`);
+        }
+        writeJsonArtifact('focused-collision.json', {
+          artifacts: collisionScreenshots,
+          collisions: result,
+          errors,
+          screenshotProofs,
+        });
+        assert.equal(errors.length, 0, `Focused collision browser/request errors: ${errors.join(' | ')}`);
+        return result;
       });
-      assert.equal(errors.length, 0, `Focused collision browser/request errors: ${errors.join(' | ')}`);
       console.log(JSON.stringify({ artifacts: collisionScreenshots, collisions, errors }));
       return;
     } finally {
@@ -3505,22 +3557,29 @@ async function verifyVoxelGame() {
     const errors = [];
     const contractFailures = [];
     try {
-      const result = await verifyBreakTimeline(browser, errors, contractFailures, blockId, focusedBreak);
-      writeJsonArtifact(`focused-break-${focusedBreak}.json`, {
-        contractFailures,
-        errors,
-        result,
-        screenshotProofs,
+      const result = await runScenario(`break-${focusedBreak}`, async () => {
+        const timeline = await verifyBreakTimeline(browser, errors, contractFailures, blockId, focusedBreak);
+        writeJsonArtifact(`focused-break-${focusedBreak}.json`, {
+          contractFailures,
+          errors,
+          result: timeline,
+          screenshotProofs,
+        });
+        assert.equal(errors.length, 0, `Focused browser/request errors: ${errors.join(' | ')}`);
+        assert.equal(contractFailures.length, 0,
+          `Focused break contract failures: ${contractFailures.join(' | ')}`);
+        return timeline;
       });
-      assert.equal(errors.length, 0, `Focused browser/request errors: ${errors.join(' | ')}`);
-      assert.equal(contractFailures.length, 0, `Focused break contract failures: ${contractFailures.join(' | ')}`);
       console.log(JSON.stringify({ blockId, contractFailures, result }));
       return;
     } finally {
       await browser.close();
     }
   }
-  const regressions = [await runRegressionScript('scripts/verify-voxel-game-task7.mjs')];
+  const regressions = [await runScenario(
+    'full-task7-regression',
+    () => runRegressionScript('scripts/verify-voxel-game-task7.mjs'),
+  )];
   const task7 = JSON.parse(fs.readFileSync(`${outputDirectory}/task7/results.json`, 'utf8'));
 
   const browser = await chromium.launch({ headless: true });
@@ -3536,89 +3595,121 @@ async function verifyVoxelGame() {
   let productionMap;
   let waterTimeline;
   try {
-    productionMap = await verifyProductionMap(browser, errors);
-    canonicalRoot = await verifyCanonicalRoot(browser, errors);
-    directMovement = await verifyDirectMovement(browser, errors);
-    forgivingSprayTargeting = await verifyForgivingSprayTargeting(browser, errors);
+    productionMap = await runScenario(
+      'full-production-map',
+      () => verifyProductionMap(browser, errors),
+    );
+    canonicalRoot = await runScenario(
+      'full-canonical-root',
+      () => verifyCanonicalRoot(browser, errors),
+    );
+    directMovement = await runScenario(
+      'full-direct-movement',
+      () => verifyDirectMovement(browser, errors),
+    );
+    forgivingSprayTargeting = await runScenario(
+      'full-forgiving-spray',
+      () => verifyForgivingSprayTargeting(browser, errors),
+    );
     missions = {
-      desktop: await verifyCompleteMission(
-        browser,
-        errors,
-        'desktop-mission',
-        false,
-        { targetedScreenshot: `${outputDirectory}/desktop-production-fire.png` },
+      desktop: await runScenario(
+        'full-desktop-mission',
+        () => verifyCompleteMission(
+          browser,
+          errors,
+          'desktop-mission',
+          false,
+          { targetedScreenshot: `${outputDirectory}/desktop-production-fire.png` },
+        ),
       ),
-      touch: await verifyCompleteMission(browser, errors, 'touch-mission', true),
+      touch: await runScenario(
+        'full-touch-mission',
+        () => verifyCompleteMission(browser, errors, 'touch-mission', true),
+      ),
     };
-    waterTimeline = await verifyWaterTimeline(browser, errors);
-    collisions = await verifyWorldCollisions(browser, errors);
+    waterTimeline = await runScenario(
+      'full-water-timeline',
+      () => verifyWaterTimeline(browser, errors),
+    );
+    collisions = await runScenario(
+      'full-collisions',
+      () => verifyWorldCollisions(browser, errors),
+    );
     for (const [blockId, colorName] of [
       ['plaza-red', 'red'],
       ['plaza-yellow', 'yellow'],
       ['plaza-blue', 'blue'],
       ['plaza-green', 'green'],
     ]) {
-      breakTimelines[blockId] = await verifyBreakTimeline(browser, errors, contractFailures, blockId, colorName);
+      breakTimelines[blockId] = await runScenario(
+        `full-break-${colorName}`,
+        () => verifyBreakTimeline(browser, errors, contractFailures, blockId, colorName),
+      );
     }
     copyVerifiedScreenshot(
       `${outputDirectory}/desktop-break-red-first-observed.png`,
       `${outputDirectory}/desktop-production-blocks.png`,
     );
     for (const target of targets) {
-      viewports[target.name] = await verifyViewport(browser, target, errors);
+      viewports[target.name] = await runScenario(
+        `full-viewport-${target.name}`,
+        () => verifyViewport(browser, target, errors),
+      );
     }
   } finally {
     await browser.close();
   }
-  assert.equal(errors.length, 0, `Voxel Game browser/request errors: ${errors.join(' | ')}`);
-  assembleRepresentativeScreenshots();
-  const errorCounts = {
-    console: errors.filter((error) => error.includes(': console:')).length,
-    page: errors.filter((error) => error.includes(': pageerror:')).length,
-    request: errors.filter((error) => error.includes(': requestfailed:')).length,
-  };
+  await runScenario('full-report', async () => {
+    assert.equal(errors.length, 0, `Voxel Game browser/request errors: ${errors.join(' | ')}`);
+    assembleRepresentativeScreenshots();
+    const errorCounts = {
+      console: errors.filter((error) => error.includes(': console:')).length,
+      page: errors.filter((error) => error.includes(': pageerror:')).length,
+      request: errors.filter((error) => error.includes(': requestfailed:')).length,
+    };
 
-  const environmentConcerns = Object.entries(viewports)
-    .filter(([, result]) => !result.policy.certified)
-    .map(([name, result]) => (
-      `${name}: ${result.policy.rendererClass} renderer; thresholdMet=${result.policy.thresholdMet}; physical-GPU revalidation required`
-    ));
-  const report = {
-    artifacts: [
-      ...expectedScreenshots,
-      ...timelineScreenshots,
-      ...collisionScreenshots,
-      ...productionMapScreenshots,
-    ],
-    breakTimelines,
-    canonicalRoot,
-    collisions,
-    contractFailures,
-    directMovement,
-    environmentConcerns,
-    errorCounts,
-    forgivingSprayTargeting,
-    missions,
-    performancePolicy: {
-      certification: 'certified only when rendererClass is physical and measured fps meets the viewport target',
-      rendererClasses: ['software', 'physical', 'unknown'],
-      targets: Object.fromEntries(targets.map(({ minimumFps, name }) => [name, minimumFps])),
-    },
-    productionMap,
-    regressions,
-    screenshotProofs,
-    task7,
-    viewports,
-    waterTimeline,
-  };
-  fs.writeFileSync(`${outputDirectory}/results.json`, `${JSON.stringify(report, null, 2)}\n`);
-  if (environmentConcerns.length > 0) {
-    console.warn(`Voxel Game physical-GPU revalidation required: ${environmentConcerns.join(' | ')}`);
-  }
-  if (contractFailures.length > 0) {
-    throw new Error(`Voxel Game release contract failures: ${contractFailures.join(' | ')}`);
-  }
-  console.log(JSON.stringify({ artifacts: report.artifacts, environmentConcerns, errorCounts, viewports }));
+    const environmentConcerns = Object.entries(viewports)
+      .filter(([, result]) => !result.policy.certified)
+      .map(([name, result]) => (
+        `${name}: ${result.policy.rendererClass} renderer; thresholdMet=${result.policy.thresholdMet}; physical-GPU revalidation required`
+      ));
+    const report = {
+      artifacts: [
+        ...expectedScreenshots,
+        ...timelineScreenshots,
+        ...collisionScreenshots,
+        ...productionMapScreenshots,
+      ],
+      breakTimelines,
+      canonicalRoot,
+      collisions,
+      contractFailures,
+      directMovement,
+      environmentConcerns,
+      errorCounts,
+      forgivingSprayTargeting,
+      missions,
+      performancePolicy: {
+        certification: 'certified only when rendererClass is physical and measured fps meets the viewport target',
+        rendererClasses: ['software', 'physical', 'unknown'],
+        targets: Object.fromEntries(targets.map(({ minimumFps, name }) => [name, minimumFps])),
+      },
+      productionMap,
+      regressions,
+      screenshotProofs,
+      task7,
+      viewports,
+      waterTimeline,
+    };
+    fs.writeFileSync(`${outputDirectory}/results.json`, `${JSON.stringify(report, null, 2)}\n`);
+    if (environmentConcerns.length > 0) {
+      console.warn(`Voxel Game physical-GPU revalidation required: ${environmentConcerns.join(' | ')}`);
+    }
+    if (contractFailures.length > 0) {
+      throw new Error(`Voxel Game release contract failures: ${contractFailures.join(' | ')}`);
+    }
+    console.log(JSON.stringify({ artifacts: report.artifacts, environmentConcerns, errorCounts, viewports }));
+  });
 }
 
 /** 意図的失敗でstale artifact消去とfailed manifest更新を自己検証する。 */
@@ -3628,8 +3719,10 @@ async function verifyManifestFailureSelfCheck() {
   fs.writeFileSync(`${artifactDirectory}/stale.png`, 'stale');
   let caught = null;
   try {
-    await runWithManifest(artifactDirectory, async () => {
-      throw new Error('Intentional Voxel Game verification failure');
+    await runWithManifest(artifactDirectory, async (scenarioProgress) => {
+      await scenarioProgress.run('manifest-failure-self-check', async () => {
+        throw new Error('Intentional Voxel Game verification failure');
+      });
     });
   } catch (error) {
     caught = error;
@@ -3640,6 +3733,9 @@ async function verifyManifestFailureSelfCheck() {
     const manifest = JSON.parse(fs.readFileSync(`${artifactDirectory}/run-manifest.json`, 'utf8'));
     assert.equal(manifest.status, 'failed');
     assert.match(manifest.error, /Intentional Voxel Game verification failure/);
+    assert.equal(manifest.lastScenario, 'manifest-failure-self-check');
+    assert.equal(manifest.scenarioStatus, 'failed');
+    assert(Number.isFinite(manifest.scenarioElapsedSeconds));
   } finally {
     fs.rmSync(artifactDirectory, { force: true, recursive: true });
   }

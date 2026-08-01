@@ -6,6 +6,12 @@ export const WORLD_AXIS_INPUTS = Object.freeze({
   positiveX: Object.freeze({ keys: Object.freeze(['KeyD', 'KeyS']), stick: Object.freeze([0.803, 0.595]) }),
   positiveZ: Object.freeze({ keys: Object.freeze(['KeyA', 'KeyS']), stick: Object.freeze([-0.595, 0.803]) }),
 });
+const OPPOSITE_WORLD_AXIS = Object.freeze({
+  negativeX: 'positiveX',
+  negativeZ: 'positiveZ',
+  positiveX: 'negativeX',
+  positiveZ: 'negativeZ',
+});
 
 /** 距離と既存係数を1〜7 frameの安全なcardinal pulseへ変換する。 */
 export function calculatePulseFrameCount(delta, multiplier) {
@@ -245,6 +251,8 @@ export function createDriveHarness(options = {}) {
       coordinateIndex,
       description,
       multiplier = pulseDistanceMultiplier,
+      precisionCounterPulse = false,
+      precisionCounterPulseThreshold = 0.6,
       target,
       tolerance = 0.4,
       touchDriver = null,
@@ -254,6 +262,8 @@ export function createDriveHarness(options = {}) {
     assert(Number.isFinite(target), `${description}: target must be finite.`);
     assert(Number.isFinite(tolerance) && tolerance >= 0,
       `${description}: tolerance must be finite and non-negative.`);
+    assert(Number.isFinite(precisionCounterPulseThreshold) && precisionCounterPulseThreshold > 0,
+      `${description}: precision counter-pulse threshold must be finite and positive.`);
     const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
     const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
     const initialResetCount = (await readState(page)).vehicle.resetCount;
@@ -266,12 +276,29 @@ export function createDriveHarness(options = {}) {
       if (Math.abs(delta) <= tolerance) return latest;
       assert.equal(latest.vehicle.resetCount, initialResetCount,
         `${description}: vehicle reset unexpectedly.`);
-      await pulseWorldAxis(page, {
-        axis: delta > 0 ? positiveAxis : negativeAxis,
-        description,
-        frameCount: calculatePulseFrameCount(delta, multiplier),
-        touchDriver,
-      });
+      const correctionAxis = delta > 0 ? positiveAxis : negativeAxis;
+      if (precisionCounterPulse && Math.abs(delta) <= precisionCounterPulseThreshold) {
+        await pulseWorldAxis(page, {
+          axis: correctionAxis,
+          brakeAfterPulse: false,
+          description: `${description} precision nudge`,
+          frameCount: 1,
+          touchDriver,
+        });
+        await pulseWorldAxis(page, {
+          axis: OPPOSITE_WORLD_AXIS[correctionAxis],
+          description: `${description} precision counter-brake`,
+          frameCount: 1,
+          touchDriver,
+        });
+      } else {
+        await pulseWorldAxis(page, {
+          axis: correctionAxis,
+          description,
+          frameCount: calculatePulseFrameCount(delta, multiplier),
+          touchDriver,
+        });
+      }
     }
     throw new Error(`${description}: coordinate did not align: ${JSON.stringify({
       actual: latest?.vehicle.position[coordinateIndex],

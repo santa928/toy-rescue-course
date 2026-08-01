@@ -89,11 +89,11 @@ feature固有scenarioの4層に分ける。
 - Modify: `docker-compose.yml`
 - Modify: `README.md`
 
-- [ ] RED: scenario開始／成功／失敗／経過秒が記録されないことを確認する。
-- [ ] production-map、nonbreak、collision、break-*へscenario progressを付ける。
-- [ ] `VOXEL_GAME_FOCUS`を渡す専用Compose serviceを追加し、不正focusを即時拒否する。
-- [ ] failure manifestへ最後のscenarioと経過秒を保存する。
-- [ ] focus全種とcanonical fullをDocker内で通す。
+- [x] RED: scenario開始／成功／失敗／経過秒が記録されないことを確認する。
+- [x] production-map、nonbreak、collision、break-*へscenario progressを付ける。
+- [x] `VOXEL_GAME_FOCUS`を渡す専用Compose serviceを追加し、不正focusを即時拒否する。
+- [x] failure manifestへ最後のscenarioと経過秒を保存する。
+- [x] focus全種とcanonical fullをDocker内で通す。
 - [ ] `巨大E2Eをfocus別に診断可能にする`でcommit・scan・push・公開確認する。
 
 ## Task 6: 総合回帰・公開検証

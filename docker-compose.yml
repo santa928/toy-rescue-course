@@ -54,6 +54,29 @@ services:
           exit 1
         }
 
+  voxel-game-focus-e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    working_dir: /app
+    environment:
+      VOXEL_GAME_BASE_URL: http://127.0.0.1:5173
+      VOXEL_GAME_FOCUS: ${VOXEL_GAME_FOCUS:-__required__}
+    volumes:
+      - ./output:/app/output
+    command:
+      - sh
+      - -lc
+      - |
+        npm run dev -- --host 127.0.0.1 > /tmp/voxel-game-focus-vite.log 2>&1 &
+        server_pid=$$!
+        trap 'kill "$$server_pid" 2>/dev/null || true' EXIT
+        node scripts/verify-voxel-game.mjs || {
+          cat /tmp/voxel-game-focus-vite.log >&2
+          exit 1
+        }
+
   voxel-game-vehicles-e2e:
     profiles: ["e2e"]
     build:
