@@ -53,19 +53,15 @@
 
 ---
 
-### Task 1: 車両registryとprimary action入力契約
+### Task 1: 車両registry契約
 
 **Files:**
 - Create: `src/voxel-game/domain/vehicleDefinitions.ts`
 - Create: `src/test/vehicleDefinitions.test.ts`
-- Modify: `src/voxel-game/input/controlState.ts`
-- Modify: `src/voxel-game/input/useVoxelGameControls.ts`
-- Modify: `src/test/voxelGameControls.test.ts`
 
 **Interfaces:**
 - Produces: `VehicleId = 'fire-truck' | 'bulldozer'`
 - Produces: `VehicleDefinition`, `VEHICLE_DEFINITIONS`, `getVehicleDefinition(id)`, `canSwitchVehicle(context)`
-- Produces: `DriveCommand.primaryAction`, `VoxelGameControls.setPrimaryAction()`, `primaryActionPressed`
 - Consumes: `MissionPhase`はまだ使わず、静的な`missionId`だけを定義する。
 
 - [ ] **Step 1: registryと切替条件のfailing testを書く**
@@ -106,9 +102,9 @@ describe('vehicle definitions', () => {
 
 - [ ] **Step 2: DockerでREDを確認する**
 
-Run: `docker compose run --rm web npm test -- src/test/vehicleDefinitions.test.ts src/test/voxelGameControls.test.ts`
+Run: `docker compose run --rm web npm test -- src/test/vehicleDefinitions.test.ts`
 
-Expected: `vehicleDefinitions` import不在と、`primaryAction`不在でFAILする。
+Expected: `vehicleDefinitions` import不在でFAILする。
 
 - [ ] **Step 3: 型と値を実装する**
 
@@ -136,38 +132,32 @@ export const VEHICLE_DEFINITIONS = [
     id: 'fire-truck', label: 'しょうぼうしゃ', missionId: 'fire-rescue',
     action: { ariaLabel: '水を出す', label: 'みず' },
     physics: { idleResponse: 4.8, mass: 1.4, movingResponse: 7.5, yawClamp: 5.2 },
-    collider: { halfExtents: [1.32, 0.9, 1.55], offset: [0, 0.95, 0] },
+    collider: { halfExtents: [1.45, 0.95, 1.7], offset: [0, 0.95, 0] },
     visualBounds: { offset: [0, 0.84, 0], scale: [2.88, 1.92, 3.36] },
   },
   {
     id: 'bulldozer', label: 'ブルドーザー', missionId: 'debris-clearance',
     action: { ariaLabel: 'ブレードを動かす', label: 'ブレード' },
     physics: { idleResponse: 4.4, mass: 1.9, movingResponse: 6.8, yawClamp: 4.8 },
-    collider: { halfExtents: [1.48, 0.78, 1.42], offset: [0, 0.82, 0] },
+    collider: { halfExtents: [1.68, 0.95, 1.56], offset: [0, 0.9, 0] },
     visualBounds: { offset: [0, 0.78, 0], scale: [3.36, 1.92, 3.12] },
   },
 ] as const satisfies readonly VehicleDefinition[];
 ```
 
-`DigitalAction`の`'spray'`を`'primaryAction'`へ置換し、`DriveCommand`も
-`{ moveX, moveY, primaryAction }`へ変更する。`KEY_ACTIONS.Space`、hookのstate、setter、aria同期名を
-同じtaskで置換する。
+- [ ] **Step 4: focused testとbuildを確認する**
 
-- [ ] **Step 4: focused testと参照残りを確認する**
+Run: `docker compose run --rm web npm test -- src/test/vehicleDefinitions.test.ts`
 
-Run: `docker compose run --rm web npm test -- src/test/vehicleDefinitions.test.ts src/test/voxelGameControls.test.ts`
+Run: `docker compose run --rm web npm run build`
 
-Run: `rg -n "sprayPressed|setSpray|controls\.spray|digital\.spray|'spray'" src`
-
-Expected: test PASS。`spray`の残りは放水VFX固有名だけで、入力command／hookには残らない。
+Expected: test PASS、既存入力consumerを変更していない状態でbuild exit 0。
 
 - [ ] **Step 5: commit・security scan・pushする**
 
 ```bash
-git add src/voxel-game/domain/vehicleDefinitions.ts src/voxel-game/input/controlState.ts \
-  src/voxel-game/input/useVoxelGameControls.ts src/test/vehicleDefinitions.test.ts \
-  src/test/voxelGameControls.test.ts
-git commit -m "車種定義と共通アクション入力を追加する"
+git add src/voxel-game/domain/vehicleDefinitions.ts src/test/vehicleDefinitions.test.ts
+git commit -m "働く車の型付き定義を追加する"
 git push origin main
 ```
 
@@ -181,28 +171,29 @@ git push origin main
 - Create: `src/test/bulldozerVoxels.test.ts`
 
 **Interfaces:**
-- Consumes: `VoxelCell`, `createVoxelModel`, `createVoxelRenderPlan`, `DriveCommand.primaryAction`
-- Produces: `BULLDOZER_MODEL`, `BULLDOZER_RENDER_PLAN`, `BULLDOZER_PALETTE`, `VoxelBulldozer`
-- Produces: `VoxelBulldozerProps.commandRef?: RefObject<DriveCommand>`。showroomでは省略できる。
+- Consumes: `VoxelCell`, `assertValidVoxelModel`, `calculateVoxelBounds`, `createVoxelRenderPlan`、`RefObject<boolean>`
+- Produces: `BULLDOZER_VOXELS`, `BULLDOZER_RENDER_PLAN`, `BULLDOZER_PALETTE`, `VoxelBulldozer`
+- Produces: `VoxelBulldozerProps.actionActiveRef?: RefObject<boolean>`。showroomでは省略できる。
 
 - [ ] **Step 1: 造形bounds・上限・特徴のfailing testを書く**
 
 ```ts
-describe('BULLDOZER_MODEL', () => {
+describe('BULLDOZER_VOXELS', () => {
   it('800 voxel・7 batch以内で黄色い車体、左右履帯、前面ブレードを持つ', () => {
-    expect(BULLDOZER_MODEL.cells.length).toBeLessThanOrEqual(800);
+    expect(BULLDOZER_VOXELS.length).toBeLessThanOrEqual(800);
     expect(BULLDOZER_RENDER_PLAN.batches.length).toBeLessThanOrEqual(7);
-    expect(BULLDOZER_MODEL.paletteNames).toEqual(expect.arrayContaining([
+    expect(BULLDOZER_PALETTE_IDS).toEqual(expect.arrayContaining([
       'yellow', 'track', 'blade', 'window', 'beacon',
     ]));
-    expect(BULLDOZER_MODEL.bounds.size[0]).toBeGreaterThan(BULLDOZER_MODEL.bounds.size[2] * 0.9);
+    const bounds = calculateVoxelBounds(BULLDOZER_VOXELS);
+    expect(bounds.size.x).toBeGreaterThan(bounds.size.z * 0.9);
   });
 
   it('左右の履帯cell数が同じでmodel座標を重複しない', () => {
-    const tracks = BULLDOZER_MODEL.cells.filter(({ palette }) => palette === 'track');
+    const tracks = BULLDOZER_VOXELS.filter(({ paletteId }) => paletteId === 'track');
     expect(tracks.filter(({ x }) => x < 0)).toHaveLength(tracks.filter(({ x }) => x > 0).length);
-    expect(new Set(BULLDOZER_MODEL.cells.map(({ x, y, z }) => `${x}:${y}:${z}`)).size)
-      .toBe(BULLDOZER_MODEL.cells.length);
+    expect(new Set(BULLDOZER_VOXELS.map(({ x, y, z }) => `${x}:${y}:${z}`)).size)
+      .toBe(BULLDOZER_VOXELS.length);
   });
 });
 ```
@@ -227,7 +218,8 @@ addBox(cells, 'blade', { x: [-6, 6], y: [0, 2], z: [-6, -5] });
 ```
 
 `VoxelBulldozer`はpaletteごとに1つの`instancedMesh`を描き、blade paletteだけを`group ref`配下へ置く。
-`useFrame`で`commandRef?.current.primaryAction`を読み、blade groupのYを`0`と`-0.12`の間でdampする。
+`useFrame`で`actionActiveRef?.current`を読み、blade groupのYを`0`と`-0.12`の間でdampする。
+入力commandの`primaryAction`移行は全consumerを同時に変えるTask 7で行う。
 
 - [ ] **Step 4: focused testとbuildを通す**
 
@@ -289,9 +281,9 @@ Expected: 新landmark不在でFAILする。
 
 ```ts
 bulldozerDebris: [
-  { id: 'debris-timber', palette: 'timber', position: [-28, 0.8, 12], radius: 1.15 },
-  { id: 'debris-stone', palette: 'stone', position: [-23.5, 0.8, 11.5], radius: 1.15 },
-  { id: 'debris-crate', palette: 'crate', position: [-18.5, 0.8, 10.5], radius: 1.15 },
+  { id: 'debris-timber', palette: 'timber', position: [-29.5, 0.8, 13.5], radius: 1.15 },
+  { id: 'debris-stone', palette: 'stone', position: [-24, 0.8, 13.8], radius: 1.15 },
+  { id: 'debris-crate', palette: 'crate', position: [-18.2, 0.8, 12.8], radius: 1.15 },
 ],
 bulldozerRouteMarkers: [
   [-3, 0.26, 0], [-7, 0.26, 0], [-11, 0.26, 0],
@@ -492,41 +484,38 @@ git push origin main
 
 ---
 
-### Task 6: 共通controllerとscene統合
+### Task 6: registry駆動の共通controller
 
 **Files:**
 - Modify: `src/voxel-game/scene/VehicleController.tsx`
 - Modify: `src/voxel-game/scene/VoxelGameScene.tsx`
-- Modify: `src/voxel-game/scene/WaterAndFire.tsx`
+- Modify: `src/voxel-game/VoxelGameApp.tsx`
 - Modify: `src/voxel-game/scene/worldCollisionLayout.ts`
 - Modify: `src/test/screenRelativeMovement.test.ts`
-- Modify: `src/test/waterAndFire.test.ts`
 - Modify: `src/test/voxelGameRenderTelemetry.test.ts`
 
 **Interfaces:**
-- Consumes: `VehicleDefinition`, `VehicleId`, coordinator、`VoxelBulldozer`、`BulldozerDebrisMission`
+- Consumes: `VehicleDefinition`, `VehicleId`, `VoxelBulldozer`
 - Produces: `VehicleTelemetry.id`と`VehicleControllerProps.vehicleId`
-- Produces: sceneが選択車種だけの専用仕事visualをactiveにする。
+- Produces: Appが未統合の中間commitでは`vehicleId='fire-truck'`を明示し、既存scene挙動を保つ。
 
-- [ ] **Step 1: 車種別physics/modelと消防gateのfailing testを書く**
+- [ ] **Step 1: 車種別physics/modelのfailing testを書く**
 
 ```ts
 it('telemetryへ車種IDを含める', () => {
-  expect(INITIAL_BULLDOZER_TELEMETRY).toMatchObject({ id: 'bulldozer', mass: 1.9 });
+  expect(createInitialVehicleTelemetry('bulldozer')).toMatchObject({
+    id: 'bulldozer', mass: 1.9, speed: 0,
+  });
 });
 
-it('消防車以外では放水signalをfalseへ固定する', () => {
-  expect(resolveFireAction('bulldozer', { primaryAction: true })).toBe(false);
-  expect(resolveFireAction('fire-truck', { primaryAction: true })).toBe(true);
-});
 ```
 
-render testでは`vehicleId='bulldozer'`時に`VoxelBulldozer`と`BulldozerDebrisMission`、
-`vehicleId='fire-truck'`時に`VoxelFireTruck`と`WaterAndFire`が各1つ接続されることを検証する。
+render testではcontrollerが`vehicleId='bulldozer'`時に`VoxelBulldozer`、
+`vehicleId='fire-truck'`時に`VoxelFireTruck`を各1つ選ぶrender plan helperを検証する。
 
 - [ ] **Step 2: DockerでREDを確認する**
 
-Run: `docker compose run --rm web npm test -- src/test/waterAndFire.test.ts src/test/voxelGameRenderTelemetry.test.ts`
+Run: `docker compose run --rm web npm test -- src/test/voxelGameRenderTelemetry.test.ts`
 
 Expected: `VehicleTelemetry.id`とscene props不在でFAIL。
 
@@ -544,16 +533,17 @@ response、yaw clamp、mass、colliderを定義から読む。model分岐は1か
 <group rotation={[0, Math.PI, 0]}>
   {vehicleId === 'fire-truck'
     ? <VoxelFireTruck />
-    : <VoxelBulldozer commandRef={commandRef} />}
+    : <VoxelBulldozer actionActiveRef={actionActiveRef} />}
 </group>
 ```
 
-scene clockはcoordinatorを進め、共有fire runtimeのblock clearanceも従来どおり同期する。
-専用visualはunmountせず`enabled` propで停止できる構造を優先し、切替時の重い再生成を避ける。
+controller内の`actionActiveRef.current`は既存`commandRef.current.spray`から毎frame同期する。
+この中間commitではAppとsceneから固定`'fire-truck'`を渡して公開挙動を変えず、Task 7で入力名と
+coordinator／専用visualを同時に統合する。
 
 - [ ] **Step 4: focused test、full unit、buildを通す**
 
-Run: `docker compose run --rm web npm test -- src/test/waterAndFire.test.ts src/test/voxelGameRenderTelemetry.test.ts src/test/screenRelativeMovement.test.ts`
+Run: `docker compose run --rm web npm test -- src/test/voxelGameRenderTelemetry.test.ts src/test/screenRelativeMovement.test.ts`
 
 Run: `docker compose run --rm web npm test`
 
@@ -561,20 +551,13 @@ Run: `docker compose run --rm web npm run build`
 
 Expected: 全unit PASS、build exit 0。
 
-- [ ] **Step 5: input旧名の参照残りを確認する**
-
-Run: `rg -n "command\.spray|controls\.spray|setSpray|sprayPressed" src scripts`
-
-Expected: 0件。`sprayActive`、`sprayOnFire`など消防domain固有名は残してよい。
-
-- [ ] **Step 6: commit・scan・pushする**
+- [ ] **Step 5: commit・scan・pushする**
 
 ```bash
 git add src/voxel-game/scene/VehicleController.tsx src/voxel-game/scene/VoxelGameScene.tsx \
-  src/voxel-game/scene/WaterAndFire.tsx src/voxel-game/scene/worldCollisionLayout.ts \
-  src/test/screenRelativeMovement.test.ts src/test/waterAndFire.test.ts \
-  src/test/voxelGameRenderTelemetry.test.ts
-git commit -m "車種別の車体とミッションをsceneへ統合する"
+  src/voxel-game/scene/worldCollisionLayout.ts src/test/screenRelativeMovement.test.ts \
+  src/test/voxelGameRenderTelemetry.test.ts src/voxel-game/VoxelGameApp.tsx
+git commit -m "車両controllerを車種定義へ接続する"
 git push origin main
 ```
 
@@ -586,15 +569,22 @@ git push origin main
 - Create: `src/voxel-game/ui/hudLayout.ts`
 - Create: `src/test/hudLayout.test.ts`
 - Modify: `src/voxel-game/VoxelGameApp.tsx`
+- Modify: `src/voxel-game/input/controlState.ts`
+- Modify: `src/voxel-game/input/useVoxelGameControls.ts`
+- Modify: `src/voxel-game/scene/VoxelGameScene.tsx`
+- Modify: `src/voxel-game/scene/WaterAndFire.tsx`
 - Modify: `src/voxel-game/ui/VoxelGameHud.tsx`
 - Modify: `src/voxel-game/styles.css`
 - Modify: `src/global.d.ts`
 - Modify: `src/test/fullscreenControls.test.ts`
+- Modify: `src/test/voxelGameControls.test.ts`
+- Modify: `src/test/waterAndFire.test.ts`
 - Modify: `src/test/voxelGameRenderTelemetry.test.ts`
 
 **Interfaces:**
 - Consumes: `VehicleMissionCoordinatorSnapshot`, `VehicleDefinition`, `canSwitchVehicle`
 - Produces: `VoxelGameHudProps.vehicleId`、`mission`、`canSwitchVehicle`、`onSelectVehicle`
+- Produces: `DriveCommand.primaryAction`、`VoxelGameControls.setPrimaryAction()`、`primaryActionPressed`
 - Produces: text stateの`vehicle.id`、`mission.id/progress/destinationDistrict`、`vehicleSelection`、工事visual actual。
 - Produces: `isHudLayoutSafe(rectangles, minimumGap)`。
 
@@ -626,6 +616,16 @@ Run: `docker compose run --rm web npm test -- src/test/hudLayout.test.ts src/tes
 Expected: helperと新telemetry field不在でFAIL。
 
 - [ ] **Step 3: App stateとHUDを実装する**
+
+最初に`DigitalAction`の`'spray'`を`'primaryAction'`、`DriveCommand.spray`を
+`DriveCommand.primaryAction`、hookの`setSpray/sprayPressed`を
+`setPrimaryAction/primaryActionPressed`へ一括置換する。Spaceとタッチ右ボタンを同じ状態へ接続し、
+`WaterAndFire`は消防車選択中だけprimary actionを放水signalへ変換する。
+
+sceneはcoordinator、選択車種、工事telemetryを受け取り、clockでcoordinatorを進める。
+`WaterAndFire`と`BulldozerDebrisMission`はmountを維持しつつ`enabled` propで選択車種だけを作動させ、
+非選択仕事は入力・進捗・route・VFXを停止する。controllerの`actionActiveRef`も同時に
+`commandRef.current.primaryAction`へ切り替える。
 
 `VoxelGameApp`はcoordinatorを`useRef`で1回生成し、購読で`selectedVehicleId`とmissionの
 離散signatureだけをstateへ反映する。`handleSelectVehicle`はevent時点のtelemetryから再度
@@ -671,7 +671,7 @@ cleanupでhookを削除する。
 
 - [ ] **Step 5: focused test、full unit、buildを通す**
 
-Run: `docker compose run --rm web npm test -- src/test/hudLayout.test.ts src/test/voxelGameRenderTelemetry.test.ts src/test/fullscreenControls.test.ts`
+Run: `docker compose run --rm web npm test -- src/test/hudLayout.test.ts src/test/voxelGameControls.test.ts src/test/waterAndFire.test.ts src/test/voxelGameRenderTelemetry.test.ts src/test/fullscreenControls.test.ts`
 
 Run: `docker compose run --rm web npm test`
 
@@ -684,7 +684,10 @@ Expected: 全unit PASS、build exit 0、文言と操作可否に矛盾なし。
 ```bash
 git add src/voxel-game/ui/hudLayout.ts src/test/hudLayout.test.ts \
   src/voxel-game/VoxelGameApp.tsx src/voxel-game/ui/VoxelGameHud.tsx \
+  src/voxel-game/input/controlState.ts src/voxel-game/input/useVoxelGameControls.ts \
+  src/voxel-game/scene/VoxelGameScene.tsx src/voxel-game/scene/WaterAndFire.tsx \
   src/voxel-game/styles.css src/global.d.ts src/test/fullscreenControls.test.ts \
+  src/test/voxelGameControls.test.ts src/test/waterAndFire.test.ts \
   src/test/voxelGameRenderTelemetry.test.ts
 git commit -m "車庫の乗り換えUIと車種別HUDを追加する"
 git push origin main
