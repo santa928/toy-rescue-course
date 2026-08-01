@@ -5,6 +5,7 @@ import * as screenshotProof from './voxel-game-screenshot-proof.mjs';
 const {
   assertHudCaptureReadiness,
   assertHudPixelProof,
+  HUD_CAPTURE_TARGETS,
   resolveRenderedCssColor,
 } = screenshotProof;
 
@@ -41,6 +42,10 @@ const completePixelProof = {
 };
 
 describe('Voxel Game screenshot pixel proof', () => {
+  test('mission captureは現在の二段HUDの仕事名を検証対象にする', () => {
+    assert.equal(HUD_CAPTURE_TARGETS.mission.labelSelector, '.mission-pill__job');
+  });
+
   test('computed brightness filterを保存PNGの最終RGBへ反映する', () => {
     assert.deepEqual(
       resolveRenderedCssColor('rgb(95, 203, 234)', 'brightness(1.06)'),

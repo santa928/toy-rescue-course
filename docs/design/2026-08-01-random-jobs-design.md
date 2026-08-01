@@ -121,15 +121,15 @@ React stateは車種、phase、進捗、job IDの離散変更だけを購読す�
 
 ## 受け入れ条件
 
-- [ ] 各車種に3仕事あり、仕事札・対象・道しるべ・照準／接触判定が同じjobを指す。
-- [ ] 同一車種で3件を使い切るまで重複せず、前回と同じjobが連続しない。
-- [ ] seedが同じなら仕事順、seedが異なれば少なくとも検証seed間の順が異なる。
-- [ ] 未完了の帰庫と車種切替ではjobが変わらず、完了後の帰庫だけで次jobになる。
-- [ ] 消火時間、がれき3個、成功1800ms、自由走行、通常積み木、色効果が維持される。
-- [ ] PC 1280×720、Tablet 1024×768、Mobile landscape 844×390で2周の仕事を完了できる。
-- [ ] 全viewportでHUDの重なり・はみ出し・操作阻害がなく、代表画像を原寸目視する。
-- [ ] console、page、request errorが0件で、telemetryが実描画と一致する。
-- [ ] unit、typecheck、budget付きbuild、canonical、専用E2E、公開smokeがPASSする。
+- [x] 各車種に3仕事あり、仕事札・対象・道しるべ・照準／接触判定が同じjobを指す。
+- [x] 同一車種で3件を使い切るまで重複せず、前回と同じjobが連続しない。
+- [x] seedが同じなら仕事順、seedが異なれば少なくとも検証seed間の順が異なる。
+- [x] 未完了の帰庫と車種切替ではjobが変わらず、完了後の帰庫だけで次jobになる。
+- [x] 消火時間、がれき3個、成功1800ms、自由走行、通常積み木、色効果が維持される。
+- [x] PC 1280×720、Tablet 1024×768、Mobile landscape 844×390で2周の仕事を完了できる。
+- [x] 全viewportでHUDの重なり・はみ出し・操作阻害がなく、代表画像を原寸目視する。
+- [x] console、page、request errorが0件で、telemetryが実描画と一致する。
+- [x] unit、typecheck、budget付きbuild、canonical、専用E2E、ローカル本番smokeがPASSする。
 
 ## 非対象
 
@@ -157,3 +157,14 @@ React stateは車種、phase、進捗、job IDの離散変更だけを購読す�
 | がれきが通常積み木やsolidへ重なる | map validationで地区、相互間隔、breakable／solid clearanceを拒否する。 |
 | 帰庫と乗り換えで意図せず再抽選される | `freeRoam -> assigned`の完了帰庫だけをjob advance eventにする。 |
 | pool数やdraw callが増える | 同時に描くのは選択jobの3対象だけとし、既存固定slotを座標差し替えで再利用する。 |
+
+## 実装・検証結果
+
+- Docker内のfresh unitは37 files／358 tests、E2E pure helperは24 testsがPASSした。production buildは641 modulesで、game 93,654 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesとなり、全budgetを満たした。
+- canonical fullは全scenarioが成功し、33 artifacts＝33 screenshot proofs、contract failure 0、console／page／request error 0/0/0だった。消防車missionは3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目を割り当てた。
+- 二車種専用E2Eは3 viewportすべてでブルドーザーの異なる2仕事を完了し、帰庫後に3件目を割り当て、消防車への復帰と放水まで完走した。色遊び専用E2Eも3 viewportでpool／shower、再接触、上書き、時間切れ、乗り換え競合を維持した。
+- canonical 33枚、二車種9枚、色遊び6枚、Vehicle Lab 15枚を原寸目視した。3現場の対象・道しるべ、消防車／ブルドーザー、炎、水、破片、色シャワー、HUD、PC／touch操作系に欠け・意図しない重なり・はみ出しはない。
+- 色シャワー直後は3 frameの描画安定待ちと実寸HUD検査を撮影前へ追加した。全viewportでmission上端12px、viewport余白8px以上、mission／color間10px以上を実測している。
+- 火災経路はjob telemetryから接近面を導出し、側面火災は東側、窓火災は北側道路から照準する。復元後のhazardも現在job座標と接近面で再取得し、古いjob座標への依存を除いた。
+- random job切替は既存の固定VFX pool、collider数、draw callを増やさず座標だけを低頻度更新する。Task 7の差分はE2E／文書だけでproduction renderer・physics・geometryを変えていないため、物理GPU再認証条件は成立しない。公開済みApple M4の消防車28 calls／ブルドーザー27 callsとmedian 59.88fps／p10 56.82fpsを性能基準として維持する。
+- ローカル本番smokeでは生成bundleのroot、互換URL、Vehicle Labを1280×720で起動し、3入口のCanvasとerror 0件を確認した。GitHub Actions／Pages／公開URLの結果はTask 7公開後に追記する。

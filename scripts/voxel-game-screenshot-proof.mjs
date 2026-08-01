@@ -10,7 +10,7 @@ export const HUD_CAPTURE_TARGETS = Object.freeze({
     selector: '.touch-joystick',
   },
   mission: {
-    labelSelector: '.mission-pill__label',
+    labelSelector: '.mission-pill__job',
     selector: '.mission-pill',
   },
   spray: {

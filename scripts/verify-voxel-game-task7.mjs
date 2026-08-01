@@ -207,7 +207,14 @@ async function verifyDesktop(browser, errors, results) {
     assert(initial.fire.intensity === 1 && !initial.fire.targeted,
       `Initial final fire contract is wrong: ${JSON.stringify(initial.fire)}`);
     assert(Array.isArray(initial.blocks) && initial.blocks.length === 4, 'Final blocks contract is incomplete.');
-    await page.getByText('火のところへいこう', { exact: true }).waitFor({ state: 'visible' });
+    const missionJob = page.locator('.mission-pill__job');
+    await missionJob.waitFor({ state: 'visible' });
+    assert((await missionJob.textContent())?.trim() === initial.mission.jobLabel,
+      `Mission HUD/job telemetry mismatch: ${JSON.stringify(initial.mission)}`);
+    assert(initial.mission.jobSeed === 1
+      && Array.isArray(initial.mission.targetPositions)
+      && initial.mission.targetPositions.length === 1,
+    `Seeded fire job telemetry is incomplete: ${JSON.stringify(initial.mission)}`);
 
     await page.keyboard.down('KeyW');
     await page.keyboard.down('KeyA');

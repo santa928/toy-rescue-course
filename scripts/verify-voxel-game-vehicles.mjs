@@ -158,6 +158,70 @@ async function setPrimaryAction(page, touch, pressed) {
   });
 }
 
+/** telemetryの3対象へ安全な外側レーンから1個ずつブレードを当て、job座標に依存せず完了する。 */
+async function clearCurrentDebrisJob(page, viewport, touchDriver) {
+  const initial = await readGameState(page);
+  const targets = [...initial.landmarks.bulldozerDebris]
+    .sort((left, right) => left.position[2] - right.position[2]);
+  assert.equal(targets.length, 3, `${viewport.name}: current job does not expose three debris targets.`);
+  const telemetryTargets = [...initial.mission.targetPositions]
+    .sort((left, right) => left[2] - right[2]);
+  assert.deepEqual(telemetryTargets, targets.map(({ position }) => position),
+    `${viewport.name}: current job target telemetry differs from debris landmarks.`);
+  const xValues = targets.map(({ position }) => position[0]);
+  const zValues = targets.map(({ position }) => position[2]);
+  const verticalJob = Math.max(...zValues) - Math.min(...zValues)
+    > Math.max(...xValues) - Math.min(...xValues);
+
+  let clearedCount = initial.bulldozer.clearedCount;
+  for (const [targetIndex, target] of targets.entries()) {
+    const approachX = verticalJob
+      ? Math.max(initial.world.bounds.minX + 2, target.position[0] - target.radius - 2)
+      : target.position[0] + target.radius + 2.4;
+    const clearAxis = verticalJob ? 'positiveX' : 'negativeX';
+    await driveToCoordinate(
+      page,
+      0,
+      approachX,
+      `${viewport.name} cycle 2 target ${targetIndex + 1} side approach`,
+      touchDriver,
+      0.35,
+    );
+    await driveToCoordinate(
+      page,
+      2,
+      target.position[2],
+      `${viewport.name} cycle 2 target ${targetIndex + 1} latitude`,
+      touchDriver,
+      0.35,
+    );
+    if (targetIndex === 0) {
+      await page.screenshot({ path: `${outputDirectory}/${viewport.name}-cycle-2-worksite.png` });
+    }
+    await setPrimaryAction(page, viewport.touch, true);
+    try {
+      const expectedClearedCount = clearedCount + 1;
+      await driveAlongWorldAxis(
+        page,
+        clearAxis,
+        (state) => state.bulldozer.clearedCount >= expectedClearedCount,
+        `${viewport.name} cycle 2 clear target ${targetIndex + 1}`,
+        touchDriver,
+      );
+      clearedCount = expectedClearedCount;
+    } finally {
+      await setPrimaryAction(page, viewport.touch, false);
+    }
+  }
+
+  const completed = await readGameState(page);
+  assert.equal(completed.bulldozer.clearedCount, completed.bulldozer.targetCount,
+    `${viewport.name}: cycle 2 did not clear every debris target.`);
+  assert(['celebrating', 'freeRoam'].includes(completed.mission.phase),
+    `${viewport.name}: cycle 2 completion phase is wrong: ${completed.mission.phase}.`);
+  return completed;
+}
+
 /** 1 viewportで選択、切替拒否、走行、3がれき、成功、帰庫を完遂する。 */
 async function verifyViewport(browser, viewport, errors) {
   const context = await browser.newContext({
@@ -290,6 +354,70 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(restarted.bulldozer.clearedCount, 0, `${viewport.name}: debris did not reset at garage.`);
     assert.equal(restarted.vehicleSelection.canSwitch, true, `${viewport.name}: switch did not reopen at garage.`);
 
+    await driveToCoordinate(
+      page,
+      2,
+      gateBypassZ,
+      `${viewport.name} cycle 2 garage exit`,
+      activeTouchDriver,
+      0.5,
+    );
+    const secondCompleted = await clearCurrentDebrisJob(page, viewport, activeTouchDriver);
+    assert.notEqual(secondCompleted.mission.jobId, selected.mission.jobId,
+      `${viewport.name}: cycle 2 reused the completed cycle 1 job.`);
+    await page.evaluate(() => window.advanceTime?.(1_800));
+    await waitForFrames(page, 2);
+    assert.equal((await readGameState(page)).mission.phase, 'freeRoam',
+      `${viewport.name}: cycle 2 celebration did not reach freeRoam.`);
+
+    await driveToCoordinate(
+      page,
+      0,
+      secondCompleted.world.bounds.minX + 2,
+      `${viewport.name} cycle 2 return west lane`,
+      activeTouchDriver,
+      0.4,
+    );
+    await driveToCoordinate(
+      page,
+      2,
+      gateBypassZ,
+      `${viewport.name} cycle 2 return gate bypass`,
+      activeTouchDriver,
+      0.5,
+    );
+    await driveToCoordinate(
+      page,
+      0,
+      -14,
+      `${viewport.name} cycle 2 return west staging`,
+      activeTouchDriver,
+      0.5,
+    );
+    await driveToCoordinate(
+      page,
+      2,
+      gateBypassZ,
+      `${viewport.name} cycle 2 return gate realign`,
+      activeTouchDriver,
+      0.45,
+    );
+    await driveToCoordinate(page, 0, 0, `${viewport.name} cycle 2 return hub`, activeTouchDriver, 0.6);
+    await driveToCoordinate(page, 2, 6, `${viewport.name} cycle 2 return garage`, activeTouchDriver, 0.6);
+    await waitForFrames(page, 4);
+    const restartedThird = await readGameState(page);
+    assert.equal(restartedThird.mission.phase, 'assigned',
+      `${viewport.name}: cycle 2 garage return did not restart a job.`);
+    assert.equal(restartedThird.mission.jobCycle, 3,
+      `${viewport.name}: completing two jobs did not advance to cycle 3.`);
+    assert.equal(new Set([
+      selected.mission.jobId,
+      restarted.mission.jobId,
+      restartedThird.mission.jobId,
+    ]).size, 3, `${viewport.name}: first shuffle bag repeated before all three jobs were drawn.`);
+    assert.equal(restartedThird.bulldozer.clearedCount, 0,
+      `${viewport.name}: cycle 3 debris did not reset at garage.`);
+
     const fireTruckButton = page.getByRole('button', { name: /しょうぼうしゃ/ });
     if (viewport.touch) await fireTruckButton.tap();
     else await fireTruckButton.click();
@@ -320,11 +448,13 @@ async function verifyViewport(browser, viewport, errors) {
     await activeTouchDriver?.releaseStick();
     return {
       completedPhase: completed.mission.phase,
+      completedSecondJob: secondCompleted.mission.jobId,
       layout,
       renderer,
       returnedVehicle: returnedToFireTruck.vehicle.id,
       returnedWaterCubeCount: returnedWater.visuals.waterCubeCount,
       restartedMission: restarted.mission,
+      restartedThirdMission: restartedThird.mission,
       selectedVehicle: selected.vehicle.id,
     };
   } finally {
@@ -349,6 +479,7 @@ try {
     screenshots: viewports.flatMap(({ name }) => [
       `${name}-bulldozer.png`,
       `${name}-worksite.png`,
+      `${name}-cycle-2-worksite.png`,
     ]),
     viewports,
   };

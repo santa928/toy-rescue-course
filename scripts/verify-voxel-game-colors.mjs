@@ -390,6 +390,8 @@ async function verifyViewport(browser, viewport, errors) {
       `${viewport.name} yellow shower activation`,
     );
     assert.match(await page.locator('.color-effect-pill').innerText(), /きいろ 12びょう/);
+    await waitForFrames(page, 3);
+    const yellowLayout = await measureActiveHud(page, viewport, false);
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-yellow-shower.png` });
 
     const rejectedSnapshot = { ...yellow.colorEffect };
@@ -451,6 +453,7 @@ async function verifyViewport(browser, viewport, errors) {
       rendererCalls: initial.renderer.rendererCalls,
       sourceCount: initial.landmarks.colorPlaySources.length,
       yellowActivationCount: yellow.colorEffect.activationCount,
+      yellowLayout,
     };
   } finally {
     await touchDriver?.releaseStick();

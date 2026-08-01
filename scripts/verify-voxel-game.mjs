@@ -18,6 +18,7 @@ import {
   releaseKeyboardKeys,
   syncKeyboardKeys,
 } from './voxel-game-e2e/drive-harness.mjs';
+import { createFireRoutePlan } from './voxel-game-e2e/fire-route-plan.mjs';
 import { createScenarioProgress } from './voxel-game-e2e/scenario-progress.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -291,7 +292,7 @@ async function captureVerifiedScreenshot(page, path) {
 /** mission pillを数frame安定させ、非空labelを確認してから検証済みPNGを保存する。 */
 async function captureStableMissionScreenshot(page, path, description) {
   await waitForFrames(page, 3);
-  const missionLabel = (await page.locator('.mission-pill__label').textContent())?.trim() ?? '';
+  const missionLabel = (await page.locator('.mission-pill__job').textContent())?.trim() ?? '';
   assert(missionLabel.length > 0, `${description}: mission pill label is empty.`);
   await captureVerifiedScreenshot(page, path);
   return missionLabel;
@@ -638,10 +639,11 @@ function buildVerifiedScenarioArrival(
   destinationDistrict,
   startedAtMs,
   description,
+  expectedArrivalDistrict = destinationDistrict,
 ) {
   const arrivedAtMs = Date.now();
   const durationSeconds = (arrivedAtMs - startedAtMs) / 1_000;
-  assert.equal(arrived.world.currentDistrict, destinationDistrict,
+  assert.equal(arrived.world.currentDistrict, expectedArrivalDistrict,
     `${description}: arrived in ${arrived.world.currentDistrict}: ${JSON.stringify({
       position: arrived.vehicle.position,
       world: arrived.world,
@@ -655,6 +657,7 @@ function buildVerifiedScenarioArrival(
       world: arrived.world,
     },
     journey: {
+      arrivalDistrict: expectedArrivalDistrict,
       arrivedAtMs,
       destinationDistrict,
       durationSeconds,
@@ -1090,19 +1093,20 @@ async function driveMissionToFire(page, touchDriver) {
   const initial = await readGameState(page);
   const garage = initial.landmarks.garage;
   const target = initial.landmarks.fireSprayTarget;
+  const routePlan = createFireRoutePlan(initial.mission.jobId, target);
   await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= garage[2] - 3,
     'fire route garage opening', touchDriver);
   await alignWorldCoordinate(page, 2, 0, 'fire route central crossing Z', 0.5, touchDriver);
-  await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= target[0] + 2,
+  await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= routePlan.trunkX,
     'fire route east trunk road', touchDriver);
-  await alignWorldCoordinate(page, 0, target[0] + 2.6, 'fire route east road X', 0.4, touchDriver);
+  await alignWorldCoordinate(page, 0, routePlan.trunkX, 'fire route east road X', 0.4, touchDriver);
   await driveAlongWorldAxis(page, 'negativeZ', (state) => (
-    state.vehicle.position[2] <= target[2] + 3.1
+    state.vehicle.position[2] <= routePlan.latitudeZ
   ), 'fire route north road', touchDriver);
   await alignWorldCoordinate(
     page,
     2,
-    target[2] + 3.1,
+    routePlan.latitudeZ,
     'fire route target latitude',
     0.35,
     touchDriver,
@@ -1110,10 +1114,8 @@ async function driveMissionToFire(page, touchDriver) {
   await alignWorldCoordinate(
     page,
     0,
-    // 1frameの西向きpulse後も「前方60度」の照準帯を飛び越えない助走距離を確保する。
-    // x=32.7は東道路中心付近で、車体supportを含めてもworld境界内に収まる。
-    target[0] + 5.8,
-    'fire route target east X',
+    routePlan.stagingX,
+    `fire route target ${routePlan.approachFace} staging`,
     0.35,
     touchDriver,
   );
@@ -1220,10 +1222,9 @@ async function driveMissionToFire(page, touchDriver) {
   while (!state.mission.targeted
     && targetAcquisitionAttemptCount < maximumTargetAcquisitionAttempts) {
     if (targetedObservedBeforeStop) targetAcquisitionCorrectionPulseCount += 1;
-    const targetAxis = state.mission.nozzleOrigin[0] > target[0] ? 'negativeX' : 'positiveX';
     targetAcquisitionAttemptCount += 1;
     state = await pulseTargetAcquisition(
-      targetAxis,
+      routePlan.acquisitionAxis,
       'fire route target acquisition',
     );
   }
@@ -1254,6 +1255,8 @@ async function driveMissionToFire(page, touchDriver) {
   return {
     ...state,
     driveMissionTargetAcquisition: {
+      arrivalDistrict: routePlan.arrivalDistrict,
+      approachFace: routePlan.approachFace,
       targetAcquisitionAttemptCount,
       targetAcquisitionBrakeFrameCount,
       targetAcquisitionCorrectionPulseCount,
@@ -1814,6 +1817,27 @@ async function verifyForgivingSprayTargeting(browser, errors) {
 async function driveMissionBackToGarage(page, touchDriver) {
   const initial = await readGameState(page);
   const garage = initial.landmarks.garage;
+  const routePlan = createFireRoutePlan(
+    initial.mission.jobId,
+    initial.landmarks.fireSprayTarget,
+  );
+  if (routePlan.requiresEastLaneBeforeReturn) {
+    await driveAlongWorldAxis(
+      page,
+      'positiveX',
+      (state) => state.vehicle.position[0] >= routePlan.trunkX,
+      'garage route north road to east lane',
+      touchDriver,
+    );
+    await alignWorldCoordinate(
+      page,
+      0,
+      routePlan.trunkX,
+      'garage route east lane X',
+      0.4,
+      touchDriver,
+    );
+  }
   await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 0,
     'garage route east road', touchDriver);
   await alignWorldCoordinate(page, 2, 0, 'garage central crossing Z', 0.2, touchDriver);
@@ -1898,67 +1922,104 @@ async function verifyCompleteMission(
   errors,
   name,
   hasTouch,
-  { targetedScreenshot = null } = {},
+  { targetedScreenshot = null, viewport = null } = {},
 ) {
-  const target = { hasTouch, height: hasTouch ? 390 : 720, name, width: hasTouch ? 844 : 1_280 };
+  const target = {
+    hasTouch,
+    height: viewport?.height ?? (hasTouch ? 390 : 720),
+    name,
+    width: viewport?.width ?? (hasTouch ? 844 : 1_280),
+  };
   const { context, page } = await openViewportPage(browser, target, errors);
   const touch = hasTouch ? await createTouchDriver(page) : null;
   try {
-    const initial = await readGameState(page);
-    assertInitialWorldPhysicsContract(initial);
-    const initialResetCount = initial.vehicle.resetCount;
-    readPoolIdentity(initial, `${name} initial`);
-    const fireJourneyStartedAtMs = Date.now();
-    const targeted = await driveMissionToFire(page, touch);
-    const fireArrival = buildVerifiedScenarioArrival(
-      initial,
-      targeted,
-      'fire',
-      fireJourneyStartedAtMs,
-      `${name}: fire journey`,
-    );
-    if (targetedScreenshot) {
-      await captureStableMissionScreenshot(
-        page,
-        targetedScreenshot,
-        `${name}: targeted capture`,
+    const cycles = [];
+    for (let cycleIndex = 1; cycleIndex <= 2; cycleIndex += 1) {
+      const initial = await readGameState(page);
+      assertInitialWorldPhysicsContract(initial);
+      assert.equal(initial.mission.jobCycle, cycleIndex,
+        `${name}: cycle ${cycleIndex} did not start with the expected job cycle.`);
+      const initialResetCount = initial.vehicle.resetCount;
+      readPoolIdentity(initial, `${name} cycle ${cycleIndex} initial`);
+      const fireJourneyStartedAtMs = Date.now();
+      const targeted = await driveMissionToFire(page, touch);
+      const fireArrival = buildVerifiedScenarioArrival(
+        initial,
+        targeted,
+        'fire',
+        fireJourneyStartedAtMs,
+        `${name}: cycle ${cycleIndex} fire journey`,
+        targeted.driveMissionTargetAcquisition.arrivalDistrict,
       );
+      if (targetedScreenshot && cycleIndex === 1) {
+        await captureStableMissionScreenshot(
+          page,
+          targetedScreenshot,
+          `${name}: targeted capture`,
+        );
+      }
+      if (touch) await touch.pressSpray();
+      else await page.keyboard.down('Space');
+      await waitForTargetedSpray(page, `${name}: cycle ${cycleIndex} targeted spray`);
+      if (hasTouch && target.width === 844 && cycleIndex === 1) {
+        await captureVerifiedScreenshot(page, `${outputDirectory}/mobile-landscape-water-fire.png`);
+      }
+      await page.evaluate(() => window.advanceTime?.(2_500));
+      await waitForFrames(page, 2);
+      if (touch) await touch.releaseSpray();
+      else await page.keyboard.up('Space');
+      const celebration = await readGameState(page);
+      assert.equal(celebration.runtime.fireIntensity, 0,
+        `${name}: cycle ${cycleIndex} fire remains after 2500ms.`);
+      assert.equal(celebration.visuals.fireVoxelCount, 0,
+        `${name}: cycle ${cycleIndex} voxel fire remains after 2500ms.`);
+      assert.equal(celebration.runtime.missionPhase, 'celebrating',
+        `${name}: cycle ${cycleIndex} celebration did not start.`);
+      assert.equal(celebration.visuals.starCubeCount, 30,
+        `${name}: cycle ${cycleIndex} celebration stars are incomplete.`);
+      if (!hasTouch && cycleIndex === 1) {
+        await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-complete.png`);
+      }
+      await page.evaluate(() => window.advanceTime?.(1_800));
+      await waitForFrames(page, 2);
+      const freeRoam = await readGameState(page);
+      assert.equal(freeRoam.runtime.missionPhase, 'freeRoam',
+        `${name}: cycle ${cycleIndex} freeRoam did not start.`);
+      const restarted = await driveMissionBackToGarage(page, touch);
+      assert.equal(restarted.runtime.missionPhase, 'assigned',
+        `${name}: cycle ${cycleIndex} mission did not restart at garage.`);
+      assert.equal(restarted.runtime.signals.atGarage, true,
+        `${name}: cycle ${cycleIndex} garage signal is not active.`);
+      assert.equal(restarted.runtime.fireIntensity, 1,
+        `${name}: cycle ${cycleIndex} fire was not restored at garage.`);
+      assert.equal(restarted.visuals.fireHazardEnabled, true,
+        `${name}: cycle ${cycleIndex} fire hazard was not restored at garage.`);
+      assert.equal(restarted.visuals.fireVoxelCount, 18,
+        `${name}: cycle ${cycleIndex} voxel fire was not restored.`);
+      assert.equal(restarted.vehicle.resetCount, initialResetCount,
+        `${name}: cycle ${cycleIndex} mission route used a vehicle reset.`);
+      assert(restarted.runtime.routeVisible,
+        `${name}: cycle ${cycleIndex} route was not restored at garage.`);
+      assert.notEqual(restarted.mission.jobId, initial.mission.jobId,
+        `${name}: cycle ${cycleIndex} completed job repeated at garage.`);
+      assert.equal(restarted.mission.jobCycle, cycleIndex + 1,
+        `${name}: cycle ${cycleIndex} did not advance its job cycle.`);
+      cycles.push({
+        ...fireArrival,
+        celebration: celebration.runtime,
+        completedJobId: initial.mission.jobId,
+        freeRoam: freeRoam.runtime,
+        restartedJobId: restarted.mission.jobId,
+        targetedDistance: targeted.mission.distance,
+      });
     }
-    if (touch) await touch.pressSpray();
-    else await page.keyboard.down('Space');
-    await waitForTargetedSpray(page, `${name}: targeted spray`);
-    if (hasTouch) {
-      await captureVerifiedScreenshot(page, `${outputDirectory}/mobile-landscape-water-fire.png`);
-    }
-    await page.evaluate(() => window.advanceTime?.(2_500));
-    await waitForFrames(page, 2);
-    if (touch) await touch.releaseSpray();
-    else await page.keyboard.up('Space');
-    const celebration = await readGameState(page);
-    assert.equal(celebration.runtime.fireIntensity, 0, `${name}: fire remains after 2500ms.`);
-    assert.equal(celebration.visuals.fireVoxelCount, 0, `${name}: voxel fire remains after 2500ms.`);
-    assert.equal(celebration.runtime.missionPhase, 'celebrating', `${name}: celebration did not start.`);
-    assert.equal(celebration.visuals.starCubeCount, 30, `${name}: celebration stars are incomplete.`);
-    if (!hasTouch) await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-complete.png`);
-    await page.evaluate(() => window.advanceTime?.(1_800));
-    await waitForFrames(page, 2);
-    const freeRoam = await readGameState(page);
-    assert.equal(freeRoam.runtime.missionPhase, 'freeRoam', `${name}: freeRoam did not start.`);
-    const restarted = await driveMissionBackToGarage(page, touch);
-    assert.equal(restarted.runtime.missionPhase, 'assigned', `${name}: mission did not restart at garage.`);
-    assert.equal(restarted.runtime.signals.atGarage, true, `${name}: garage signal is not active.`);
-    assert.equal(restarted.runtime.fireIntensity, 1, `${name}: fire was not restored at garage.`);
-    assert.equal(restarted.visuals.fireHazardEnabled, true, `${name}: fire hazard was not restored at garage.`);
-    assert.equal(restarted.visuals.fireVoxelCount, 18, `${name}: voxel fire was not restored.`);
-    assert.equal(restarted.vehicle.resetCount, initialResetCount, `${name}: mission route used a vehicle reset.`);
-    assert(restarted.runtime.routeVisible, `${name}: route was not restored at garage.`);
+    assert.equal(new Set(cycles.map(({ completedJobId }) => completedJobId)).size, 2,
+      `${name}: two completed cycles did not use distinct jobs.`);
     return {
-      ...fireArrival,
-      celebration: celebration.runtime,
-      freeRoam: freeRoam.runtime,
+      ...cycles[0],
+      cycles,
       input: hasTouch ? 'touch' : 'keyboard',
-      restarted: restarted.runtime,
-      targetedDistance: targeted.mission.distance,
+      restarted: (await readGameState(page)).runtime,
     };
   } finally {
     await page.keyboard.up('Space').catch(() => undefined);
@@ -2845,19 +2906,71 @@ async function verifyFireHazardLifecycle(browser, errors) {
       'Fire-hazard lifecycle garage return used a vehicle reset.');
 
     await driveMissionToFire(page, touch);
-    await driveAlongWorldAxis(page, 'positiveX', (state) => (
-      state.vehicle.position[0] >= easternRunupX
-    ),
-      'restored fire hazard east heading staging', touch);
-    await alignWorldCoordinate(
-      page,
-      2,
-      fireHazard.position[2],
-      'restored fire hazard targeting lane Z',
-      0.15,
-      touch,
+    const restoredFireHazard = restarted.visualLayout.fireHazard;
+    const restoredRoutePlan = createFireRoutePlan(
+      restarted.mission.jobId,
+      restarted.landmarks.fireSprayTarget,
     );
-    await alignWorldCoordinate(page, 0, easternRunupX, 'restored fire hazard head-on X', 0.15, touch);
+    const restoredApproach = restoredRoutePlan.approachFace === 'north'
+      ? {
+        axis: 'z',
+        centerIndex: 2,
+        clearanceDirection: -1,
+        heading: (state) => state.vehicle.forward[2],
+        input: [0, 1],
+        runup: restoredFireHazard.position[2] - restoredFireHazard.scale[2] / 2
+          - VEHICLE_COLLIDER_HALF_EXTENTS[2] - 2.5,
+      }
+      : {
+        axis: 'x',
+        centerIndex: 0,
+        clearanceDirection: 1,
+        heading: (state) => -state.vehicle.forward[0],
+        input: [-1, 0],
+        runup: restoredFireHazard.position[0] + restoredFireHazard.scale[0] / 2
+          + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 2.5,
+      };
+    if (restoredRoutePlan.approachFace === 'north') {
+      await driveAlongWorldAxis(page, 'positiveZ', (state) => (
+        state.vehicle.position[2] >= restoredApproach.runup
+      ), 'restored fire hazard north heading staging', touch);
+      await alignWorldCoordinate(
+        page,
+        0,
+        restoredFireHazard.position[0],
+        'restored fire hazard targeting lane X',
+        0.15,
+        touch,
+      );
+      await alignWorldCoordinate(
+        page,
+        2,
+        restoredApproach.runup,
+        'restored fire hazard head-on Z',
+        0.15,
+        touch,
+      );
+    } else {
+      await driveAlongWorldAxis(page, 'positiveX', (state) => (
+        state.vehicle.position[0] >= restoredApproach.runup
+      ), 'restored fire hazard east heading staging', touch);
+      await alignWorldCoordinate(
+        page,
+        2,
+        restoredFireHazard.position[2],
+        'restored fire hazard targeting lane Z',
+        0.15,
+        touch,
+      );
+      await alignWorldCoordinate(
+        page,
+        0,
+        restoredApproach.runup,
+        'restored fire hazard head-on X',
+        0.15,
+        touch,
+      );
+    }
     const reblockStart = await readGameState(page);
     assert.equal(reblockStart.runtime.fireIntensity, 1,
       'Restored fire intensity changed before second collider contact.');
@@ -2866,7 +2979,11 @@ async function verifyFireHazardLifecycle(browser, errors) {
     assert.equal(reblockStart.vehicle.resetCount, before.vehicle.resetCount,
       'Second fire-hazard approach used a vehicle reset.');
 
-    await touch.setStick(...worldDirectionToTouchStick(reblockStart.camera, -1, 0));
+    await touch.setStick(...worldDirectionToTouchStick(
+      reblockStart.camera,
+      restoredApproach.input[0],
+      restoredApproach.input[1],
+    ));
     let reblockMinimumClearance = Number.POSITIVE_INFINITY;
     let reblockContactClearance = null;
     const reblockContactPositions = [];
@@ -2875,14 +2992,19 @@ async function verifyFireHazardLifecycle(browser, errors) {
       const state = await readGameState(page);
       assert.equal(state.vehicle.resetCount, before.vehicle.resetCount,
         'Vehicle reset while pressing the restored fire hazard.');
-      const clearance = collisionClearance(state.vehicle, fireHazard, 'x', 1);
-      const headingAlongApproach = -state.vehicle.forward[0];
+      const clearance = collisionClearance(
+        state.vehicle,
+        restoredFireHazard,
+        restoredApproach.axis,
+        restoredApproach.clearanceDirection,
+      );
+      const headingAlongApproach = restoredApproach.heading(state);
       if (headingAlongApproach >= MIN_COLLISION_APPROACH_ALIGNMENT) {
         reblockMinimumClearance = Math.min(reblockMinimumClearance, clearance);
       }
       if (headingAlongApproach >= MIN_COLLISION_APPROACH_ALIGNMENT && clearance <= 0.12) {
         reblockContactClearance ??= clearance;
-        reblockContactPositions.push(state.vehicle.position[0]);
+        reblockContactPositions.push(state.vehicle.position[restoredApproach.centerIndex]);
         if (reblockContactPositions.length >= 45) break;
       }
     }
@@ -2902,8 +3024,10 @@ async function verifyFireHazardLifecycle(browser, errors) {
       })}`);
     assert(reblockContactTravel <= MAX_COLLISION_SETTLING_TRAVEL,
       `Vehicle traversed the restored fire hazard while input was held (${reblockContactTravel}).`);
-    const reblockCenterClearance = reblockedState.vehicle.position[0]
-      - (fireHazard.position[0] + fireHazard.scale[0] / 2);
+    const reblockCenterClearance = restoredApproach.clearanceDirection * (
+      reblockedState.vehicle.position[restoredApproach.centerIndex]
+        - restoredFireHazard.position[restoredApproach.centerIndex]
+    );
     assert(reblockCenterClearance > 0,
       `Vehicle center crossed the restored fire hazard: ${JSON.stringify({
         centerClearance: reblockCenterClearance,
@@ -2941,6 +3065,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
         resetCount: passed.vehicle.resetCount,
       },
       reblocked: {
+        approachFace: restoredRoutePlan.approachFace,
         centerClearance: reblockCenterClearance,
         contactClearance: reblockContactClearance,
         contactFrameCount: reblockContactPositions.length,
@@ -3480,6 +3605,12 @@ async function verifyVoxelGame(scenarioProgress) {
           'nonbreak-desktop-mission',
           () => verifyCompleteMission(browser, errors, 'desktop-mission', false),
         ),
+        tablet: await runScenario(
+          'nonbreak-tablet-mission',
+          () => verifyCompleteMission(browser, errors, 'tablet-mission', true, {
+            viewport: { height: 768, width: 1_024 },
+          }),
+        ),
         touch: await runScenario(
           'nonbreak-touch-mission',
           () => verifyCompleteMission(browser, errors, 'touch-mission', true),
@@ -3621,6 +3752,12 @@ async function verifyVoxelGame(scenarioProgress) {
           false,
           { targetedScreenshot: `${outputDirectory}/desktop-production-fire.png` },
         ),
+      ),
+      tablet: await runScenario(
+        'full-tablet-mission',
+        () => verifyCompleteMission(browser, errors, 'tablet-mission', true, {
+          viewport: { height: 768, width: 1_024 },
+        }),
       ),
       touch: await runScenario(
         'full-touch-mission',

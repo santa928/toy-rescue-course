@@ -117,16 +117,22 @@ Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状�
 共有境界のpure／fake page契約はDocker内のNode testで単独確認できます。
 
 ```bash
-docker compose run --rm web node --test scripts/voxel-game-e2e/drive-harness.node-test.mjs scripts/voxel-game-e2e/scenario-progress.node-test.mjs
+docker compose run --rm web node --test \
+  scripts/voxel-game-e2e/drive-harness.node-test.mjs \
+  scripts/voxel-game-e2e/scenario-progress.node-test.mjs \
+  scripts/voxel-game-e2e/fire-route-plan.node-test.mjs \
+  scripts/voxel-game-screenshot-proof.node-test.mjs \
+  scripts/voxel-game-break-physics-contract.node-test.mjs
 ```
-共有走行8件とscenario進捗3件のNode test 11件を実行します。canonical fullの最新manifestは
-18 scenarioすべて成功、33 artifacts＝33 screenshot proofs、contract failure 0、browser error 0/0/0です。
+共有走行、scenario進捗、HUD screenshot proof、job別火災経路を含むNode test 24件を実行します。
+canonical fullの最新manifestは全scenario成功、33 artifacts＝33 screenshot proofs、contract failure 0、
+browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目へ進みます。
 
 `production-smoke-e2e`は生成済みbundleをVite previewで配信し、root、互換URL、Vehicle LabのWebGL起動と
 console／page／request errorがないことを実ブラウザで確認します。
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー仕事・帰庫再開の結果と6枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
 
 2026-08-01の色遊び込み実装を1280×720の `ANGLE Metal Renderer: Apple M4` で2秒warm-up＋12秒計測した結果、消防車はmedian 59.88fps／p10 56.82fps／平均59.92fps（scene 28 calls、車体7 calls）、ブルドーザーはmedian 59.88fps／p10 56.82fps／平均58.92fps（scene 27 calls、車体7 calls）でした。色遊びstationは78 cube／5 callsで、両車とも認証目標のmedian 55fps以上／p10 45fps以上を満たしています。72×72の現mapではchunk streaming／LODは不要と判定し、96×96超への拡張または性能未達時だけ再評価します。実機再認証時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。
