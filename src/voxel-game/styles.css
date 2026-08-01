@@ -254,15 +254,34 @@ button {
   background: #e33a32;
 }
 
+.mission-pill[data-vehicle='police'] {
+  border-color: #27344c;
+  color: #202c42;
+  box-shadow: 0 6px 0 #1769ff;
+}
+
+.mission-pill[data-vehicle='police'] .mission-pill__vehicle span {
+  border-color: #27344c;
+  background: #f7f4eb;
+}
+
+.mission-pill[data-vehicle='police'] .mission-pill__vehicle span:nth-child(2) {
+  background: #1769ff;
+}
+
+.mission-pill[data-vehicle='police'] .mission-pill__vehicle span:nth-child(3) {
+  background: #e33a32;
+}
+
 .vehicle-selector {
   position: absolute;
   top: calc(env(safe-area-inset-top) + 12px);
   left: calc(env(safe-area-inset-left) + 14px);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
-  width: min(232px, 38vw);
-  min-width: 206px;
+  width: min(350px, 46vw);
+  min-width: 318px;
   padding-bottom: 2px;
   pointer-events: auto;
 }
@@ -318,6 +337,13 @@ button {
     linear-gradient(to right, transparent 34%, #e33a32 34% 66%, transparent 66%),
     linear-gradient(to bottom, transparent 36%, #e33a32 36% 64%, transparent 64%),
     #fffdf7;
+}
+
+.vehicle-selector__button[data-vehicle='police'] .vehicle-selector__swatch {
+  border-color: #27344c;
+  background:
+    linear-gradient(to right, #e33a32 0 50%, #1769ff 50% 100%) top / 100% 42% no-repeat,
+    linear-gradient(to bottom, #fffdf7 0 52%, #27344c 52% 100%);
 }
 
 .fullscreen-button {
@@ -623,6 +649,46 @@ button {
   box-shadow: 0 3px 0 #7f1717;
 }
 
+.primary-action-button[data-vehicle='police'] {
+  border-color: #27344c;
+  color: #202c42;
+  background: #fffdf7;
+  box-shadow: 0 8px 0 #1769ff;
+}
+
+.primary-action-button[data-vehicle='police'] .primary-action-button__glyph span {
+  border: 2px solid #27344c;
+}
+
+.primary-action-button[data-vehicle='police'] .primary-action-button__glyph span:nth-child(1) {
+  top: 5px;
+  left: 3px;
+  width: 20px;
+  height: 13px;
+  background: #e33a32;
+}
+
+.primary-action-button[data-vehicle='police'] .primary-action-button__glyph span:nth-child(2) {
+  top: 5px;
+  right: 3px;
+  width: 20px;
+  height: 13px;
+  background: #1769ff;
+}
+
+.primary-action-button[data-vehicle='police'] .primary-action-button__glyph span:nth-child(3) {
+  right: 8px;
+  bottom: 4px;
+  left: 8px;
+  height: 13px;
+  background: #27344c;
+}
+
+.primary-action-button[data-vehicle='police'][data-pressed='true'] {
+  background: #dce9ff;
+  box-shadow: 0 3px 0 #1769ff;
+}
+
 .fullscreen-button:hover:not(:disabled),
 .primary-action-button:hover {
   filter: brightness(1.06);
@@ -696,7 +762,7 @@ button {
 @media (min-width: 641px) and (max-width: 1050px) {
   .status-stack {
     right: calc(env(safe-area-inset-right) + 116px);
-    left: calc(env(safe-area-inset-left) + min(232px, 38vw) + 22px);
+    left: calc(env(safe-area-inset-left) + min(350px, 46vw) + 22px);
     max-width: none;
     transform: none;
   }
@@ -713,7 +779,8 @@ button {
 
   .vehicle-selector {
     top: calc(env(safe-area-inset-top) + 76px);
-    width: min(232px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 28px));
+    width: min(350px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 28px));
+    min-width: 0;
   }
 
   .voxel-game-hud[data-color-effect-active='true'] .vehicle-selector {

@@ -26,7 +26,10 @@ export type VehicleJobId =
   | 'soil-west'
   | 'patient-pond'
   | 'patient-playground'
-  | 'patient-picnic';
+  | 'patient-picnic'
+  | 'patrol-main'
+  | 'patrol-pools'
+  | 'patrol-showers';
 
 /** HUD、scene、telemetryが共有する車種別仕事の共通定義。 */
 interface BaseVehicleJobDefinition {
@@ -89,12 +92,30 @@ export interface AmbulanceVehicleJobDefinition extends BaseVehicleJobDefinition 
   readonly vehicleId: 'ambulance';
 }
 
+/** パトカーがサイレンを鳴らして通過する玩具の巡回門。 */
+export interface PoliceCheckpointTargetDefinition {
+  readonly id: string;
+  readonly position: WorldPoint;
+  readonly radius: number;
+}
+
+/** パトカーの3巡回門、走行判定、道しるべを同じ仕事へ束ねる。 */
+export interface PoliceVehicleJobDefinition extends BaseVehicleJobDefinition {
+  readonly destinationDistrict: 'south';
+  readonly interaction: ActionTargetInteraction;
+  readonly kind: 'patrol';
+  readonly targetKind: 'checkpoint';
+  readonly targets: readonly PoliceCheckpointTargetDefinition[];
+  readonly vehicleId: 'police';
+}
+
 /** 全車種仕事を扱うdiscriminated union。 */
 export type VehicleJobDefinition =
   | FireVehicleJobDefinition
   | BulldozerVehicleJobDefinition
   | ExcavatorVehicleJobDefinition
-  | AmbulanceVehicleJobDefinition;
+  | AmbulanceVehicleJobDefinition
+  | PoliceVehicleJobDefinition;
 
 /** 車種ごとに型を保った仕事registry。 */
 export interface VehicleJobRegistry {
@@ -102,6 +123,7 @@ export interface VehicleJobRegistry {
   readonly bulldozer: readonly BulldozerVehicleJobDefinition[];
   readonly excavator: readonly ExcavatorVehicleJobDefinition[];
   readonly 'fire-truck': readonly FireVehicleJobDefinition[];
+  readonly police: readonly PoliceVehicleJobDefinition[];
 }
 
 const FIRE_ROUTE_COMMON = PRODUCTION_WORLD_MAP.landmarks.fireRouteMarkers.slice(0, 9);
@@ -133,6 +155,13 @@ const AMBULANCE_INTERACTION = {
   holdDurationMs: 1_200,
   maximumSpeed: 0.35,
   minimumSpeed: 0,
+} as const satisfies ActionTargetInteraction;
+const POLICE_INTERACTION = {
+  contactRadius: 1.5,
+  forwardOffset: 0,
+  holdDurationMs: 250,
+  maximumSpeed: 5.5,
+  minimumSpeed: 0.35,
 } as const satisfies ActionTargetInteraction;
 
 /** 抽選対象となる各車種3件のcanonical仕事定義。 */
@@ -354,6 +383,77 @@ export const VEHICLE_JOBS = {
       vehicleId: 'excavator',
     },
   ],
+  police: [
+    {
+      destinationDistrict: 'south',
+      id: 'patrol-main',
+      interaction: POLICE_INTERACTION,
+      kind: 'patrol',
+      label: 'まんなかを みまわろう',
+      routeMarkers: [
+        [0, 0.26, 3],
+        [6, 0.26, 4],
+        [6, 0.26, 9],
+        [6, 0.26, 13],
+        [3, 0.26, 15],
+        [0, 0.26, 17],
+        [0, 0.26, 21],
+      ],
+      targetKind: 'checkpoint',
+      targets: [
+        { id: 'patrol-main-a', position: [0, 0.7, 17], radius: 0.75 },
+        { id: 'patrol-main-b', position: [0, 0.7, 24], radius: 0.75 },
+        { id: 'patrol-main-c', position: [0, 0.7, 31], radius: 0.75 },
+      ],
+      vehicleId: 'police',
+    },
+    {
+      destinationDistrict: 'south',
+      id: 'patrol-pools',
+      interaction: POLICE_INTERACTION,
+      kind: 'patrol',
+      label: 'プールがわを みまわろう',
+      routeMarkers: [
+        [0, 0.26, 3],
+        [-6, 0.26, 4],
+        [-10, 0.26, 8],
+        [-10, 0.26, 12],
+        [-10, 0.26, 16],
+        [-10, 0.26, 18],
+        [-10, 0.26, 20],
+      ],
+      targetKind: 'checkpoint',
+      targets: [
+        { id: 'patrol-pools-a', position: [-10, 0.7, 20.75], radius: 0.75 },
+        { id: 'patrol-pools-b', position: [-10, 0.7, 26.3], radius: 0.75 },
+        { id: 'patrol-pools-c', position: [-6, 0.7, 32], radius: 0.75 },
+      ],
+      vehicleId: 'police',
+    },
+    {
+      destinationDistrict: 'south',
+      id: 'patrol-showers',
+      interaction: POLICE_INTERACTION,
+      kind: 'patrol',
+      label: 'シャワーがわを みまわろう',
+      routeMarkers: [
+        [0, 0.26, 3],
+        [6, 0.26, 4],
+        [10, 0.26, 8],
+        [10, 0.26, 12],
+        [10, 0.26, 16],
+        [10, 0.26, 18],
+        [10, 0.26, 20],
+      ],
+      targetKind: 'checkpoint',
+      targets: [
+        { id: 'patrol-showers-a', position: [10, 0.7, 20.75], radius: 0.75 },
+        { id: 'patrol-showers-b', position: [10, 0.7, 26.3], radius: 0.75 },
+        { id: 'patrol-showers-c', position: [6, 0.7, 32], radius: 0.75 },
+      ],
+      vehicleId: 'police',
+    },
+  ],
 } as const satisfies VehicleJobRegistry;
 
 /** アクション対象の接触半径、保持時間、速度範囲が有限かつ実行可能か判定する。 */
@@ -381,6 +481,7 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
     'bulldozer',
     'excavator',
     'ambulance',
+    'police',
   ];
 
   for (const vehicleId of vehicleIds) {
@@ -445,7 +546,7 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
         if (!hasValidActionTargetInteraction(job.interaction)) {
           errors.push(`Excavator job ${job.id} has invalid interaction`);
         }
-      } else {
+      } else if (job.kind === 'patient-care') {
         if (job.targets.length !== 1) {
           errors.push(`Ambulance job ${job.id} must have exactly 1 patient`);
         }
@@ -462,6 +563,23 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
         if (!hasValidActionTargetInteraction(job.interaction)) {
           errors.push(`Ambulance job ${job.id} has invalid interaction`);
         }
+      } else {
+        if (job.targets.length !== 3) {
+          errors.push(`Police job ${job.id} must have exactly 3 checkpoints`);
+        }
+        const targetIds = new Set(job.targets.map(({ id }) => id));
+        if (targetIds.size !== job.targets.length
+          || job.targets.some(({ id }) => id.trim().length === 0)) {
+          errors.push(`Police job ${job.id} must have unique non-empty target ids`);
+        }
+        if (job.targetKind !== 'checkpoint'
+          || job.destinationDistrict !== 'south'
+          || job.targets.some(({ position }) => resolveWorldDistrict(position) !== 'south')) {
+          errors.push(`Police job ${job.id} must stay in the south district`);
+        }
+        if (!hasValidActionTargetInteraction(job.interaction)) {
+          errors.push(`Police job ${job.id} has invalid interaction`);
+        }
       }
     }
   }
@@ -473,6 +591,7 @@ export function getVehicleJobs(vehicleId: unknown): readonly VehicleJobDefinitio
   if (vehicleId === 'bulldozer') return VEHICLE_JOBS.bulldozer;
   if (vehicleId === 'excavator') return VEHICLE_JOBS.excavator;
   if (vehicleId === 'ambulance') return VEHICLE_JOBS.ambulance;
+  if (vehicleId === 'police') return VEHICLE_JOBS.police;
   return VEHICLE_JOBS['fire-truck'];
 }
 

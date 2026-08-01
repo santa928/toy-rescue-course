@@ -60,6 +60,19 @@ const ambulanceMission: VehicleMissionSnapshot = {
   vehicleId: 'ambulance',
 };
 
+const policeMission: VehicleMissionSnapshot = {
+  destinationDistrict: 'south',
+  id: 'patrol',
+  jobCycle: 1,
+  jobId: 'patrol-main',
+  jobLabel: 'まんなかを みまわろう',
+  objectiveLabel: 'みまわり あと3かしょ',
+  phase: 'active',
+  progress: { current: 0, target: 3 },
+  routeVisible: false,
+  vehicleId: 'police',
+};
+
 const inactiveColorEffect: VehicleColorEffectSnapshot = {
   active: false,
   activationCount: 0,
@@ -74,7 +87,7 @@ const inactiveColorEffect: VehicleColorEffectSnapshot = {
 };
 
 describe('VoxelGameHud', () => {
-  it('車庫では3台の選択状態とブルドーザー固有の主操作を公開する', () => {
+  it('車庫では5台の選択状態とブルドーザー固有の主操作を公開する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
       canSwitchVehicle
       colorEffect={inactiveColorEffect}
@@ -92,12 +105,33 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('ブルドーザー');
     expect(html).toContain('ショベルカー');
     expect(html).toContain('きゅうきゅうしゃ');
+    expect(html).toContain('パトカー');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="ブレードを動かす"');
     expect(html).toContain('きたのがれきをかたづけよう');
     expect(html).toContain('こうじげんばへ いこう');
     expect(html).toContain('1しゅうめ・0/3');
     expect(html).toContain('aria-label="きたのがれきをかたづけよう。こうじげんばへ いこう。1しゅうめ・0/3"');
+  });
+
+  it('パトカー固有の巡回仕事、3地点進捗、サイレン操作を公開する', () => {
+    const html = renderToStaticMarkup(<VoxelGameHud
+      canSwitchVehicle
+      colorEffect={inactiveColorEffect}
+      controls={createControls()}
+      fullscreen={false}
+      fullscreenAvailable
+      mission={policeMission}
+      onSelectVehicle={vi.fn()}
+      onToggleFullscreen={vi.fn()}
+      selectedVehicleId="police"
+    />);
+
+    expect(html).toContain('aria-label="サイレンを鳴らす"');
+    expect(html).toContain('まんなかを みまわろう');
+    expect(html).toContain('みまわり あと3かしょ');
+    expect(html).toContain('1しゅうめ・0/3');
+    expect(html).toContain('data-vehicle="police"');
   });
 
   it('救急車固有の仕事、1体進捗、手当て操作を公開する', () => {

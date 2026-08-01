@@ -6,6 +6,7 @@ export const VEHICLE_PAINTABLE_PALETTE_IDS = {
   ambulance: ['white'],
   bulldozer: ['yellow'],
   excavator: ['orange'],
+  police: ['white'],
 } as const satisfies Record<VehicleId, readonly string[]>;
 
 interface ResolveVehiclePaintColorOptions {

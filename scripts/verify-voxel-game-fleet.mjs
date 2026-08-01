@@ -30,6 +30,7 @@ const harness = createDriveHarness({
     'excavator',
     'landmarks',
     'mission',
+    'police',
     'renderer',
     'vehicle',
     'vehicleSelection',
@@ -67,7 +68,7 @@ function rectDistance(left, right) {
   return Math.hypot(horizontal, vertical);
 }
 
-/** 4台selectorと主要HUDが画面内・親内・安全余白内にあることを実寸で検証する。 */
+/** 5台selectorと主要HUDが画面内・親内・安全余白内にあることを実寸で検証する。 */
 async function measureFleetHud(page, viewport) {
   const selectors = {
     action: '.primary-action-button',
@@ -104,7 +105,7 @@ async function measureFleetHud(page, viewport) {
       return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top };
     })
   ));
-  assert.equal(buttonBoxes.length, 4, `${viewport.name}: selector must contain four vehicle buttons.`);
+  assert.equal(buttonBoxes.length, 5, `${viewport.name}: selector must contain five vehicle buttons.`);
   for (const button of buttonBoxes) {
     assert(
       button.left >= selector.left && button.top >= selector.top
@@ -196,6 +197,41 @@ async function careForPatient(page, viewport) {
   return completed;
 }
 
+/** サイレンを鳴らして巡回門へ走り込み、250msの速度gate完了を待つ。 */
+async function patrolCheckpoint(
+  page,
+  viewport,
+  touchDriver,
+  expectedCompletedCount,
+) {
+  let completed = null;
+  let latest = null;
+  await setPrimaryAction(page, viewport.touch, true);
+  try {
+    latest = await driveAlongWorldAxis(page, {
+      axis: 'positiveZ',
+      brakeAfterArrival: false,
+      description: `${viewport.name}: patrol checkpoint ${expectedCompletedCount}`,
+      maxBursts: 180,
+      predicate: (state) => state.police.completedCount >= expectedCompletedCount,
+      touchDriver,
+    });
+    completed = latest;
+  } finally {
+    await setPrimaryAction(page, viewport.touch, false);
+  }
+  assert(completed,
+    `${viewport.name}: checkpoint ${expectedCompletedCount} did not complete: ${JSON.stringify({
+      contactPoint: latest?.police.contactPoint,
+      holdMilliseconds: latest?.police.holdMilliseconds,
+      position: latest?.vehicle.position,
+      speed: latest?.vehicle.speed,
+      targets: latest?.police.targets,
+    })}.`);
+  await brakeVehicle(page, { frameLimit: 220 });
+  return readGameState(page);
+}
+
 /** 1 viewportでショベル選択、土3山、成功、帰庫、次仕事まで実走する。 */
 async function verifyExcavatorViewport(browser, viewport, errors) {
   const context = await browser.newContext({
@@ -228,6 +264,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       'bulldozer',
       'excavator',
       'ambulance',
+      'police',
     ]);
     assert.equal(initial.vehicleSelection.canSwitch, true);
     const excavatorButton = page.getByRole('button', { name: 'ショベルカーをえらぶ' });
@@ -513,6 +550,154 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(ambulanceRestarted.ambulance.completedCount, 0);
     assert.equal(ambulanceRestarted.vehicleSelection.canSwitch, true);
 
+    const policeButton = page.getByRole('button', { name: 'パトカーをえらぶ' });
+    if (viewport.touch) await policeButton.tap();
+    else await policeButton.click();
+    await waitForFrames(page, 4);
+
+    const policeSelected = await readGameState(page);
+    assert.equal(policeSelected.vehicle.id, 'police', `${viewport.name}: police switch failed.`);
+    assert.equal(policeSelected.mission.id, 'patrol');
+    assert.equal(policeSelected.mission.jobId, 'patrol-main');
+    assert.equal(policeSelected.mission.jobCycle, 1);
+    assert.equal(policeSelected.mission.progress.current, 0);
+    assert.equal(policeSelected.mission.progress.target, 3);
+    assert.equal(policeSelected.renderer.vehicleDrawCalls <= 7, true,
+      `${viewport.name}: police exceeded seven body draw calls.`);
+    assert.equal(policeSelected.police.targetBodyVoxelCount, 18);
+    assert.equal(policeSelected.police.targetAccentVoxelCount, 9);
+    assert.equal(policeSelected.ambulance.targetBodyVoxelCount, 0);
+    assert.equal(policeSelected.excavator.targetBodyVoxelCount, 0);
+    assert.equal(policeSelected.visuals.actionTargetTargetCubeCount, 27);
+    assert.deepEqual(
+      policeSelected.mission.targetPositions,
+      policeSelected.landmarks.policeTargets.map(({ position }) => position),
+    );
+    assert.equal(await policeButton.getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('.primary-action-button').getAttribute('aria-label'),
+      'サイレンを鳴らす');
+    const policeLayout = await measureFleetHud(page, viewport);
+    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-garage.png` });
+
+    await driveToCoordinate(page, {
+      coordinateIndex: 2,
+      description: `${viewport.name}: police leave garage`,
+      target: 3,
+      tolerance: 0.4,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 0,
+      description: `${viewport.name}: police bypass garage wall`,
+      target: 6,
+      tolerance: 0.45,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 2,
+      description: `${viewport.name}: police enter south district`,
+      target: 13,
+      tolerance: 0.45,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 0,
+      description: `${viewport.name}: police center patrol road`,
+      target: 0,
+      tolerance: 0.4,
+      touchDriver,
+    });
+    await setPrimaryAction(page, viewport.touch, true);
+    await waitForFrames(page, 3);
+    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-checkpoint-before.png` });
+    await setPrimaryAction(page, viewport.touch, false);
+
+    const checkpoints = [...policeSelected.landmarks.policeTargets]
+      .sort((left, right) => left.position[2] - right.position[2]);
+    assert.equal(checkpoints.length, 3, `${viewport.name}: police needs three checkpoints.`);
+    let policeCompleted = policeSelected;
+    for (const [index, checkpoint] of checkpoints.entries()) {
+      await driveToCoordinate(page, {
+        coordinateIndex: 0,
+        description: `${viewport.name}: checkpoint ${index + 1} center lane`,
+        target: checkpoint.position[0],
+        tolerance: 0.28,
+        touchDriver,
+      });
+      await driveToCoordinate(page, {
+        coordinateIndex: 2,
+        description: `${viewport.name}: checkpoint ${index + 1} staging`,
+        target: checkpoint.position[2] - 3,
+        tolerance: 0.3,
+        touchDriver,
+      });
+      policeCompleted = await patrolCheckpoint(
+        page,
+        viewport,
+        touchDriver,
+        index + 1,
+      );
+      assert.equal(policeCompleted.police.completedCount, index + 1);
+      if (index === 0) {
+        assert(policeCompleted.police.activeParticleCount > 0,
+          `${viewport.name}: checkpoint emitted no voxel particles.`);
+        await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-worksite.png` });
+      }
+    }
+    assert.equal(policeCompleted.police.targetBodyVoxelCount, 0);
+    assert(['celebrating', 'freeRoam'].includes(policeCompleted.mission.phase),
+      `${viewport.name}: police completion phase is ${policeCompleted.mission.phase}.`);
+    assert.equal(policeCompleted.fire.intensity, 1,
+      `${viewport.name}: police action changed fire intensity.`);
+    assert.equal(policeCompleted.visuals.waterCubeCount, 0,
+      `${viewport.name}: police action emitted water.`);
+
+    await page.evaluate(() => window.advanceTime?.(1_800));
+    await waitForFrames(page, 2);
+    assert.equal((await readGameState(page)).mission.phase, 'freeRoam');
+    await driveToCoordinate(page, {
+      coordinateIndex: 2,
+      description: `${viewport.name}: police clear south sign before return`,
+      target: 26,
+      tolerance: 0.45,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 0,
+      description: `${viewport.name}: police enter east return road`,
+      target: 6,
+      tolerance: 0.5,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 2,
+      description: `${viewport.name}: police return garage bypass`,
+      target: 3,
+      tolerance: 0.5,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 0,
+      description: `${viewport.name}: police center garage entrance`,
+      target: 0,
+      tolerance: 0.4,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 2,
+      description: `${viewport.name}: police enter garage`,
+      target: 6,
+      tolerance: 0.5,
+      touchDriver,
+    });
+    await waitForFrames(page, 5);
+    const policeRestarted = await readGameState(page);
+    assert.equal(policeRestarted.mission.phase, 'assigned');
+    assert.equal(policeRestarted.mission.jobCycle, 2);
+    assert.notEqual(policeRestarted.mission.jobId, policeSelected.mission.jobId);
+    assert.equal(policeRestarted.police.completedCount, 0);
+    assert.equal(policeRestarted.vehicleSelection.canSwitch, true);
+
     return {
       ambulance: {
         completedJobId: patientCompleted.mission.jobId,
@@ -522,6 +707,11 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       completedJobId: completed.mission.jobId,
       layout,
       nextJobId: restarted.mission.jobId,
+      police: {
+        completedJobId: policeCompleted.mission.jobId,
+        layout: policeLayout,
+        nextJobId: policeRestarted.mission.jobId,
+      },
       rendererCalls: restarted.renderer.rendererCalls,
       vehicleDrawCalls: restarted.renderer.vehicleDrawCalls,
       viewport: viewport.name,
@@ -550,6 +740,9 @@ try {
       `${name}-ambulance-garage.png`,
       `${name}-ambulance-patient-before.png`,
       `${name}-ambulance-worksite.png`,
+      `${name}-police-garage.png`,
+      `${name}-police-checkpoint-before.png`,
+      `${name}-police-worksite.png`,
     ]),
     viewports,
   };

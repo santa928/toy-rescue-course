@@ -10,6 +10,7 @@ const BLOCK_IDS = ['block-a'] as const;
 const DEBRIS_IDS = VEHICLE_JOBS.bulldozer[0].debris.map(({ id }) => id);
 const SOIL_IDS = VEHICLE_JOBS.excavator[0].targets.map(({ id }) => id);
 const PATIENT_IDS = VEHICLE_JOBS.ambulance[0].targets.map(({ id }) => id);
+const CHECKPOINT_IDS = VEHICLE_JOBS.police[0].targets.map(({ id }) => id);
 
 /** 消防仕事を完了して車庫へ戻し、次のassigned仕事まで進める。 */
 function completeFireJobAndReturn(coordinator: VehicleMissionCoordinator): void {
@@ -148,6 +149,32 @@ describe('VehicleMissionCoordinator', () => {
         vehicleId: 'ambulance',
       },
       selectedVehicleId: 'ambulance',
+    });
+  });
+
+  it('パトカーの巡回門進捗を共通仕事snapshotへ変換する', () => {
+    const coordinator = new VehicleMissionCoordinator(BLOCK_IDS, { jobSeed: 1 });
+    coordinator.selectVehicle('police', { atGarage: true, speed: 0 });
+    coordinator.setSpatialSignals({
+      atActionTargetWorksite: true,
+      atBulldozerWorksite: false,
+      atGarage: false,
+    });
+    coordinator.advance(1);
+    expect(coordinator.registerActionTargetCompletion(CHECKPOINT_IDS[0])).toBe(true);
+
+    expect(coordinator.getSnapshot()).toMatchObject({
+      police: { completedCount: 1, missionPhase: 'active', targetCount: 3 },
+      mission: {
+        destinationDistrict: 'south',
+        id: 'patrol',
+        jobCycle: 1,
+        objectiveLabel: 'みまわり あと2かしょ',
+        phase: 'active',
+        progress: { current: 1, target: 3 },
+        vehicleId: 'police',
+      },
+      selectedVehicleId: 'police',
     });
   });
 

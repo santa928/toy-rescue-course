@@ -28,6 +28,7 @@ import {
   type BulldozerVehicleJobDefinition,
   type ExcavatorVehicleJobDefinition,
   type FireVehicleJobDefinition,
+  type PoliceVehicleJobDefinition,
   type VehicleJobId,
 } from './vehicleJobs';
 
@@ -57,11 +58,13 @@ export interface VehicleMissionCoordinatorSnapshot {
     readonly bulldozer: BulldozerVehicleJobDefinition;
     readonly excavator: ExcavatorVehicleJobDefinition;
     readonly fire: FireVehicleJobDefinition;
+    readonly police: PoliceVehicleJobDefinition;
   };
   readonly excavator: ActionTargetMissionSnapshot;
   readonly fire: VoxelGameSnapshot;
   readonly jobSeed: number;
   readonly mission: VehicleMissionSnapshot;
+  readonly police: ActionTargetMissionSnapshot;
   readonly selectedVehicleId: VehicleId;
 }
 
@@ -189,6 +192,33 @@ function createAmbulanceMissionSnapshot(
   };
 }
 
+/** 巡回仕事snapshotを残り門数つきの車種共通表示契約へ変換する。 */
+function createPoliceMissionSnapshot(
+  snapshot: ActionTargetMissionSnapshot,
+  job: PoliceVehicleJobDefinition,
+  jobCycle: number,
+): VehicleMissionSnapshot {
+  const remaining = snapshot.targetCount - snapshot.completedCount;
+  const labels: Readonly<Record<MissionPhase, string>> = {
+    active: `みまわり あと${remaining}かしょ`,
+    assigned: job.label,
+    celebrating: 'できた！',
+    freeRoam: 'じゆうにあそぼう',
+  };
+  return {
+    destinationDistrict: 'south',
+    id: 'patrol',
+    jobCycle,
+    jobId: job.id,
+    jobLabel: job.label,
+    objectiveLabel: labels[snapshot.missionPhase],
+    phase: snapshot.missionPhase,
+    progress: { current: snapshot.completedCount, target: snapshot.targetCount },
+    routeVisible: snapshot.routeVisible,
+    vehicleId: 'police',
+  };
+}
+
 /** Reactへ通知する離散状態だけを安定した比較文字列へ変換する。 */
 function createObservableSignature(snapshot: VehicleMissionCoordinatorSnapshot): string {
   return [
@@ -207,11 +237,13 @@ export class VehicleMissionCoordinator {
   public readonly bulldozerRuntime: BulldozerMissionRuntime;
   public readonly excavatorRuntime: ActionTargetMissionRuntime;
   public readonly fireRuntime: VoxelGameRuntime;
+  public readonly policeRuntime: ActionTargetMissionRuntime;
   public readonly jobSeed: number;
   private currentAmbulanceJob: AmbulanceVehicleJobDefinition;
   private currentBulldozerJob: BulldozerVehicleJobDefinition;
   private currentExcavatorJob: ExcavatorVehicleJobDefinition;
   private currentFireJob: FireVehicleJobDefinition;
+  private currentPoliceJob: PoliceVehicleJobDefinition;
   private readonly bulldozerJobDeck: JobDeck<BulldozerVehicleJobDefinition>;
   private readonly ambulanceJobDeck: JobDeck<AmbulanceVehicleJobDefinition>;
   private ambulanceJobCycle = 1;
@@ -220,6 +252,8 @@ export class VehicleMissionCoordinator {
   private excavatorJobCycle = 1;
   private readonly fireJobDeck: JobDeck<FireVehicleJobDefinition>;
   private fireJobCycle = 1;
+  private readonly policeJobDeck: JobDeck<PoliceVehicleJobDefinition>;
+  private policeJobCycle = 1;
   private readonly listeners = new Set<VehicleMissionCoordinatorListener>();
   private observableSignature: string;
   private readonly rotateJobsOnCompletion: boolean;
@@ -236,10 +270,12 @@ export class VehicleMissionCoordinator {
     this.ambulanceJobDeck = new JobDeck(VEHICLE_JOBS.ambulance, this.jobSeed);
     this.bulldozerJobDeck = new JobDeck(VEHICLE_JOBS.bulldozer, this.jobSeed);
     this.excavatorJobDeck = new JobDeck(VEHICLE_JOBS.excavator, this.jobSeed);
+    this.policeJobDeck = new JobDeck(VEHICLE_JOBS.police, this.jobSeed);
     this.currentFireJob = this.fireJobDeck.draw();
     this.currentAmbulanceJob = this.ambulanceJobDeck.draw();
     this.currentBulldozerJob = this.bulldozerJobDeck.draw();
     this.currentExcavatorJob = this.excavatorJobDeck.draw();
+    this.currentPoliceJob = this.policeJobDeck.draw();
     this.fireRuntime = new VoxelGameRuntime(blockIds);
     this.ambulanceRuntime = new ActionTargetMissionRuntime(
       this.currentAmbulanceJob.targets.map(({ id }) => id),
@@ -249,6 +285,9 @@ export class VehicleMissionCoordinator {
     );
     this.excavatorRuntime = new ActionTargetMissionRuntime(
       this.currentExcavatorJob.targets.map(({ id }) => id),
+    );
+    this.policeRuntime = new ActionTargetMissionRuntime(
+      this.currentPoliceJob.targets.map(({ id }) => id),
     );
     this.observableSignature = createObservableSignature(this.getSnapshot());
   }
@@ -272,10 +311,13 @@ export class VehicleMissionCoordinator {
     this.excavatorRuntime.setAtWorksite(false);
     this.ambulanceRuntime.setAtGarage(false);
     this.ambulanceRuntime.setAtWorksite(false);
+    this.policeRuntime.setAtGarage(false);
+    this.policeRuntime.setAtWorksite(false);
     if (nextVehicleId === 'fire-truck') this.fireRuntime.resetMission();
     else if (nextVehicleId === 'bulldozer') this.bulldozerRuntime.resetMission();
     else if (nextVehicleId === 'excavator') this.excavatorRuntime.resetMission();
-    else this.ambulanceRuntime.resetMission();
+    else if (nextVehicleId === 'ambulance') this.ambulanceRuntime.resetMission();
+    else this.policeRuntime.resetMission();
     this.publishObservableChanges();
     return true;
   }
@@ -294,6 +336,7 @@ export class VehicleMissionCoordinator {
     const bulldozerSelected = this.selectedVehicleId === 'bulldozer';
     const excavatorSelected = this.selectedVehicleId === 'excavator';
     const ambulanceSelected = this.selectedVehicleId === 'ambulance';
+    const policeSelected = this.selectedVehicleId === 'police';
     this.fireRuntime.setSignals({
       atGarage: this.selectedVehicleId === 'fire-truck' && signals.atGarage,
     });
@@ -309,6 +352,11 @@ export class VehicleMissionCoordinator {
     this.ambulanceRuntime.setAtGarage(ambulanceSelected && signals.atGarage);
     this.ambulanceRuntime.setAtWorksite(
       ambulanceSelected
+      && (signals.atActionTargetWorksite ?? signals.atBulldozerWorksite),
+    );
+    this.policeRuntime.setAtGarage(policeSelected && signals.atGarage);
+    this.policeRuntime.setAtWorksite(
+      policeSelected
       && (signals.atActionTargetWorksite ?? signals.atBulldozerWorksite),
     );
   }
@@ -327,7 +375,9 @@ export class VehicleMissionCoordinator {
       ? this.excavatorRuntime
       : this.selectedVehicleId === 'ambulance'
         ? this.ambulanceRuntime
-        : null;
+        : this.selectedVehicleId === 'police'
+          ? this.policeRuntime
+          : null;
     if (!runtime) return false;
     const changed = runtime.registerTargetCompletion(id);
     if (changed) this.publishObservableChanges();
@@ -340,6 +390,7 @@ export class VehicleMissionCoordinator {
     const bulldozerPhaseBeforeAdvance = this.bulldozerRuntime.getSnapshot().missionPhase;
     const excavatorPhaseBeforeAdvance = this.excavatorRuntime.getSnapshot().missionPhase;
     const ambulancePhaseBeforeAdvance = this.ambulanceRuntime.getSnapshot().missionPhase;
+    const policePhaseBeforeAdvance = this.policeRuntime.getSnapshot().missionPhase;
     this.fireRuntime.advance(milliseconds);
     if (this.selectedVehicleId === 'bulldozer') {
       this.bulldozerRuntime.advance(milliseconds);
@@ -350,10 +401,14 @@ export class VehicleMissionCoordinator {
     if (this.selectedVehicleId === 'ambulance') {
       this.ambulanceRuntime.advance(milliseconds);
     }
+    if (this.selectedVehicleId === 'police') {
+      this.policeRuntime.advance(milliseconds);
+    }
     const firePhaseAfterAdvance = this.fireRuntime.getSnapshot().missionPhase;
     const bulldozerPhaseAfterAdvance = this.bulldozerRuntime.getSnapshot().missionPhase;
     const excavatorPhaseAfterAdvance = this.excavatorRuntime.getSnapshot().missionPhase;
     const ambulancePhaseAfterAdvance = this.ambulanceRuntime.getSnapshot().missionPhase;
+    const policePhaseAfterAdvance = this.policeRuntime.getSnapshot().missionPhase;
     if (
       this.selectedVehicleId === 'fire-truck'
       && this.rotateJobsOnCompletion
@@ -399,6 +454,18 @@ export class VehicleMissionCoordinator {
         this.currentAmbulanceJob.targets.map(({ id }) => id),
       );
     }
+    if (
+      this.selectedVehicleId === 'police'
+      && this.rotateJobsOnCompletion
+      && policePhaseBeforeAdvance === 'freeRoam'
+      && policePhaseAfterAdvance === 'assigned'
+    ) {
+      this.currentPoliceJob = this.policeJobDeck.draw();
+      this.policeJobCycle += 1;
+      this.policeRuntime.assignTargets(
+        this.currentPoliceJob.targets.map(({ id }) => id),
+      );
+    }
     this.publishObservableChanges();
   }
 
@@ -408,6 +475,7 @@ export class VehicleMissionCoordinator {
     const bulldozer = this.bulldozerRuntime.getSnapshot();
     const excavator = this.excavatorRuntime.getSnapshot();
     const ambulance = this.ambulanceRuntime.getSnapshot();
+    const police = this.policeRuntime.getSnapshot();
     return {
       ambulance,
       bulldozer,
@@ -416,6 +484,7 @@ export class VehicleMissionCoordinator {
         bulldozer: this.currentBulldozerJob,
         excavator: this.currentExcavatorJob,
         fire: this.currentFireJob,
+        police: this.currentPoliceJob,
       },
       excavator,
       fire,
@@ -434,11 +503,18 @@ export class VehicleMissionCoordinator {
               this.currentExcavatorJob,
               this.excavatorJobCycle,
             )
-            : createAmbulanceMissionSnapshot(
-              ambulance,
-              this.currentAmbulanceJob,
-              this.ambulanceJobCycle,
-            ),
+            : this.selectedVehicleId === 'ambulance'
+              ? createAmbulanceMissionSnapshot(
+                ambulance,
+                this.currentAmbulanceJob,
+                this.ambulanceJobCycle,
+              )
+              : createPoliceMissionSnapshot(
+                police,
+                this.currentPoliceJob,
+                this.policeJobCycle,
+              ),
+      police,
       selectedVehicleId: this.selectedVehicleId,
     };
   }

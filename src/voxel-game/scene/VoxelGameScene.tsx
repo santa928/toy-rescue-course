@@ -7,6 +7,7 @@ import { FIRE_TRUCK_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelFireTruck';
 import { BULLDOZER_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelBulldozer';
 import { EXCAVATOR_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelExcavator';
 import { AMBULANCE_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelAmbulance';
+import { POLICE_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelPolice';
 import type { DriveCommand } from '../input/controlState';
 import {
   canSwitchVehicle,
@@ -169,7 +170,8 @@ function readVehicleDrawCalls(vehicleId: VehicleId): number {
   if (vehicleId === 'fire-truck') return FIRE_TRUCK_RENDER_PLAN.drawCalls;
   if (vehicleId === 'bulldozer') return BULLDOZER_RENDER_PLAN.drawCalls;
   if (vehicleId === 'excavator') return EXCAVATOR_RENDER_PLAN.drawCalls;
-  return AMBULANCE_RENDER_PLAN.drawCalls;
+  if (vehicleId === 'ambulance') return AMBULANCE_RENDER_PLAN.drawCalls;
+  return POLICE_RENDER_PLAN.drawCalls;
 }
 
 /** 複数frameとdraw callを確認してから自動検証へscene readyを通知する。 */
@@ -326,7 +328,7 @@ export function VoxelGameScene({
         />
         <ActionTargetMission
           commandRef={commandRef}
-          enabled={vehicleId === 'excavator' || vehicleId === 'ambulance'}
+          enabled={vehicleId === 'excavator' || vehicleId === 'ambulance' || vehicleId === 'police'}
           job={actionTargetJob}
           registerTargetCompletion={(id) => coordinator.registerActionTargetCompletion(id)}
           runtime={actionTargetRuntime}

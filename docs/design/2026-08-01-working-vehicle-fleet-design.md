@@ -104,22 +104,22 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 
 ## UIアンカー
 
-- selectorは左上へ2列で置き、5台時は3行目を左から配置する。
+- selectorは左上へ3列2段で置く。844×390でも高さ104pxに収め、左下stickとの縦方向の安全余白を確保する。
 - selector外接矩形はmission札から8px、joystickから12px、viewport四辺から8px以上離す。
 - 844×390では短い車名を使い、selectorボタン高さを子要素実寸から逆算する。
 - 色札表示中もmission札、selector、fullscreen、stick、主操作と重ねない。
 
 ## 受け入れ条件
 
-- [ ] 5台が車庫で選択でき、車庫外・走行中の拒否契約を維持する。
-- [ ] 追加3台の外形、役割部品、主操作アニメーションが車種ごとに識別できる。
-- [ ] 追加3台が各3仕事を持ち、1巡内非重複・補充境界非連続・seed再現を満たす。
-- [ ] ショベル3山、救急1体、警察3地点の速度・距離・継続時間gateがpure testと実走で一致する。
-- [ ] 未完了帰庫と乗り換えでは仕事を変えず、完了帰庫だけで次仕事へ進む。
-- [ ] bodyだけが一時塗装され、役割部品の色とdraw call数を維持する。
+- [x] 5台が車庫で選択でき、車庫外・走行中の拒否契約を維持する。
+- [x] 追加3台の外形、役割部品、主操作アニメーションが車種ごとに識別できる。
+- [x] 追加3台が各3仕事を持ち、1巡内非重複・補充境界非連続・seed再現を満たす。
+- [x] ショベル3山、救急1体、警察3地点の速度・距離・継続時間gateがpure testと実走で一致する。
+- [x] 未完了帰庫と乗り換えでは仕事を変えず、完了帰庫だけで次仕事へ進む。
+- [x] bodyだけが一時塗装され、役割部品の色とdraw call数を維持する。
 - [ ] 既存消防、ブルドーザー、自由積み木、色遊び、物理衝突を回帰させない。
-- [ ] 1280×720、1024×768、844×390でselector、仕事、主操作に欠け・重なり・操作阻害がない。
-- [ ] console／page／request error 0、telemetryと実描画一致、代表画像原寸目視を満たす。
+- [x] 1280×720、1024×768、844×390でselector、仕事、主操作に欠け・重なり・操作阻害がない。
+- [x] console／page／request error 0、telemetryと実描画一致、代表画像原寸目視を満たす。
 - [ ] fresh unit、budget付きbuild、専用E2E、canonical、production smoke、公開E2EがPASSする。
 
 ## 非対象
@@ -142,7 +142,7 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 | リスク | 対策 |
 | --- | --- |
 | 5台分の条件分岐がAppとsceneへ散る | 追加3台をActionTarget registry／runtime／sceneへ集約する。 |
-| selectorがmobile HUDを塞ぐ | 2列3行の実寸境界と全操作矩形をPlaywrightで数値検証する。 |
+| selectorがmobile HUDを塞ぐ | 3列2段の実寸境界と全操作矩形をPlaywrightで数値検証する。 |
 | 非選択仕事が同時描画される | `enabled=false`で全固定slotを非activeにしtelemetry count 0をassertする。 |
 | 仕事表示と接触対象がずれる | current job refだけをscene、HUD、telemetryへ渡す。 |
 | 色替えで赤十字や灯火が消える | paintable body paletteを車種別に限定する。 |
@@ -169,6 +169,16 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - desktop keyboard、tablet touch、mobile-landscape touchで患者の手当前表示、手当て、成功、帰庫、次仕事を実走した。4ボタンはselector境界内、主要UI間は8px以上だった。
 - 3 viewportともscene 30 calls、救急車車体7 calls。患者の横たわり、起き上がり、赤十字、HUD、操作系を15枚の画像で原寸目視した。物理GPU再認証は5台総合回帰で行う。
 - commit `e64eca6`をmainへpushし、remote SHA一致、ahead／behind `0/0`、Pages run `30707424042`のunit／build／deploy successを確認した。公開manifestは`2026-08-01T16:12:50.807Z`で全3 viewport成功し、公開root・互換URL・Vehicle Labもsmokeを通過した。
+
+### 2026-08-01 Task 5 パトカー実測
+
+- 白い低い車体、黒帯、青緑窓、赤青灯、黒タイヤを純voxel 7 batchで実装し、bodyだけを一時塗装対象にした。サイレン操作中は赤青灯が0.5秒周期で交互に強調される。
+- 南地区へ3件×3門の巡回仕事を追加した。車体中心1.5unit以内、速度0.35以上5.5以下、サイレン250ms継続で門を完了し、通過時は水色粒、全完了時は既存の成功星を出す。
+- 初回目視で門の内幅1.52unitがパトカー物理車幅2.96unitより狭いことを検出した。内幅を3.36unitへ広げ、車幅より広いことをpure testで固定した。
+- 長距離E2Eは各門の3unit手前で中央線へ再整列し、帰庫時は南地区看板postを避けてz=26を通る明示ウェイポイントへ変更した。判定半径やworld物理は緩めていない。
+- fresh Docker unitは43 files／425 tests、production buildは651 modulesで全budget内だった。game entryは129,376 bytes、Threeは718,551 bytes、Rapierは2,237,128 bytesだった。
+- desktop keyboard、tablet touch、mobile-landscape touchで3門、成功、帰庫、次仕事を連続実走した。sceneは30 calls、パトカー車体は7 calls、5ボタンselectorは3列2段・幅350px・高さ104pxで全親境界内に収まった。
+- fleet manifestは`2026-08-01T16:51:10.246Z`で全3 viewport成功し、ショベルカー6枚、救急車9枚、パトカー9枚の計24枚を原寸目視した。production smokeもroot、互換URL、Vehicle Labの3入口でPASSした。
 
 - 受け入れ条件、非対象、リスクと対策、性能目標を明示した。
 - 保留項目は理由、影響、代替タスク、復帰条件を記載した。

@@ -8,12 +8,13 @@ import {
 } from '../voxel-game/domain/vehicleDefinitions';
 
 describe('vehicle definitions', () => {
-  it('消防車、ブルドーザー、ショベルカー、救急車を一意な利用可能車種として公開する', () => {
+  it('消防車、ブルドーザー、ショベルカー、救急車、パトカーを一意な利用可能車種として公開する', () => {
     expect(VEHICLE_DEFINITIONS.map(({ id }) => id)).toEqual([
       'fire-truck',
       'bulldozer',
       'excavator',
       'ambulance',
+      'police',
     ]);
     expect(validateVehicleDefinitions(VEHICLE_DEFINITIONS)).toEqual([]);
   });
@@ -72,6 +73,17 @@ describe('vehicle definitions', () => {
       missionId: 'patient-care',
       physics: { idleResponse: 4.7, mass: 1.6, movingResponse: 7.2, yawClamp: 5.1 },
       visualBounds: { offset: [0, 0.84, 0], scale: [2.64, 1.92, 3.12] },
+    });
+  });
+
+  it('パトカーへ巡回向けの軽快な物理、低い外接、サイレン操作を割り当てる', () => {
+    expect(getVehicleDefinition('police')).toMatchObject({
+      action: { ariaLabel: 'サイレンを鳴らす', label: 'サイレン' },
+      collider: { halfExtents: [1.48, 0.92, 1.62], offset: [0, 0.92, 0] },
+      label: 'パトカー',
+      missionId: 'patrol',
+      physics: { idleResponse: 4.9, mass: 1.45, movingResponse: 7.6, yawClamp: 5.4 },
+      visualBounds: { offset: [0, 0.78, 0], scale: [2.64, 1.76, 3.12] },
     });
   });
 

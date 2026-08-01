@@ -43,6 +43,29 @@ describe('action target contact', () => {
     })).toBe(false);
   });
 
+  it('巡回門はサイレン中かつ速度0.35以上で250ms走り続けたときだけ完了できる', () => {
+    const patrolInteraction: ActionTargetInteraction = {
+      contactRadius: 1.5,
+      forwardOffset: 0,
+      holdDurationMs: 250,
+      maximumSpeed: 5.5,
+      minimumSpeed: 0.35,
+    };
+    const sample = {
+      actionActive: true,
+      contactPoint: [0, 1.15, 17] as const,
+      interaction: patrolInteraction,
+      speed: 0.35,
+      targetPosition: [0, 0.7, 17] as const,
+      targetRadius: 0.75,
+    };
+
+    expect(isActionTargetContact(sample)).toBe(true);
+    expect(isActionTargetContact({ ...sample, actionActive: false })).toBe(false);
+    expect(isActionTargetContact({ ...sample, speed: 0.349 })).toBe(false);
+    expect(advanceActionTargetHold(200, true, 50, 250)).toBe(250);
+  });
+
   it('接触中だけ最大50msずつ必要時間まで累積し、離れると0へ戻す', () => {
     expect(advanceActionTargetHold(680, true, 50, 700)).toBe(700);
     expect(advanceActionTargetHold(100, true, 500, 700)).toBe(150);

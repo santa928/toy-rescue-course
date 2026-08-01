@@ -90,12 +90,37 @@ describe('vehicle jobs', () => {
     ))).toBe(true);
   });
 
+  it('パトカーへ南地区の3地点を巡回する3仕事を定義する', () => {
+    const jobs = getVehicleJobs('police');
+
+    expect(jobs.map(({ id }) => id)).toEqual([
+      'patrol-main',
+      'patrol-pools',
+      'patrol-showers',
+    ]);
+    expect(jobs.every((job) => (
+      job.kind === 'patrol'
+      && job.vehicleId === 'police'
+      && job.destinationDistrict === 'south'
+      && job.targetKind === 'checkpoint'
+      && job.routeMarkers.length === 7
+      && job.targets.length === 3
+      && job.targets.every(({ position }) => resolveWorldDistrict(position) === 'south')
+      && job.interaction.contactRadius === 1.5
+      && job.interaction.forwardOffset === 0
+      && job.interaction.holdDurationMs === 250
+      && job.interaction.minimumSpeed === 0.35
+      && job.interaction.maximumSpeed === 5.5
+    ))).toBe(true);
+  });
+
   it('全仕事を一意なIDと短い仕事札で公開し、canonical定義を検証する', () => {
     const jobs = [
       ...VEHICLE_JOBS['fire-truck'],
       ...VEHICLE_JOBS.bulldozer,
       ...VEHICLE_JOBS.excavator,
       ...VEHICLE_JOBS.ambulance,
+      ...VEHICLE_JOBS.police,
     ];
 
     expect(new Set(jobs.map(({ id }) => id)).size).toBe(jobs.length);
@@ -125,6 +150,7 @@ describe('vehicle jobs', () => {
       ],
       excavator: VEHICLE_JOBS.excavator,
       ambulance: VEHICLE_JOBS.ambulance,
+      police: VEHICLE_JOBS.police,
     } as unknown as VehicleJobRegistry;
 
     expect(validateVehicleJobs(invalidRegistry)).toEqual([

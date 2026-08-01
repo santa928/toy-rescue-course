@@ -41,8 +41,13 @@ import {
 } from './scene/BulldozerDebrisMission';
 import {
   createActionTargetMissionTelemetry,
+  type ActionTargetMissionJob,
   type ActionTargetMissionTelemetry,
 } from './scene/ActionTargetMission';
+import type {
+  ActionTargetMissionRuntime,
+  ActionTargetMissionSnapshot,
+} from './domain/ActionTargetMissionRuntime';
 import {
   createFireJobSceneLayout,
   getFireLayerCount,
@@ -105,6 +110,34 @@ export function selectVehicleWithColorEffect(
   const switched = coordinator.selectVehicle(vehicleId, context);
   if (switched) colorEffectRuntime.handleSuccessfulVehicleSwitch(vehicleId);
   return switched;
+}
+
+/** 選択中の追加車両へ対応する共通アクション仕事snapshotを返す。 */
+function getActionTargetMissionSnapshot(
+  snapshot: VehicleMissionCoordinatorSnapshot,
+): ActionTargetMissionSnapshot {
+  if (snapshot.selectedVehicleId === 'ambulance') return snapshot.ambulance;
+  if (snapshot.selectedVehicleId === 'police') return snapshot.police;
+  return snapshot.excavator;
+}
+
+/** 選択中の追加車両へ対応する共通アクション仕事定義を返す。 */
+function getActionTargetMissionJob(
+  snapshot: VehicleMissionCoordinatorSnapshot,
+): ActionTargetMissionJob {
+  if (snapshot.selectedVehicleId === 'ambulance') return snapshot.currentJobs.ambulance;
+  if (snapshot.selectedVehicleId === 'police') return snapshot.currentJobs.police;
+  return snapshot.currentJobs.excavator;
+}
+
+/** 選択中の追加車両へ対応する共通アクションruntimeを返す。 */
+function getActionTargetRuntime(
+  coordinator: VehicleMissionCoordinator,
+  vehicleId: VehicleId,
+): ActionTargetMissionRuntime {
+  if (vehicleId === 'ambulance') return coordinator.ambulanceRuntime;
+  if (vehicleId === 'police') return coordinator.policeRuntime;
+  return coordinator.excavatorRuntime;
 }
 
 /** 運転可能な箱庭Canvas、入力、段階的な自動検証hookを構成する。 */
@@ -246,9 +279,7 @@ export function VoxelGameApp(): ReactElement {
     controls.reset();
     telemetryRef.current = createInitialVehicleTelemetry(vehicleId);
     const snapshot = coordinator.getSnapshot();
-    actionTargetMissionSnapshotRef.current = snapshot.selectedVehicleId === 'ambulance'
-      ? snapshot.ambulance
-      : snapshot.excavator;
+    actionTargetMissionSnapshotRef.current = getActionTargetMissionSnapshot(snapshot);
     bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
     bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
     setCoordinatorSnapshot(snapshot);
@@ -273,9 +304,7 @@ export function VoxelGameApp(): ReactElement {
 
   useEffect(() => {
     const unsubscribe = coordinator.subscribe((snapshot) => {
-      actionTargetMissionSnapshotRef.current = snapshot.selectedVehicleId === 'ambulance'
-        ? snapshot.ambulance
-        : snapshot.excavator;
+      actionTargetMissionSnapshotRef.current = getActionTargetMissionSnapshot(snapshot);
       bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
       bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
       setCoordinatorSnapshot(snapshot);
@@ -296,6 +325,7 @@ export function VoxelGameApp(): ReactElement {
       const actionTargetTelemetry = actionTargetMissionTelemetryRef.current;
       const ambulanceActionActive = coordinatorState.selectedVehicleId === 'ambulance';
       const excavatorActionActive = coordinatorState.selectedVehicleId === 'excavator';
+      const policeActionActive = coordinatorState.selectedVehicleId === 'police';
       const waterFrame = createWaterFlowFrame({
         path: missionTelemetry.waterPath,
         splashElapsedSeconds: missionTelemetry.splashElapsedSeconds,
@@ -376,6 +406,33 @@ export function VoxelGameApp(): ReactElement {
           targetCount: coordinatorState.excavator.targetCount,
           targets: coordinatorState.excavator.targets.map((target) => ({ ...target })),
         },
+        police: {
+          activeParticleCount: policeActionActive
+            ? actionTargetTelemetry.activeParticleCount
+            : 0,
+          completedCount: coordinatorState.police.completedCount,
+          contactPoint: policeActionActive
+            ? [...actionTargetTelemetry.contactPoint]
+            : [0, -40, 0],
+          holdMilliseconds: policeActionActive
+            ? [...actionTargetTelemetry.holdMilliseconds]
+            : [0, 0, 0],
+          missionPhase: coordinatorState.police.missionPhase,
+          routeMarkerCount: policeActionActive
+            ? actionTargetTelemetry.routeMarkerCount
+            : 0,
+          starVoxelCount: policeActionActive
+            ? actionTargetTelemetry.starVoxelCount
+            : 0,
+          targetAccentVoxelCount: policeActionActive
+            ? actionTargetTelemetry.targetAccentVoxelCount
+            : 0,
+          targetBodyVoxelCount: policeActionActive
+            ? actionTargetTelemetry.targetBodyVoxelCount
+            : 0,
+          targetCount: coordinatorState.police.targetCount,
+          targets: coordinatorState.police.targets.map((target) => ({ ...target })),
+        },
         coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south',
         colorEffect,
         controls: { ...command },
@@ -394,6 +451,9 @@ export function VoxelGameApp(): ReactElement {
             ({ id, position, radius }) => ({ id, position, radius }),
           ),
           excavatorTargets: coordinatorState.currentJobs.excavator.targets.map(
+            ({ id, position, radius }) => ({ id, position, radius }),
+          ),
+          policeTargets: coordinatorState.currentJobs.police.targets.map(
             ({ id, position, radius }) => ({ id, position, radius }),
           ),
           colorPlaySources: COLOR_PLAY_SOURCES.map((source) => ({
@@ -544,14 +604,13 @@ export function VoxelGameApp(): ReactElement {
       <section className="voxel-game-canvas" aria-label="純ボクセル働く車の箱庭">
         <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}>
           <VoxelGameScene
-            actionTargetJob={coordinatorSnapshot.selectedVehicleId === 'ambulance'
-              ? coordinatorSnapshot.currentJobs.ambulance
-              : coordinatorSnapshot.currentJobs.excavator}
+            actionTargetJob={getActionTargetMissionJob(coordinatorSnapshot)}
             actionTargetMissionSnapshotRef={actionTargetMissionSnapshotRef}
             actionTargetMissionTelemetryRef={actionTargetMissionTelemetryRef}
-            actionTargetRuntime={coordinatorSnapshot.selectedVehicleId === 'ambulance'
-              ? coordinator.ambulanceRuntime
-              : coordinator.excavatorRuntime}
+            actionTargetRuntime={getActionTargetRuntime(
+              coordinator,
+              coordinatorSnapshot.selectedVehicleId,
+            )}
             breakablePoolHandleRef={breakablePoolHandleRef}
             breakableTelemetryRef={breakableTelemetryRef}
             bulldozerJobRef={bulldozerJobRef}

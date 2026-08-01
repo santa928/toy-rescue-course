@@ -71,6 +71,19 @@ describe('vehicle controller config', () => {
       position: [0, 0.8, 6],
     });
   });
+
+  it('パトカーのcontroller値と車種付き初期telemetryを解決する', () => {
+    expect(resolveVehicleControllerConfig('police')).toMatchObject({
+      collider: { halfExtents: [1.48, 0.92, 1.62], offset: [0, 0.92, 0] },
+      physics: { idleResponse: 4.9, mass: 1.45, movingResponse: 7.6, yawClamp: 5.4 },
+      vehicleId: 'police',
+    });
+    expect(createInitialVehicleTelemetry('police')).toMatchObject({
+      id: 'police',
+      mass: 1.45,
+      position: [0, 0.8, 6],
+    });
+  });
 });
 
 describe('advanceRenderTelemetry', () => {
@@ -171,6 +184,18 @@ describe('buildMissionJobTelemetry', () => {
       targetPositions: VEHICLE_JOBS.ambulance[0].targets.map(({ position }) => position),
     });
   });
+
+  it('巡回仕事では現在仕事の3つの巡回門を公開する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+    coordinator.selectVehicle('police', { atGarage: true, speed: 0 });
+
+    expect(buildMissionJobTelemetry(coordinator.getSnapshot())).toMatchObject({
+      jobCycle: 1,
+      jobId: 'patrol-main',
+      jobSeed: 1,
+      targetPositions: VEHICLE_JOBS.police[0].targets.map(({ position }) => position),
+    });
+  });
 });
 
 describe('syncVehicleMissionSpatialSignals', () => {
@@ -209,6 +234,20 @@ describe('syncVehicleMissionSpatialSignals', () => {
       id: 'patient-care',
       phase: 'active',
       vehicleId: 'ambulance',
+    });
+  });
+
+  it('パトカーで南地区へ着くと巡回仕事を開始する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+    coordinator.selectVehicle('police', { atGarage: true, speed: 0 });
+
+    syncVehicleMissionSpatialSignals(coordinator, [0, 0.8, 17]);
+    coordinator.advance(1);
+
+    expect(coordinator.getSnapshot().mission).toMatchObject({
+      id: 'patrol',
+      phase: 'active',
+      vehicleId: 'police',
     });
   });
 });

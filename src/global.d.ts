@@ -42,6 +42,19 @@ declare global {
       readonly targetCount: number;
       readonly targets: readonly import('./voxel-game/domain/ActionTargetMissionRuntime').ActionTargetSnapshot[];
     };
+    readonly police: {
+      readonly activeParticleCount: number;
+      readonly completedCount: number;
+      readonly contactPoint: readonly [number, number, number];
+      readonly holdMilliseconds: readonly number[];
+      readonly missionPhase: import('./voxel-game/domain/VoxelGameRuntime').MissionPhase;
+      readonly routeMarkerCount: number;
+      readonly starVoxelCount: number;
+      readonly targetAccentVoxelCount: number;
+      readonly targetBodyVoxelCount: number;
+      readonly targetCount: number;
+      readonly targets: readonly import('./voxel-game/domain/ActionTargetMissionRuntime').ActionTargetSnapshot[];
+    };
     readonly camera: import('./voxel-game/scene/WorldFixedCamera').WorldCameraTelemetry;
     readonly colorEffect: import('./voxel-game/domain/VehicleColorEffectRuntime').VehicleColorEffectSnapshot;
     readonly controls: import('./voxel-game/input/controlState').DriveCommand;
@@ -71,6 +84,11 @@ declare global {
         readonly radius: number;
       }[];
       readonly excavatorTargets: readonly {
+        readonly id: string;
+        readonly position: readonly [number, number, number];
+        readonly radius: number;
+      }[];
+      readonly policeTargets: readonly {
         readonly id: string;
         readonly position: readonly [number, number, number];
         readonly radius: number;

@@ -21,7 +21,9 @@ export function buildMissionJobTelemetry(
       ? snapshot.currentJobs.bulldozer.debris.map(({ position }) => position)
       : snapshot.selectedVehicleId === 'excavator'
         ? snapshot.currentJobs.excavator.targets.map(({ position }) => position)
-        : snapshot.currentJobs.ambulance.targets.map(({ position }) => position);
+        : snapshot.selectedVehicleId === 'ambulance'
+          ? snapshot.currentJobs.ambulance.targets.map(({ position }) => position)
+          : snapshot.currentJobs.police.targets.map(({ position }) => position);
   return {
     jobCycle: snapshot.mission.jobCycle,
     jobId: snapshot.mission.jobId,

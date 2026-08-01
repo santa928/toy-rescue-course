@@ -57,12 +57,12 @@ const BODY_SHAPES: Readonly<Record<ActionTargetKind, readonly {
   readonly scale: WorldPoint;
 }[]>> = {
   checkpoint: [
-    { offset: [-0.9, 0, 0], scale: [0.28, 1.5, 0.28] },
-    { offset: [0.9, 0, 0], scale: [0.28, 1.5, 0.28] },
-    { offset: [-0.6, 0.7, 0], scale: [0.6, 0.28, 0.28] },
-    { offset: [0, 0.7, 0], scale: [0.6, 0.28, 0.28] },
-    { offset: [0.6, 0.7, 0], scale: [0.6, 0.28, 0.28] },
-    { offset: [0, -0.62, 0], scale: [2.2, 0.12, 0.5] },
+    { offset: [-1.82, 0, 0], scale: [0.28, 1.5, 0.28] },
+    { offset: [1.82, 0, 0], scale: [0.28, 1.5, 0.28] },
+    { offset: [-1.32, 0.7, 0], scale: [1.32, 0.28, 0.28] },
+    { offset: [0, 0.7, 0], scale: [1.32, 0.28, 0.28] },
+    { offset: [1.32, 0.7, 0], scale: [1.32, 0.28, 0.28] },
+    { offset: [0, -0.62, 0], scale: [4.2, 0.12, 0.5] },
   ],
   patient: [
     { offset: [0, 0.68, 0], scale: [0.72, 0.72, 0.72] },
@@ -86,9 +86,9 @@ const ACCENT_SHAPES: Readonly<Record<ActionTargetKind, readonly {
   readonly scale: WorldPoint;
 }[]>> = {
   checkpoint: [
-    { offset: [-0.55, 0.7, -0.2], scale: [0.32, 0.32, 0.32] },
+    { offset: [-1.32, 0.7, -0.2], scale: [0.32, 0.32, 0.32] },
     { offset: [0, 0.7, -0.2], scale: [0.32, 0.32, 0.32] },
-    { offset: [0.55, 0.7, -0.2], scale: [0.32, 0.32, 0.32] },
+    { offset: [1.32, 0.7, -0.2], scale: [0.32, 0.32, 0.32] },
   ],
   patient: [
     { offset: [0, 0.12, -0.3], scale: [0.18, 0.58, 0.12] },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActionTargetMissionRuntime } from '../voxel-game/domain/ActionTargetMissionRuntime';
+import { VEHICLE_DEFINITIONS } from '../voxel-game/domain/vehicleDefinitions';
 import {
   ACTION_TARGET_ACCENT_POOL_SIZE,
   ACTION_TARGET_BODY_POOL_SIZE,
@@ -30,6 +31,16 @@ const PATIENT_JOB: ActionTargetVfxJob = {
   routeMarkers: Array.from({ length: 7 }, (_, index) => [0, 0.25, -index] as const),
   targetKind: 'patient',
   targets: [{ id: 'patient-a', position: [2, 0.7, -3], radius: 0.6 }],
+};
+
+const CHECKPOINT_JOB: ActionTargetVfxJob = {
+  routeMarkers: Array.from({ length: 7 }, (_, index) => [0, 0.25, index] as const),
+  targetKind: 'checkpoint',
+  targets: [
+    { id: 'checkpoint-a', position: [0, 0.7, 17], radius: 0.75 },
+    { id: 'checkpoint-b', position: [0, 0.7, 24], radius: 0.75 },
+    { id: 'checkpoint-c', position: [0, 0.7, 31], radius: 0.75 },
+  ],
 };
 
 describe('action target VFX', () => {
@@ -116,6 +127,47 @@ describe('action target VFX', () => {
 
     expect(frame.targetBodies.filter(({ active }) => active)).toHaveLength(6);
     expect(frame.targetBodies[0].position[1]).toBeGreaterThan(lyingHeadY);
+    expect(frame.particles.some(({ active }) => active)).toBe(true);
+  });
+
+  it('巡回門3つを赤青accent付きで表示し、通過済み門だけ粒へ変える', () => {
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(CHECKPOINT_JOB.targets.map(({ id }) => id));
+    const completionTimes = new Float64Array([-1, -1, -1]);
+
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      completionTimes,
+      1,
+      CHECKPOINT_JOB,
+      true,
+    );
+    expect(frame.targetBodies.filter(({ active }) => active)).toHaveLength(18);
+    expect(frame.targetAccents.filter(({ active }) => active)).toHaveLength(9);
+
+    const leftPost = frame.targetBodies[0];
+    const rightPost = frame.targetBodies[1];
+    const gateInnerWidth = (
+      rightPost.position[0] - rightPost.scale[0] / 2
+      - (leftPost.position[0] + leftPost.scale[0] / 2)
+    );
+    const police = VEHICLE_DEFINITIONS.find(({ id }) => id === 'police');
+    expect(police).toBeDefined();
+    const policeWidth = (police?.collider.halfExtents[0] ?? 0) * 2;
+    expect(gateInnerWidth).toBeGreaterThan(policeWidth);
+
+    runtime.registerTargetCompletion('checkpoint-a');
+    completionTimes[0] = 1;
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      completionTimes,
+      1.2,
+      CHECKPOINT_JOB,
+      true,
+    );
+    expect(frame.targetBodies.filter(({ active }) => active)).toHaveLength(12);
     expect(frame.particles.some(({ active }) => active)).toBe(true);
   });
 });
