@@ -32,10 +32,10 @@
 
 ## Task 4: 救急車
 
-- [ ] model data、赤十字、7 batch上限、paint palette、手当て脈動をTDD実装する。
-- [ ] 公園の3救助仕事、1.2秒停止手当て、coordinator、HUD、telemetryへ接続する。
-- [ ] PC／touchで選択、手当て、成功、帰庫、次仕事を実走する。
-- [ ] 3 viewport画像を原寸目視し、5台selector境界を数値確認する。
+- [x] model data、赤十字、7 batch上限、paint palette、手当て脈動をTDD実装する。
+- [x] 公園の3救助仕事、1.2秒停止手当て、coordinator、HUD、telemetryへ接続する。
+- [x] PC／touchで選択、手当て、成功、帰庫、次仕事を実走する。
+- [x] 3 viewport画像を原寸目視し、4台selector境界を数値確認する。
 - [ ] 日本語commit、secret scan、main push、Actions／Pages／公開E2Eを確認する。
 
 ## Task 5: パトカー

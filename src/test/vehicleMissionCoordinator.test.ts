@@ -9,6 +9,7 @@ import { VEHICLE_JOBS } from '../voxel-game/domain/vehicleJobs';
 const BLOCK_IDS = ['block-a'] as const;
 const DEBRIS_IDS = VEHICLE_JOBS.bulldozer[0].debris.map(({ id }) => id);
 const SOIL_IDS = VEHICLE_JOBS.excavator[0].targets.map(({ id }) => id);
+const PATIENT_IDS = VEHICLE_JOBS.ambulance[0].targets.map(({ id }) => id);
 
 /** 消防仕事を完了して車庫へ戻し、次のassigned仕事まで進める。 */
 function completeFireJobAndReturn(coordinator: VehicleMissionCoordinator): void {
@@ -121,6 +122,32 @@ describe('VehicleMissionCoordinator', () => {
         vehicleId: 'excavator',
       },
       selectedVehicleId: 'excavator',
+    });
+  });
+
+  it('救急車の1体手当てを共通仕事snapshotへ変換する', () => {
+    const coordinator = new VehicleMissionCoordinator(BLOCK_IDS, { jobSeed: 1 });
+    coordinator.selectVehicle('ambulance', { atGarage: true, speed: 0 });
+    coordinator.setSpatialSignals({
+      atActionTargetWorksite: true,
+      atBulldozerWorksite: false,
+      atGarage: false,
+    });
+    coordinator.advance(1);
+    expect(coordinator.registerActionTargetCompletion(PATIENT_IDS[0])).toBe(true);
+
+    expect(coordinator.getSnapshot()).toMatchObject({
+      ambulance: { completedCount: 1, missionPhase: 'celebrating', targetCount: 1 },
+      mission: {
+        destinationDistrict: 'park',
+        id: 'patient-care',
+        jobCycle: 1,
+        objectiveLabel: 'できた！',
+        phase: 'celebrating',
+        progress: { current: 1, target: 1 },
+        vehicleId: 'ambulance',
+      },
+      selectedVehicleId: 'ambulance',
     });
   });
 

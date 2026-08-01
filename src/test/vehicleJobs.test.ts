@@ -61,8 +61,32 @@ describe('vehicle jobs', () => {
       && job.routeMarkers.length === 7
       && job.targets.length === 3
       && job.targets.every(({ position }) => resolveWorldDistrict(position) === 'blocks')
+      && job.interaction.contactRadius === 1.6
       && job.interaction.holdDurationMs === 700
       && job.interaction.maximumSpeed === 0.45
+    ))).toBe(true);
+  });
+
+  it('救急車へ公園の1体を手当てする3仕事を定義する', () => {
+    const jobs = getVehicleJobs('ambulance');
+
+    expect(jobs.map(({ id }) => id)).toEqual([
+      'patient-pond',
+      'patient-playground',
+      'patient-picnic',
+    ]);
+    expect(jobs.every((job) => (
+      job.kind === 'patient-care'
+      && job.vehicleId === 'ambulance'
+      && job.destinationDistrict === 'park'
+      && job.targetKind === 'patient'
+      && job.routeMarkers.length === 7
+      && job.targets.length === 1
+      && job.targets.every(({ position }) => resolveWorldDistrict(position) === 'park')
+      && job.interaction.contactRadius === 1.8
+      && job.interaction.forwardOffset === 0
+      && job.interaction.holdDurationMs === 1_200
+      && job.interaction.maximumSpeed === 0.35
     ))).toBe(true);
   });
 
@@ -71,6 +95,7 @@ describe('vehicle jobs', () => {
       ...VEHICLE_JOBS['fire-truck'],
       ...VEHICLE_JOBS.bulldozer,
       ...VEHICLE_JOBS.excavator,
+      ...VEHICLE_JOBS.ambulance,
     ];
 
     expect(new Set(jobs.map(({ id }) => id)).size).toBe(jobs.length);
@@ -99,6 +124,7 @@ describe('vehicle jobs', () => {
         },
       ],
       excavator: VEHICLE_JOBS.excavator,
+      ambulance: VEHICLE_JOBS.ambulance,
     } as unknown as VehicleJobRegistry;
 
     expect(validateVehicleJobs(invalidRegistry)).toEqual([

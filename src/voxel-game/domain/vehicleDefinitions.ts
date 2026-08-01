@@ -1,10 +1,14 @@
 import type { WorldPoint } from '../scene/productionWorldMap';
 
 /** 本番箱庭で最初から選べる働く車の識別子。 */
-export type VehicleId = 'fire-truck' | 'bulldozer' | 'excavator';
+export type VehicleId = 'fire-truck' | 'bulldozer' | 'excavator' | 'ambulance';
 
 /** 車両ごとに割り当てる仕事の識別子。 */
-export type VehicleMissionId = 'fire-rescue' | 'debris-clearance' | 'soil-digging';
+export type VehicleMissionId =
+  | 'fire-rescue'
+  | 'debris-clearance'
+  | 'soil-digging'
+  | 'patient-care';
 
 /** HUDへ表示する車両固有primary actionの文言。 */
 export interface VehicleActionDefinition {
@@ -94,6 +98,20 @@ export const VEHICLE_DEFINITIONS = [
       yawClamp: 4.9,
     },
     visualBounds: { offset: [0, 0.84, -0.18], scale: [3.12, 2.08, 3.72] },
+  },
+  {
+    action: { ariaLabel: '手当てをする', label: 'てあて' },
+    collider: { halfExtents: [1.5, 0.98, 1.68], offset: [0, 0.98, 0] },
+    id: 'ambulance',
+    label: 'きゅうきゅうしゃ',
+    missionId: 'patient-care',
+    physics: {
+      idleResponse: 4.7,
+      mass: 1.6,
+      movingResponse: 7.2,
+      yawClamp: 5.1,
+    },
+    visualBounds: { offset: [0, 0.84, 0], scale: [2.64, 1.92, 3.12] },
   },
 ] as const satisfies readonly VehicleDefinition[];
 

@@ -23,7 +23,10 @@ export type VehicleJobId =
   | 'debris-west'
   | 'soil-north'
   | 'soil-south'
-  | 'soil-west';
+  | 'soil-west'
+  | 'patient-pond'
+  | 'patient-playground'
+  | 'patient-picnic';
 
 /** HUD、scene、telemetryが共有する車種別仕事の共通定義。 */
 interface BaseVehicleJobDefinition {
@@ -69,14 +72,33 @@ export interface ExcavatorVehicleJobDefinition extends BaseVehicleJobDefinition 
   readonly vehicleId: 'excavator';
 }
 
+/** 救急車が公園で手当てする1体の玩具患者。 */
+export interface AmbulancePatientTargetDefinition {
+  readonly id: string;
+  readonly position: WorldPoint;
+  readonly radius: number;
+}
+
+/** 救急車の患者、駐車判定、道しるべを同じ仕事へ束ねる。 */
+export interface AmbulanceVehicleJobDefinition extends BaseVehicleJobDefinition {
+  readonly destinationDistrict: 'park';
+  readonly interaction: ActionTargetInteraction;
+  readonly kind: 'patient-care';
+  readonly targetKind: 'patient';
+  readonly targets: readonly AmbulancePatientTargetDefinition[];
+  readonly vehicleId: 'ambulance';
+}
+
 /** 全車種仕事を扱うdiscriminated union。 */
 export type VehicleJobDefinition =
   | FireVehicleJobDefinition
   | BulldozerVehicleJobDefinition
-  | ExcavatorVehicleJobDefinition;
+  | ExcavatorVehicleJobDefinition
+  | AmbulanceVehicleJobDefinition;
 
 /** 車種ごとに型を保った仕事registry。 */
 export interface VehicleJobRegistry {
+  readonly ambulance: readonly AmbulanceVehicleJobDefinition[];
   readonly bulldozer: readonly BulldozerVehicleJobDefinition[];
   readonly excavator: readonly ExcavatorVehicleJobDefinition[];
   readonly 'fire-truck': readonly FireVehicleJobDefinition[];
@@ -99,15 +121,81 @@ function createFireCelebrationCenters([x, y, z]: WorldPoint): readonly WorldPoin
 const FIRE_WINDOW_LEFT_TARGET = [22.2, 1.45, -19.6] as const;
 const FIRE_WINDOW_RIGHT_TARGET = [24.8, 1.45, -19.6] as const;
 const EXCAVATOR_INTERACTION = {
-  contactRadius: 0.8,
+  contactRadius: 1.6,
   forwardOffset: 1.65,
   holdDurationMs: 700,
   maximumSpeed: 0.45,
   minimumSpeed: 0,
 } as const satisfies ActionTargetInteraction;
+const AMBULANCE_INTERACTION = {
+  contactRadius: 1.8,
+  forwardOffset: 0,
+  holdDurationMs: 1_200,
+  maximumSpeed: 0.35,
+  minimumSpeed: 0,
+} as const satisfies ActionTargetInteraction;
 
 /** 抽選対象となる各車種3件のcanonical仕事定義。 */
 export const VEHICLE_JOBS = {
+  ambulance: [
+    {
+      destinationDistrict: 'park',
+      id: 'patient-pond',
+      interaction: AMBULANCE_INTERACTION,
+      kind: 'patient-care',
+      label: 'いけのそばで てあてしよう',
+      routeMarkers: [
+        [0, 0.26, 3],
+        [0, 0.26, 0],
+        [0, 0.26, -4],
+        [0, 0.26, -8],
+        [0, 0.26, -12],
+        [0, 0.26, -17],
+        [-4, 0.26, -22.5],
+      ],
+      targetKind: 'patient',
+      targets: [{ id: 'patient-pond-a', position: [-4, 0.7, -24], radius: 0.6 }],
+      vehicleId: 'ambulance',
+    },
+    {
+      destinationDistrict: 'park',
+      id: 'patient-playground',
+      interaction: AMBULANCE_INTERACTION,
+      kind: 'patient-care',
+      label: 'ゆうぐのそばで てあてしよう',
+      routeMarkers: [
+        [0, 0.26, 3],
+        [0, 0.26, 0],
+        [0, 0.26, -4],
+        [0, 0.26, -8],
+        [0, 0.26, -12],
+        [0, 0.26, -18],
+        [6, 0.26, -27.5],
+      ],
+      targetKind: 'patient',
+      targets: [{ id: 'patient-playground-a', position: [6, 0.7, -29.5], radius: 0.6 }],
+      vehicleId: 'ambulance',
+    },
+    {
+      destinationDistrict: 'park',
+      id: 'patient-picnic',
+      interaction: AMBULANCE_INTERACTION,
+      kind: 'patient-care',
+      label: 'ピクニックで てあてしよう',
+      routeMarkers: [
+        [0, 0.26, 3],
+        [0, 0.26, 0],
+        [0, 0.26, -4],
+        [0, 0.26, -8],
+        [0, 0.26, -12],
+        [0, 0.26, -15],
+        [3.5, 0.26, -17],
+      ],
+      targetKind: 'patient',
+      targets: [{ id: 'patient-picnic-a', position: [3.5, 0.7, -18], radius: 0.6 }],
+      vehicleId: 'ambulance',
+    },
+  ],
   'fire-truck': [
     {
       celebrationStarCenters: PRODUCTION_WORLD_MAP.landmarks.celebrationStarCenters,
@@ -268,11 +356,32 @@ export const VEHICLE_JOBS = {
   ],
 } as const satisfies VehicleJobRegistry;
 
+/** アクション対象の接触半径、保持時間、速度範囲が有限かつ実行可能か判定する。 */
+function hasValidActionTargetInteraction(interaction: ActionTargetInteraction): boolean {
+  return [
+    interaction.contactRadius,
+    interaction.forwardOffset,
+    interaction.holdDurationMs,
+    interaction.maximumSpeed,
+    interaction.minimumSpeed,
+  ].every(Number.isFinite)
+    && interaction.contactRadius > 0
+    && interaction.forwardOffset >= 0
+    && interaction.holdDurationMs > 0
+    && interaction.minimumSpeed >= 0
+    && interaction.maximumSpeed >= interaction.minimumSpeed;
+}
+
 /** registryの件数、ID、文言、車種、対象数、座標契約を決定的に列挙する。 */
 export function validateVehicleJobs(registry: VehicleJobRegistry): readonly string[] {
   const errors: string[] = [];
   const ids = new Set<string>();
-  const vehicleIds: readonly VehicleId[] = ['fire-truck', 'bulldozer', 'excavator'];
+  const vehicleIds: readonly VehicleId[] = [
+    'fire-truck',
+    'bulldozer',
+    'excavator',
+    'ambulance',
+  ];
 
   for (const vehicleId of vehicleIds) {
     const jobs: readonly VehicleJobDefinition[] = registry[vehicleId];
@@ -319,7 +428,7 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
           || job.debris.some(({ position }) => resolveWorldDistrict(position) !== 'blocks')) {
           errors.push(`Bulldozer job ${job.id} must stay in the blocks district`);
         }
-      } else {
+      } else if (job.kind === 'soil-digging') {
         if (job.targets.length !== 3) {
           errors.push(`Excavator job ${job.id} must have exactly 3 soil targets`);
         }
@@ -333,22 +442,25 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
           || job.targets.some(({ position }) => resolveWorldDistrict(position) !== 'blocks')) {
           errors.push(`Excavator job ${job.id} must stay in the blocks district`);
         }
-        const interaction = job.interaction;
-        if (
-          ![
-            interaction.contactRadius,
-            interaction.forwardOffset,
-            interaction.holdDurationMs,
-            interaction.maximumSpeed,
-            interaction.minimumSpeed,
-          ].every(Number.isFinite)
-          || interaction.contactRadius <= 0
-          || interaction.forwardOffset < 0
-          || interaction.holdDurationMs <= 0
-          || interaction.minimumSpeed < 0
-          || interaction.maximumSpeed < interaction.minimumSpeed
-        ) {
+        if (!hasValidActionTargetInteraction(job.interaction)) {
           errors.push(`Excavator job ${job.id} has invalid interaction`);
+        }
+      } else {
+        if (job.targets.length !== 1) {
+          errors.push(`Ambulance job ${job.id} must have exactly 1 patient`);
+        }
+        const targetIds = new Set(job.targets.map(({ id }) => id));
+        if (targetIds.size !== job.targets.length
+          || job.targets.some(({ id }) => id.trim().length === 0)) {
+          errors.push(`Ambulance job ${job.id} must have unique non-empty target ids`);
+        }
+        if (job.targetKind !== 'patient'
+          || job.destinationDistrict !== 'park'
+          || job.targets.some(({ position }) => resolveWorldDistrict(position) !== 'park')) {
+          errors.push(`Ambulance job ${job.id} must stay in the park district`);
+        }
+        if (!hasValidActionTargetInteraction(job.interaction)) {
+          errors.push(`Ambulance job ${job.id} has invalid interaction`);
         }
       }
     }
@@ -360,6 +472,7 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
 export function getVehicleJobs(vehicleId: unknown): readonly VehicleJobDefinition[] {
   if (vehicleId === 'bulldozer') return VEHICLE_JOBS.bulldozer;
   if (vehicleId === 'excavator') return VEHICLE_JOBS.excavator;
+  if (vehicleId === 'ambulance') return VEHICLE_JOBS.ambulance;
   return VEHICLE_JOBS['fire-truck'];
 }
 

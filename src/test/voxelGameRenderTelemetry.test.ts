@@ -58,6 +58,19 @@ describe('vehicle controller config', () => {
       speed: 0,
     });
   });
+
+  it('救急車のcontroller値と車種付き初期telemetryを解決する', () => {
+    expect(resolveVehicleControllerConfig('ambulance')).toMatchObject({
+      collider: { halfExtents: [1.5, 0.98, 1.68], offset: [0, 0.98, 0] },
+      physics: { idleResponse: 4.7, mass: 1.6, movingResponse: 7.2, yawClamp: 5.1 },
+      vehicleId: 'ambulance',
+    });
+    expect(createInitialVehicleTelemetry('ambulance')).toMatchObject({
+      id: 'ambulance',
+      mass: 1.6,
+      position: [0, 0.8, 6],
+    });
+  });
 });
 
 describe('advanceRenderTelemetry', () => {
@@ -146,6 +159,18 @@ describe('buildMissionJobTelemetry', () => {
       targetPositions: VEHICLE_JOBS.excavator[0].targets.map(({ position }) => position),
     });
   });
+
+  it('救急仕事では現在仕事の1体だけを公開する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+    coordinator.selectVehicle('ambulance', { atGarage: true, speed: 0 });
+
+    expect(buildMissionJobTelemetry(coordinator.getSnapshot())).toMatchObject({
+      jobCycle: 1,
+      jobId: 'patient-pond',
+      jobSeed: 1,
+      targetPositions: VEHICLE_JOBS.ambulance[0].targets.map(({ position }) => position),
+    });
+  });
 });
 
 describe('syncVehicleMissionSpatialSignals', () => {
@@ -170,6 +195,20 @@ describe('syncVehicleMissionSpatialSignals', () => {
       id: 'soil-digging',
       phase: 'active',
       vehicleId: 'excavator',
+    });
+  });
+
+  it('救急車で公園へ着くと手当て仕事を開始する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+    coordinator.selectVehicle('ambulance', { atGarage: true, speed: 0 });
+
+    syncVehicleMissionSpatialSignals(coordinator, [-4, 0.8, -24]);
+    coordinator.advance(1);
+
+    expect(coordinator.getSnapshot().mission).toMatchObject({
+      id: 'patient-care',
+      phase: 'active',
+      vehicleId: 'ambulance',
     });
   });
 });

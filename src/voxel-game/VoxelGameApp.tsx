@@ -246,7 +246,9 @@ export function VoxelGameApp(): ReactElement {
     controls.reset();
     telemetryRef.current = createInitialVehicleTelemetry(vehicleId);
     const snapshot = coordinator.getSnapshot();
-    actionTargetMissionSnapshotRef.current = snapshot.excavator;
+    actionTargetMissionSnapshotRef.current = snapshot.selectedVehicleId === 'ambulance'
+      ? snapshot.ambulance
+      : snapshot.excavator;
     bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
     bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
     setCoordinatorSnapshot(snapshot);
@@ -271,7 +273,9 @@ export function VoxelGameApp(): ReactElement {
 
   useEffect(() => {
     const unsubscribe = coordinator.subscribe((snapshot) => {
-      actionTargetMissionSnapshotRef.current = snapshot.excavator;
+      actionTargetMissionSnapshotRef.current = snapshot.selectedVehicleId === 'ambulance'
+        ? snapshot.ambulance
+        : snapshot.excavator;
       bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
       bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
       setCoordinatorSnapshot(snapshot);
@@ -290,6 +294,8 @@ export function VoxelGameApp(): ReactElement {
       const missionTelemetry = missionTelemetryRef.current;
       const bulldozerTelemetry = bulldozerMissionTelemetryRef.current;
       const actionTargetTelemetry = actionTargetMissionTelemetryRef.current;
+      const ambulanceActionActive = coordinatorState.selectedVehicleId === 'ambulance';
+      const excavatorActionActive = coordinatorState.selectedVehicleId === 'excavator';
       const waterFrame = createWaterFlowFrame({
         path: missionTelemetry.waterPath,
         splashElapsedSeconds: missionTelemetry.splashElapsedSeconds,
@@ -304,6 +310,33 @@ export function VoxelGameApp(): ReactElement {
       const breakables = breakablePoolHandleRef.current?.readActualTelemetry()
         ?? breakableTelemetryRef.current;
       const payload: VoxelGameTextState = {
+        ambulance: {
+          activeParticleCount: ambulanceActionActive
+            ? actionTargetTelemetry.activeParticleCount
+            : 0,
+          completedCount: coordinatorState.ambulance.completedCount,
+          contactPoint: ambulanceActionActive
+            ? [...actionTargetTelemetry.contactPoint]
+            : [0, -40, 0],
+          holdMilliseconds: ambulanceActionActive
+            ? [...actionTargetTelemetry.holdMilliseconds]
+            : [0, 0, 0],
+          missionPhase: coordinatorState.ambulance.missionPhase,
+          routeMarkerCount: ambulanceActionActive
+            ? actionTargetTelemetry.routeMarkerCount
+            : 0,
+          starVoxelCount: ambulanceActionActive
+            ? actionTargetTelemetry.starVoxelCount
+            : 0,
+          targetAccentVoxelCount: ambulanceActionActive
+            ? actionTargetTelemetry.targetAccentVoxelCount
+            : 0,
+          targetBodyVoxelCount: ambulanceActionActive
+            ? actionTargetTelemetry.targetBodyVoxelCount
+            : 0,
+          targetCount: coordinatorState.ambulance.targetCount,
+          targets: coordinatorState.ambulance.targets.map((target) => ({ ...target })),
+        },
         blocks: runtime.blocks.map((block) => ({ ...block })),
         bulldozer: {
           activeChipCount: bulldozerTelemetry.activeChipCount,
@@ -317,15 +350,29 @@ export function VoxelGameApp(): ReactElement {
           targetCount: coordinatorState.bulldozer.targetCount,
         },
         excavator: {
-          activeParticleCount: actionTargetTelemetry.activeParticleCount,
+          activeParticleCount: excavatorActionActive
+            ? actionTargetTelemetry.activeParticleCount
+            : 0,
           completedCount: coordinatorState.excavator.completedCount,
-          contactPoint: [...actionTargetTelemetry.contactPoint],
-          holdMilliseconds: [...actionTargetTelemetry.holdMilliseconds],
+          contactPoint: excavatorActionActive
+            ? [...actionTargetTelemetry.contactPoint]
+            : [0, -40, 0],
+          holdMilliseconds: excavatorActionActive
+            ? [...actionTargetTelemetry.holdMilliseconds]
+            : [0, 0, 0],
           missionPhase: coordinatorState.excavator.missionPhase,
-          routeMarkerCount: actionTargetTelemetry.routeMarkerCount,
-          starVoxelCount: actionTargetTelemetry.starVoxelCount,
-          targetAccentVoxelCount: actionTargetTelemetry.targetAccentVoxelCount,
-          targetBodyVoxelCount: actionTargetTelemetry.targetBodyVoxelCount,
+          routeMarkerCount: excavatorActionActive
+            ? actionTargetTelemetry.routeMarkerCount
+            : 0,
+          starVoxelCount: excavatorActionActive
+            ? actionTargetTelemetry.starVoxelCount
+            : 0,
+          targetAccentVoxelCount: excavatorActionActive
+            ? actionTargetTelemetry.targetAccentVoxelCount
+            : 0,
+          targetBodyVoxelCount: excavatorActionActive
+            ? actionTargetTelemetry.targetBodyVoxelCount
+            : 0,
           targetCount: coordinatorState.excavator.targetCount,
           targets: coordinatorState.excavator.targets.map((target) => ({ ...target })),
         },
@@ -341,6 +388,9 @@ export function VoxelGameApp(): ReactElement {
           breakableBlocks: BREAKABLE_BLOCKS.map(({ id, position }) => ({ id, position })),
           blockPlaza: BLOCK_PLAZA,
           bulldozerDebris: coordinatorState.currentJobs.bulldozer.debris.map(
+            ({ id, position, radius }) => ({ id, position, radius }),
+          ),
+          ambulanceTargets: coordinatorState.currentJobs.ambulance.targets.map(
             ({ id, position, radius }) => ({ id, position, radius }),
           ),
           excavatorTargets: coordinatorState.currentJobs.excavator.targets.map(
@@ -494,9 +544,14 @@ export function VoxelGameApp(): ReactElement {
       <section className="voxel-game-canvas" aria-label="純ボクセル働く車の箱庭">
         <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}>
           <VoxelGameScene
-            actionTargetJob={coordinatorSnapshot.currentJobs.excavator}
+            actionTargetJob={coordinatorSnapshot.selectedVehicleId === 'ambulance'
+              ? coordinatorSnapshot.currentJobs.ambulance
+              : coordinatorSnapshot.currentJobs.excavator}
             actionTargetMissionSnapshotRef={actionTargetMissionSnapshotRef}
             actionTargetMissionTelemetryRef={actionTargetMissionTelemetryRef}
+            actionTargetRuntime={coordinatorSnapshot.selectedVehicleId === 'ambulance'
+              ? coordinator.ambulanceRuntime
+              : coordinator.excavatorRuntime}
             breakablePoolHandleRef={breakablePoolHandleRef}
             breakableTelemetryRef={breakableTelemetryRef}
             bulldozerJobRef={bulldozerJobRef}

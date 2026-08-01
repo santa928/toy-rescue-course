@@ -57,7 +57,7 @@ PCとtouchの同じ主操作で完了できるようにする。既存の自由�
 ### 救急車
 
 - 公園にいる1体の玩具へ向かい、近くで停止して手当てする。
-- 車体中心が半径1.8以内、速度0.35以下、主操作継続1.2秒で完了する。
+- 患者を車体で隠さず横へ止められるよう、車体中心が半径2.4以内、速度0.35以下、主操作継続1.2秒で完了する。
 - 対象は手当て中に白赤の小cubeで脈動し、完了時に起き上がる表現にする。
 - 仕事札は「てあてをしよう」、主操作は「てあて」。
 
@@ -159,6 +159,15 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - desktop keyboard、tablet touch、mobile-landscape touchで土3山、成功、帰庫、次仕事を完走した。
 - 3 viewportとも主要HUDは画面内、3ボタンはselector境界内、主要UI間は8px以上だった。
 - Docker software rendererではscene 30 calls、ショベルカー車体7 calls。物理GPU再認証は5台総合回帰で行う。
+
+### 2026-08-01 Task 4 救急車実測
+
+- 白い箱形車体、赤帯と赤十字、青緑窓、赤色灯、黒タイヤを純voxel 7 batchで実装した。
+- 公園の3仕事へ各1体の患者を置き、車体中心2.4unit以内、速度0.35以下、主操作1.2秒保持で手当てする。完了した患者は0.65秒で横向きから起き上がる。
+- 動的に移動する固定poolが原点周辺の境界でfrustum cullingされ、telemetry上はactiveでも土山と患者が見えない不具合を実ブラウザで発見した。動的poolだけ`frustumCulled=false`として、描画対象と判定対象を一致させた。
+- Docker内fresh unitは42 files／409 tests、production buildは649 modulesで全bundle予算内だった。game entryは121,542 bytes、Threeは718,551 bytes、Rapierは2,237,128 bytesだった。
+- desktop keyboard、tablet touch、mobile-landscape touchで患者の手当前表示、手当て、成功、帰庫、次仕事を実走した。4ボタンはselector境界内、主要UI間は8px以上だった。
+- 3 viewportともscene 30 calls、救急車車体7 calls。患者の横たわり、起き上がり、赤十字、HUD、操作系を15枚の画像で原寸目視した。物理GPU再認証は5台総合回帰で行う。
 
 - 受け入れ条件、非対象、リスクと対策、性能目標を明示した。
 - 保留項目は理由、影響、代替タスク、復帰条件を記載した。

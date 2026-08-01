@@ -6,6 +6,8 @@ export const ACTION_TARGET_ACCENT_POOL_SIZE = 9;
 export const ACTION_TARGET_PARTICLE_POOL_SIZE = 18;
 export const ACTION_TARGET_ROUTE_POOL_SIZE = 7;
 export const ACTION_TARGET_STAR_POOL_SIZE = 12;
+/** 毎frame遠隔座標へ動かす固定poolは原点の初期境界で描画除外しない。 */
+export const ACTION_TARGET_DYNAMIC_FRUSTUM_CULLED = false;
 
 /** 追加車両の対象を描き分ける3つの玩具形状。 */
 export type ActionTargetKind = 'soil' | 'patient' | 'checkpoint';
@@ -49,6 +51,7 @@ const ACCENT_VOXELS_PER_TARGET = ACTION_TARGET_ACCENT_POOL_SIZE / TARGET_CAPACIT
 const PARTICLES_PER_TARGET = ACTION_TARGET_PARTICLE_POOL_SIZE / TARGET_CAPACITY;
 const HIDDEN_Y = -40;
 const PARTICLE_LIFETIME_SECONDS = 1.1;
+const PATIENT_RISE_SECONDS = 0.65;
 const BODY_SHAPES: Readonly<Record<ActionTargetKind, readonly {
   readonly offset: WorldPoint;
   readonly scale: WorldPoint;
@@ -98,6 +101,19 @@ const ACCENT_SHAPES: Readonly<Record<ActionTargetKind, readonly {
     { offset: [0.55, 0.3, -0.22], scale: [0.2, 0.2, 0.2] },
   ],
 };
+const PATIENT_LYING_BODY_SHAPES = [
+  { offset: [-0.72, 0.04, 0], scale: [0.72, 0.72, 0.72] },
+  { offset: [0, 0, 0], scale: [0.9, 0.52, 0.78] },
+  { offset: [0, 0, -0.48], scale: [0.72, 0.24, 0.24] },
+  { offset: [0, 0, 0.48], scale: [0.72, 0.24, 0.24] },
+  { offset: [0.7, 0, -0.24], scale: [0.7, 0.28, 0.3] },
+  { offset: [0.7, 0, 0.24], scale: [0.7, 0.28, 0.3] },
+] as const;
+const PATIENT_LYING_ACCENT_SHAPES = [
+  { offset: [0, -0.3, 0], scale: [0.58, 0.12, 0.18] },
+  { offset: [0, -0.3, -0.2], scale: [0.18, 0.12, 0.22] },
+  { offset: [0, -0.3, 0.2], scale: [0.18, 0.12, 0.22] },
+] as const;
 const PARTICLE_DIRECTIONS = [
   [-0.9, 0.9, -0.45], [-0.58, 1.05, 0.7], [-0.18, 0.88, -0.92],
   [0.25, 1.1, 0.88], [0.62, 0.86, -0.58], [0.94, 0.98, 0.38],
@@ -172,6 +188,18 @@ function updateCelebrationCenter(
   target[2] = Math.round(z / count * 2) / 2;
 }
 
+/** 患者の完了時刻から、横たわった0〜立ち上がった1の補間率を返す。 */
+function getPatientRiseProgress(
+  completed: boolean,
+  completionTimeSeconds: number,
+  elapsedSeconds: number,
+): number {
+  if (!completed || completionTimeSeconds < 0) return 0;
+  return Math.min(1, Math.max(0, (
+    elapsedSeconds - completionTimeSeconds
+  ) / PATIENT_RISE_SECONDS));
+}
+
 /** 現在snapshotと完了時刻から全固定slotを配列再生成なしで更新する。 */
 export function updateActionTargetVfxFrame(
   frame: ActionTargetVfxFrame,
@@ -187,36 +215,67 @@ export function updateActionTargetVfxFrame(
   for (const transform of frame.targetBodies) {
     const source = job.targets[transform.sourceIndex];
     const state = snapshot.targets[transform.sourceIndex];
-    const shape = BODY_SHAPES[job.targetKind][transform.slot % BODY_VOXELS_PER_TARGET];
-    if (!enabled || !source || !state || state.completed || !shape) {
+    const shapeIndex = transform.slot % BODY_VOXELS_PER_TARGET;
+    const shape = BODY_SHAPES[job.targetKind][shapeIndex];
+    const patientShape = PATIENT_LYING_BODY_SHAPES[shapeIndex];
+    const patientVisible = job.targetKind === 'patient';
+    if (!enabled || !source || !state || (state.completed && !patientVisible) || !shape) {
       hideActionTargetTransform(transform);
       continue;
     }
+    const rise = patientVisible
+      ? getPatientRiseProgress(
+        state.completed,
+        completionTimesSeconds[transform.sourceIndex] ?? -1,
+        safeElapsed,
+      )
+      : 1;
+    const startShape = patientVisible && patientShape ? patientShape : shape;
     transform.active = true;
-    transform.position[0] = source.position[0] + shape.offset[0];
-    transform.position[1] = source.position[1] + shape.offset[1];
-    transform.position[2] = source.position[2] + shape.offset[2];
-    transform.scale[0] = shape.scale[0];
-    transform.scale[1] = shape.scale[1];
-    transform.scale[2] = shape.scale[2];
+    transform.position[0] = source.position[0]
+      + startShape.offset[0] + (shape.offset[0] - startShape.offset[0]) * rise;
+    transform.position[1] = source.position[1]
+      + startShape.offset[1] + (shape.offset[1] - startShape.offset[1]) * rise;
+    transform.position[2] = source.position[2]
+      + startShape.offset[2] + (shape.offset[2] - startShape.offset[2]) * rise;
+    transform.scale[0] = startShape.scale[0] + (shape.scale[0] - startShape.scale[0]) * rise;
+    transform.scale[1] = startShape.scale[1] + (shape.scale[1] - startShape.scale[1]) * rise;
+    transform.scale[2] = startShape.scale[2] + (shape.scale[2] - startShape.scale[2]) * rise;
   }
 
   for (const transform of frame.targetAccents) {
     const source = job.targets[transform.sourceIndex];
     const state = snapshot.targets[transform.sourceIndex];
-    const shape = ACCENT_SHAPES[job.targetKind][transform.slot % ACCENT_VOXELS_PER_TARGET];
-    if (!enabled || !source || !state || state.completed || !shape) {
+    const shapeIndex = transform.slot % ACCENT_VOXELS_PER_TARGET;
+    const shape = ACCENT_SHAPES[job.targetKind][shapeIndex];
+    const patientShape = PATIENT_LYING_ACCENT_SHAPES[shapeIndex];
+    const patientVisible = job.targetKind === 'patient';
+    if (!enabled || !source || !state || (state.completed && !patientVisible) || !shape) {
       hideActionTargetTransform(transform);
       continue;
     }
+    const rise = patientVisible
+      ? getPatientRiseProgress(
+        state.completed,
+        completionTimesSeconds[transform.sourceIndex] ?? -1,
+        safeElapsed,
+      )
+      : 1;
+    const startShape = patientVisible && patientShape ? patientShape : shape;
     const pulse = 1 + Math.sin(safeElapsed * 5 + transform.slot) * 0.08;
     transform.active = true;
-    transform.position[0] = source.position[0] + shape.offset[0];
-    transform.position[1] = source.position[1] + shape.offset[1];
-    transform.position[2] = source.position[2] + shape.offset[2];
-    transform.scale[0] = shape.scale[0] * pulse;
-    transform.scale[1] = shape.scale[1] * pulse;
-    transform.scale[2] = shape.scale[2] * pulse;
+    transform.position[0] = source.position[0]
+      + startShape.offset[0] + (shape.offset[0] - startShape.offset[0]) * rise;
+    transform.position[1] = source.position[1]
+      + startShape.offset[1] + (shape.offset[1] - startShape.offset[1]) * rise;
+    transform.position[2] = source.position[2]
+      + startShape.offset[2] + (shape.offset[2] - startShape.offset[2]) * rise;
+    transform.scale[0] = (startShape.scale[0]
+      + (shape.scale[0] - startShape.scale[0]) * rise) * pulse;
+    transform.scale[1] = (startShape.scale[1]
+      + (shape.scale[1] - startShape.scale[1]) * rise) * pulse;
+    transform.scale[2] = (startShape.scale[2]
+      + (shape.scale[2] - startShape.scale[2]) * rise) * pulse;
   }
 
   for (const transform of frame.particles) {

@@ -8,11 +8,12 @@ import {
 } from '../voxel-game/domain/vehicleDefinitions';
 
 describe('vehicle definitions', () => {
-  it('消防車、ブルドーザー、ショベルカーを一意な利用可能車種として公開する', () => {
+  it('消防車、ブルドーザー、ショベルカー、救急車を一意な利用可能車種として公開する', () => {
     expect(VEHICLE_DEFINITIONS.map(({ id }) => id)).toEqual([
       'fire-truck',
       'bulldozer',
       'excavator',
+      'ambulance',
     ]);
     expect(validateVehicleDefinitions(VEHICLE_DEFINITIONS)).toEqual([]);
   });
@@ -60,6 +61,17 @@ describe('vehicle definitions', () => {
         offset: [0, 0.84, -0.18],
         scale: [3.12, 2.08, 3.72],
       },
+    });
+  });
+
+  it('救急車へ停止手当て向けの物理、箱形外接、主操作を割り当てる', () => {
+    expect(getVehicleDefinition('ambulance')).toMatchObject({
+      action: { ariaLabel: '手当てをする', label: 'てあて' },
+      collider: { halfExtents: [1.5, 0.98, 1.68], offset: [0, 0.98, 0] },
+      label: 'きゅうきゅうしゃ',
+      missionId: 'patient-care',
+      physics: { idleResponse: 4.7, mass: 1.6, movingResponse: 7.2, yawClamp: 5.1 },
+      visualBounds: { offset: [0, 0.84, 0], scale: [2.64, 1.92, 3.12] },
     });
   });
 

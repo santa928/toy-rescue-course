@@ -3,6 +3,7 @@ import { ActionTargetMissionRuntime } from '../voxel-game/domain/ActionTargetMis
 import {
   ACTION_TARGET_ACCENT_POOL_SIZE,
   ACTION_TARGET_BODY_POOL_SIZE,
+  ACTION_TARGET_DYNAMIC_FRUSTUM_CULLED,
   ACTION_TARGET_PARTICLE_POOL_SIZE,
   ACTION_TARGET_ROUTE_POOL_SIZE,
   ACTION_TARGET_STAR_POOL_SIZE,
@@ -25,9 +26,16 @@ const JOB: ActionTargetVfxJob = {
   ],
 };
 
+const PATIENT_JOB: ActionTargetVfxJob = {
+  routeMarkers: Array.from({ length: 7 }, (_, index) => [0, 0.25, -index] as const),
+  targetKind: 'patient',
+  targets: [{ id: 'patient-a', position: [2, 0.7, -3], radius: 0.6 }],
+};
+
 describe('action target VFX', () => {
   it('共通sceneを固定5 batchと非active telemetryで開始する', () => {
     expect(ACTION_TARGET_MISSION_DRAW_CALLS).toBe(5);
+    expect(ACTION_TARGET_DYNAMIC_FRUSTUM_CULLED).toBe(false);
     expect(createActionTargetMissionTelemetry()).toMatchObject({
       activeParticleCount: 0,
       completedCount: 0,
@@ -91,5 +99,23 @@ describe('action target VFX', () => {
 
     expect(frame.stars.filter(({ active }) => active)).toHaveLength(12);
     expect(frame.celebrationCenter).toEqual([5, 1.4, 3]);
+  });
+
+  it('患者は手当前に横たわり、完了後は粒を出しながら起き上がって残る', () => {
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(['patient-a']);
+    const completionTimes = new Float64Array([-1, -1, -1]);
+
+    updateActionTargetVfxFrame(frame, runtime.getSnapshot(), completionTimes, 1, PATIENT_JOB, true);
+    const lyingHeadY = frame.targetBodies[0].position[1];
+    expect(frame.targetBodies.filter(({ active }) => active)).toHaveLength(6);
+
+    runtime.registerTargetCompletion('patient-a');
+    completionTimes[0] = 1;
+    updateActionTargetVfxFrame(frame, runtime.getSnapshot(), completionTimes, 1.8, PATIENT_JOB, true);
+
+    expect(frame.targetBodies.filter(({ active }) => active)).toHaveLength(6);
+    expect(frame.targetBodies[0].position[1]).toBeGreaterThan(lyingHeadY);
+    expect(frame.particles.some(({ active }) => active)).toBe(true);
   });
 });

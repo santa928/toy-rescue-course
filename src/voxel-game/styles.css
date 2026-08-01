@@ -239,6 +239,21 @@ button {
   background: #858b94;
 }
 
+.mission-pill[data-vehicle='ambulance'] {
+  border-color: #a61e1e;
+  color: #6b1616;
+  box-shadow: 0 6px 0 #a61e1e;
+}
+
+.mission-pill[data-vehicle='ambulance'] .mission-pill__vehicle span {
+  border-color: #a61e1e;
+  background: #fffdf7;
+}
+
+.mission-pill[data-vehicle='ambulance'] .mission-pill__vehicle span:nth-child(2) {
+  background: #e33a32;
+}
+
 .vehicle-selector {
   position: absolute;
   top: calc(env(safe-area-inset-top) + 12px);
@@ -295,6 +310,14 @@ button {
 .vehicle-selector__button[data-vehicle='excavator'] .vehicle-selector__swatch {
   border-color: #8a430c;
   background: #e87918;
+}
+
+.vehicle-selector__button[data-vehicle='ambulance'] .vehicle-selector__swatch {
+  border-color: #a61e1e;
+  background:
+    linear-gradient(to right, transparent 34%, #e33a32 34% 66%, transparent 66%),
+    linear-gradient(to bottom, transparent 36%, #e33a32 36% 64%, transparent 64%),
+    #fffdf7;
 }
 
 .fullscreen-button {
@@ -559,6 +582,45 @@ button {
 .primary-action-button[data-vehicle='excavator'][data-pressed='true'] {
   background: var(--toy-white);
   box-shadow: 0 3px 0 #713709;
+}
+
+.primary-action-button[data-vehicle='ambulance'] {
+  border-color: #a61e1e;
+  color: #6b1616;
+  background: #fffdf7;
+  box-shadow: 0 8px 0 #7f1717;
+}
+
+.primary-action-button[data-vehicle='ambulance'] .primary-action-button__glyph span {
+  border: 0;
+  background: #e33a32;
+}
+
+.primary-action-button[data-vehicle='ambulance'] .primary-action-button__glyph span:nth-child(1) {
+  top: 2px;
+  left: 17px;
+  width: 14px;
+  height: 34px;
+}
+
+.primary-action-button[data-vehicle='ambulance'] .primary-action-button__glyph span:nth-child(2) {
+  top: 12px;
+  left: 7px;
+  width: 34px;
+  height: 14px;
+}
+
+.primary-action-button[data-vehicle='ambulance'] .primary-action-button__glyph span:nth-child(3) {
+  right: 2px;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  background: #f5b8b3;
+}
+
+.primary-action-button[data-vehicle='ambulance'][data-pressed='true'] {
+  background: #ffe0dc;
+  box-shadow: 0 3px 0 #7f1717;
 }
 
 .fullscreen-button:hover:not(:disabled),

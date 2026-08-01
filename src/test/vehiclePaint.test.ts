@@ -15,12 +15,18 @@ import {
   EXCAVATOR_VOXELS,
 } from '../vehicle-lab/model/excavatorVoxels';
 import {
+  AMBULANCE_PALETTE,
+  AMBULANCE_PALETTE_IDS,
+  AMBULANCE_VOXELS,
+} from '../vehicle-lab/model/ambulanceVoxels';
+import {
   VEHICLE_PAINTABLE_PALETTE_IDS,
   resolveVehiclePaintColor,
 } from '../vehicle-lab/model/vehiclePaint';
 import { BULLDOZER_RENDER_PLAN } from '../vehicle-lab/scene/VoxelBulldozer';
 import { FIRE_TRUCK_RENDER_PLAN } from '../vehicle-lab/scene/VoxelFireTruck';
 import { EXCAVATOR_RENDER_PLAN } from '../vehicle-lab/scene/VoxelExcavator';
+import { AMBULANCE_RENDER_PLAN } from '../vehicle-lab/scene/VoxelAmbulance';
 
 describe('vehicle paint palette', () => {
   it('3台のbody paletteだけをpaint対象にする', () => {
@@ -28,7 +34,24 @@ describe('vehicle paint palette', () => {
       'fire-truck': ['red'],
       bulldozer: ['yellow'],
       excavator: ['orange'],
+      ambulance: ['white'],
     });
+  });
+
+  it.each([
+    ['#ef4444'],
+    ['#3b82f6'],
+    ['#facc15'],
+  ])('救急車bodyへ%sを適用し、赤帯・赤十字・窓・車輪・灯火は残す', (paintColor) => {
+    for (const paletteId of AMBULANCE_PALETTE_IDS) {
+      const baseColor = AMBULANCE_PALETTE[paletteId].color;
+      expect(resolveVehiclePaintColor({
+        baseColor,
+        paintColor,
+        paletteId,
+        vehicleId: 'ambulance',
+      })).toBe(paletteId === 'white' ? paintColor : baseColor);
+    }
   });
 
   it.each([
@@ -95,8 +118,10 @@ describe('vehicle paint palette', () => {
     expect(FIRE_TRUCK_RENDER_PLAN.voxelCount).toBe(FIRE_TRUCK_VOXELS.length);
     expect(BULLDOZER_RENDER_PLAN.voxelCount).toBe(BULLDOZER_VOXELS.length);
     expect(EXCAVATOR_RENDER_PLAN.voxelCount).toBe(EXCAVATOR_VOXELS.length);
+    expect(AMBULANCE_RENDER_PLAN.voxelCount).toBe(AMBULANCE_VOXELS.length);
     expect(FIRE_TRUCK_RENDER_PLAN.drawCalls).toBe(7);
     expect(BULLDOZER_RENDER_PLAN.drawCalls).toBe(7);
     expect(EXCAVATOR_RENDER_PLAN.drawCalls).toBe(7);
+    expect(AMBULANCE_RENDER_PLAN.drawCalls).toBe(7);
   });
 });

@@ -129,6 +129,7 @@ services:
     working_dir: /app
     environment:
       VOXEL_GAME_BASE_URL: http://127.0.0.1:5173
+      VOXEL_GAME_FLEET_VIEWPORT: ${VOXEL_GAME_FLEET_VIEWPORT:-}
     volumes:
       - ./output:/app/output
     command:

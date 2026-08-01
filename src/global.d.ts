@@ -3,6 +3,19 @@ export {};
 declare global {
   /** 自動操作と目視状態を一致させるVoxel Gameの完成版text-state契約。 */
   interface VoxelGameTextState {
+    readonly ambulance: {
+      readonly activeParticleCount: number;
+      readonly completedCount: number;
+      readonly contactPoint: readonly [number, number, number];
+      readonly holdMilliseconds: readonly number[];
+      readonly missionPhase: import('./voxel-game/domain/VoxelGameRuntime').MissionPhase;
+      readonly routeMarkerCount: number;
+      readonly starVoxelCount: number;
+      readonly targetAccentVoxelCount: number;
+      readonly targetBodyVoxelCount: number;
+      readonly targetCount: number;
+      readonly targets: readonly import('./voxel-game/domain/ActionTargetMissionRuntime').ActionTargetSnapshot[];
+    };
     readonly blocks: readonly import('./voxel-game/domain/VoxelGameRuntime').BreakableSnapshot[];
     readonly breakables: import('./voxel-game/scene/BreakableBlockPlaza').BreakableTelemetry;
     readonly bulldozer: {
@@ -39,6 +52,11 @@ declare global {
       readonly targeted: boolean;
     };
     readonly landmarks: {
+      readonly ambulanceTargets: readonly {
+        readonly id: string;
+        readonly position: readonly [number, number, number];
+        readonly radius: number;
+      }[];
       readonly breakableBlocks: readonly {
         readonly id: string;
         readonly position: readonly [number, number, number];

@@ -47,6 +47,19 @@ const excavatorMission: VehicleMissionSnapshot = {
   vehicleId: 'excavator',
 };
 
+const ambulanceMission: VehicleMissionSnapshot = {
+  destinationDistrict: 'park',
+  id: 'patient-care',
+  jobCycle: 1,
+  jobId: 'patient-pond',
+  jobLabel: 'いけのそばで てあてしよう',
+  objectiveLabel: 'てあてをしよう',
+  phase: 'active',
+  progress: { current: 0, target: 1 },
+  routeVisible: false,
+  vehicleId: 'ambulance',
+};
+
 const inactiveColorEffect: VehicleColorEffectSnapshot = {
   active: false,
   activationCount: 0,
@@ -78,12 +91,33 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('しょうぼうしゃ');
     expect(html).toContain('ブルドーザー');
     expect(html).toContain('ショベルカー');
+    expect(html).toContain('きゅうきゅうしゃ');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="ブレードを動かす"');
     expect(html).toContain('きたのがれきをかたづけよう');
     expect(html).toContain('こうじげんばへ いこう');
     expect(html).toContain('1しゅうめ・0/3');
     expect(html).toContain('aria-label="きたのがれきをかたづけよう。こうじげんばへ いこう。1しゅうめ・0/3"');
+  });
+
+  it('救急車固有の仕事、1体進捗、手当て操作を公開する', () => {
+    const html = renderToStaticMarkup(<VoxelGameHud
+      canSwitchVehicle
+      colorEffect={inactiveColorEffect}
+      controls={createControls()}
+      fullscreen={false}
+      fullscreenAvailable
+      mission={ambulanceMission}
+      onSelectVehicle={vi.fn()}
+      onToggleFullscreen={vi.fn()}
+      selectedVehicleId="ambulance"
+    />);
+
+    expect(html).toContain('aria-label="手当てをする"');
+    expect(html).toContain('いけのそばで てあてしよう');
+    expect(html).toContain('てあてをしよう');
+    expect(html).toContain('1しゅうめ・0/1');
+    expect(html).toContain('data-vehicle="ambulance"');
   });
 
   it('ショベルカー固有の仕事、進捗、バケット操作を公開する', () => {

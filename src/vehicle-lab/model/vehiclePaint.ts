@@ -3,6 +3,7 @@ import type { VehicleId } from '../../voxel-game/domain/vehicleDefinitions';
 /** 車種ごとに一時色へ置き換えてよいbody palette ID。 */
 export const VEHICLE_PAINTABLE_PALETTE_IDS = {
   'fire-truck': ['red'],
+  ambulance: ['white'],
   bulldozer: ['yellow'],
   excavator: ['orange'],
 } as const satisfies Record<VehicleId, readonly string[]>;

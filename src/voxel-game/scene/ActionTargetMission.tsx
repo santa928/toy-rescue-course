@@ -17,6 +17,7 @@ import type { VehicleTelemetryRef } from './VehicleController';
 import {
   ACTION_TARGET_ACCENT_POOL_SIZE,
   ACTION_TARGET_BODY_POOL_SIZE,
+  ACTION_TARGET_DYNAMIC_FRUSTUM_CULLED,
   ACTION_TARGET_PARTICLE_POOL_SIZE,
   ACTION_TARGET_ROUTE_POOL_SIZE,
   ACTION_TARGET_STAR_POOL_SIZE,
@@ -144,7 +145,12 @@ function VoxelPool({
   readonly vertexColors?: boolean;
 }): ReactElement {
   return (
-    <instancedMesh args={[UNIT_GEOMETRY, undefined, count]} dispose={null} ref={meshRef}>
+    <instancedMesh
+      args={[UNIT_GEOMETRY, undefined, count]}
+      dispose={null}
+      frustumCulled={ACTION_TARGET_DYNAMIC_FRUSTUM_CULLED}
+      ref={meshRef}
+    >
       <meshLambertMaterial
         color={color}
         emissive={emissive ? color : undefined}

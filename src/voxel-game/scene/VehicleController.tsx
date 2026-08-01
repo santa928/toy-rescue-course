@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { VoxelFireTruck } from '../../vehicle-lab/scene/VoxelFireTruck';
 import { VoxelBulldozer } from '../../vehicle-lab/scene/VoxelBulldozer';
 import { VoxelExcavator } from '../../vehicle-lab/scene/VoxelExcavator';
+import { VoxelAmbulance } from '../../vehicle-lab/scene/VoxelAmbulance';
 import {
   getVehicleDefinition,
   type VehicleColliderDefinition,
@@ -122,7 +123,10 @@ function SelectedVehicleModel({
   if (vehicleId === 'bulldozer') {
     return <VoxelBulldozer actionActiveRef={actionActiveRef} paintColor={paintColor} />;
   }
-  return <VoxelExcavator actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+  if (vehicleId === 'excavator') {
+    return <VoxelExcavator actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+  }
+  return <VoxelAmbulance actionActiveRef={actionActiveRef} paintColor={paintColor} />;
 }
 
 /** 入力refを毎frame読み、消防車の速度・旋回・resetをRapierへ反映する。 */
