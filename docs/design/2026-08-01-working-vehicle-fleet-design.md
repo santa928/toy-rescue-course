@@ -168,6 +168,7 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - Docker内fresh unitは42 files／409 tests、production buildは649 modulesで全bundle予算内だった。game entryは121,542 bytes、Threeは718,551 bytes、Rapierは2,237,128 bytesだった。
 - desktop keyboard、tablet touch、mobile-landscape touchで患者の手当前表示、手当て、成功、帰庫、次仕事を実走した。4ボタンはselector境界内、主要UI間は8px以上だった。
 - 3 viewportともscene 30 calls、救急車車体7 calls。患者の横たわり、起き上がり、赤十字、HUD、操作系を15枚の画像で原寸目視した。物理GPU再認証は5台総合回帰で行う。
+- commit `e64eca6`をmainへpushし、remote SHA一致、ahead／behind `0/0`、Pages run `30707424042`のunit／build／deploy successを確認した。公開manifestは`2026-08-01T16:12:50.807Z`で全3 viewport成功し、公開root・互換URL・Vehicle Labもsmokeを通過した。
 
 - 受け入れ条件、非対象、リスクと対策、性能目標を明示した。
 - 保留項目は理由、影響、代替タスク、復帰条件を記載した。
