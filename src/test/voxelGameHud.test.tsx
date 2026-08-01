@@ -66,7 +66,10 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('ブルドーザー');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="ブレードを動かす"');
+    expect(html).toContain('きたのがれきをかたづけよう');
     expect(html).toContain('こうじげんばへ いこう');
+    expect(html).toContain('1しゅうめ・0/3');
+    expect(html).toContain('aria-label="きたのがれきをかたづけよう。こうじげんばへ いこう。1しゅうめ・0/3"');
   });
 
   it('車庫外では乗り換えUIを隠す', () => {

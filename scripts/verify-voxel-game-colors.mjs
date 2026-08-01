@@ -224,7 +224,7 @@ async function verifyViewport(browser, viewport, errors) {
   ));
   let touchDriver = null;
   try {
-    await page.goto(`${baseUrl}/voxel-game.html?colors=${viewport.name}-${Date.now()}`, {
+    await page.goto(`${baseUrl}/voxel-game.html?colors=${viewport.name}-${Date.now()}&job-seed=1`, {
       waitUntil: 'networkidle',
     });
     await page.waitForFunction(() => document.documentElement.dataset.voxelSceneReady === 'true'

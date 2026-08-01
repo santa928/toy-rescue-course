@@ -118,7 +118,7 @@ async function openPage(browser, scenario, viewport, errors) {
   page.on('requestfailed', (request) => errors.push(
     `${scenario}: requestfailed: ${request.url()} ${request.failure()?.errorText ?? ''}`,
   ));
-  await page.goto(`${baseUrl}/voxel-game.html?task7=${scenario}-${Date.now()}`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/voxel-game.html?task7=${scenario}-${Date.now()}&job-seed=1`, { waitUntil: 'networkidle' });
   await page.locator('.voxel-game-canvas canvas').waitFor({ state: 'visible' });
   await page.locator('.voxel-game-hud').waitFor({ state: 'visible', timeout: 5_000 });
   await page.waitForFunction(

@@ -89,7 +89,7 @@ button {
   align-items: center;
   width: max-content;
   max-width: 100%;
-  min-height: 52px;
+  min-height: 58px;
   margin: 0;
   padding: 8px 16px 8px 12px;
   border: 4px solid var(--toy-fire-red-deep);
@@ -176,11 +176,41 @@ button {
   left: 9px;
 }
 
-.mission-pill__label {
+.mission-pill__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mission-pill__job,
+.mission-pill__objective {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mission-pill__job {
+  font-size: 0.96em;
+}
+
+.mission-pill__details {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.63em;
+  letter-spacing: 0.025em;
+}
+
+.mission-pill__objective {
+  flex: 1 1 auto;
+}
+
+.mission-pill__progress {
+  flex: 0 0 auto;
+  color: #695948;
 }
 
 .mission-pill[data-vehicle='bulldozer'] {
@@ -489,7 +519,7 @@ button {
 
 @media (max-height: 480px) {
   .mission-pill {
-    min-height: 46px;
+    min-height: 50px;
     padding: 6px 12px 6px 8px;
     box-shadow: 0 4px 0 var(--toy-safety-yellow-deep);
     font-size: 0.9rem;
@@ -501,6 +531,15 @@ button {
     height: 26px;
     margin-right: 7px;
     transform: scale(0.86);
+  }
+
+  .mission-pill__copy {
+    gap: 2px;
+  }
+
+  .mission-pill__details {
+    gap: 6px;
+    font-size: 0.6em;
   }
 
   .color-effect-pill {
@@ -528,6 +567,15 @@ button {
     height: 18px;
     margin-right: 6px;
     border-width: 3px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1050px) {
+  .status-stack {
+    right: calc(env(safe-area-inset-right) + 116px);
+    left: calc(env(safe-area-inset-left) + min(232px, 38vw) + 22px);
+    max-width: none;
+    transform: none;
   }
 }
 

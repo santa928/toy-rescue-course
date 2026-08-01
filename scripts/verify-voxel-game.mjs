@@ -500,7 +500,7 @@ async function openViewportPage(browser, target, errors, pathname = '/voxel-game
   page.on('requestfailed', (request) => errors.push(
     `${target.name}: requestfailed: ${request.url()} ${request.failure()?.errorText ?? ''}`,
   ));
-  await page.goto(`${baseUrl}${pathname}?release=${target.name}-${Date.now()}`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}${pathname}?release=${target.name}-${Date.now()}&job-seed=1`, { waitUntil: 'networkidle' });
   await page.locator('.voxel-game-canvas canvas').waitFor({ state: 'visible' });
   await page.locator('.voxel-game-hud').waitFor({ state: 'visible' });
   await page.waitForFunction(

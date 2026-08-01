@@ -135,7 +135,7 @@ async function openGamePage(
     if (message.type() === 'error') errors.push(`${scenario}: ${message.text()}`);
   });
   page.on('pageerror', (error) => errors.push(`${scenario}: ${String(error)}`));
-  await page.goto(`${baseUrl}/voxel-game.html?task5=${scenario}-${Date.now()}`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/voxel-game.html?task5=${scenario}-${Date.now()}&job-seed=1`, { waitUntil: 'networkidle' });
   await page.locator('.voxel-game-canvas canvas').waitFor({ state: 'visible' });
   await page.waitForFunction(
     () => document.documentElement.dataset.voxelSceneReady === 'true'

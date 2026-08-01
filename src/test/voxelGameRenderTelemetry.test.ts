@@ -15,6 +15,8 @@ import {
   resolveVehicleControllerConfig,
 } from '../voxel-game/scene/VehicleController';
 import { COLOR_PLAY_SOURCES } from '../voxel-game/scene/worldLayout';
+import { buildMissionJobTelemetry } from '../voxel-game/domain/jobTelemetry';
+import { VEHICLE_JOBS } from '../voxel-game/domain/vehicleJobs';
 
 describe('vehicle controller config', () => {
   it('消防車の既存controller値をregistryから解決する', () => {
@@ -82,6 +84,33 @@ describe('buildWorldTelemetry', () => {
 
   it('選択中仕事に応じて工事地区を目的地へ公開する', () => {
     expect(buildWorldTelemetry([0, 0.8, 6], 'blocks').destinationDistrict).toBe('blocks');
+  });
+});
+
+describe('buildMissionJobTelemetry', () => {
+  it('消防仕事のseed、識別情報、実放水targetを同じsnapshotから公開する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+
+    expect(buildMissionJobTelemetry(coordinator.getSnapshot())).toEqual({
+      jobCycle: 1,
+      jobId: 'fire-side',
+      jobLabel: 'よこの火をけそう',
+      jobSeed: 1,
+      targetPositions: [VEHICLE_JOBS['fire-truck'][0].sprayTarget],
+    });
+  });
+
+  it('ブルドーザー仕事では3つの実接触targetを公開する', () => {
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
+    coordinator.selectVehicle('bulldozer', { atGarage: true, speed: 0 });
+
+    expect(buildMissionJobTelemetry(coordinator.getSnapshot())).toEqual({
+      jobCycle: 1,
+      jobId: 'debris-north',
+      jobLabel: 'きたのがれきをかたづけよう',
+      jobSeed: 1,
+      targetPositions: VEHICLE_JOBS.bulldozer[0].debris.map(({ position }) => position),
+    });
   });
 });
 

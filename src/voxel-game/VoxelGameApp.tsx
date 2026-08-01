@@ -16,6 +16,8 @@ import {
   VehicleColorEffectRuntime,
   type VehicleColorEffectSnapshot,
 } from './domain/VehicleColorEffectRuntime';
+import { buildMissionJobTelemetry } from './domain/jobTelemetry';
+import { resolveSessionJobSeed } from './domain/sessionJobSeed';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
 import {
   bindFullscreenControls,
@@ -161,9 +163,12 @@ export function VoxelGameApp(): ReactElement {
   });
   const coordinatorRef = useRef<VehicleMissionCoordinator | null>(null);
   if (coordinatorRef.current === null) {
+    const entropy = new Uint32Array(1);
+    window.crypto.getRandomValues(entropy);
+    const { seed } = resolveSessionJobSeed(window.location.search, entropy[0]);
     coordinatorRef.current = new VehicleMissionCoordinator(
       BREAKABLE_BLOCKS.map(({ id }) => id),
-      { jobSeed: 1 },
+      { jobSeed: seed, rotateJobsOnCompletion: true },
     );
   }
   const coordinator = coordinatorRef.current;
@@ -267,6 +272,7 @@ export function VoxelGameApp(): ReactElement {
       const coordinatorState = coordinator.getSnapshot();
       const runtime = coordinatorState.fire;
       const currentMission = coordinatorState.mission;
+      const currentJob = buildMissionJobTelemetry(coordinatorState);
       const fireJob = coordinatorState.currentJobs.fire;
       const fireSceneLayout = createFireJobSceneLayout(fireJob);
       const command = controls.commandRef.current;
@@ -335,9 +341,7 @@ export function VoxelGameApp(): ReactElement {
           destinationDistrict: currentMission.destinationDistrict,
           direction: [...missionTelemetry.direction],
           id: currentMission.id,
-          jobCycle: currentMission.jobCycle,
-          jobId: currentMission.jobId,
-          jobLabel: currentMission.jobLabel,
+          ...currentJob,
           nozzleOrigin: [...missionTelemetry.nozzleOrigin],
           objectiveLabel: currentMission.objectiveLabel,
           phase: currentMission.phase,

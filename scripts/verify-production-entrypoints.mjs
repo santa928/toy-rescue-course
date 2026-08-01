@@ -61,7 +61,7 @@ async function verifyProductionEntrypoints() {
 
       try {
         const response = await page.goto(
-          `${baseUrl}${target.pathname}?production-smoke=${Date.now()}`,
+          `${baseUrl}${target.pathname}?production-smoke=${Date.now()}&job-seed=1`,
           { waitUntil: 'networkidle' },
         );
         assert.equal(response?.ok(), true, `${target.name}: HTML response failed.`);

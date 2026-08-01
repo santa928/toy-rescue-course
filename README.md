@@ -41,7 +41,9 @@ docker compose up --build web
 
 中央車庫の中で停止すると「しょうぼうしゃ」と「ブルドーザー」を選べます。選択に失敗や解除条件はなく、車庫へ戻れば何度でも乗り換えられます。消防車の主操作は放水、ブルドーザーの主操作は前面ブレードです。
 
-放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。ブルドーザーでは西地区の道しるべをたどり、走りながらブレードを動かして3個の工事がれきへ触れると、ボクセル破片へ崩して片付けられます。仕事を終えた後は自由走行になり、車庫へ戻ると同じ仕事を最初から何度でも遊べます。
+放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。ブルドーザーでは西地区の道しるべをたどり、走りながらブレードを動かして3個の工事がれきへ触れると、ボクセル破片へ崩して片付けられます。各車種には3件の仕事があり、仕事を終えて自由走行から車庫へ戻ると、同じ仕事が連続しない次の依頼へ進みます。未完了の帰庫や乗り換えでは依頼を変えません。
+
+通常プレイの仕事順はページを開くたびに変わり、検証や再現ではURLへ`?job-seed=1`のような10進整数を付けると同じ順序になります。現在のjob ID、仕事名、巡回番号、seed、実判定対象座標は`render_game_to_text()`の`mission`へ公開します。
 
 どちらの車でも赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。北の公園の木の幹と火災建物本体には進入できません。
 
@@ -91,7 +93,7 @@ VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-ga
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは34 files / 315 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。最新fresh unit testは37 files / 358 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -107,7 +109,7 @@ docker compose --profile e2e run --rm --build voxel-game-colors-e2e
 production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
 決定的なchunkへ分割します。`postbuild`が3つのHTML entryからのasset参照と、game entry 350kB、
 通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-01の実測は
-game 84,583 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
+game 93,654 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
 
 Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状態読取、keyboard／touch stick、
 制動、world軸走行、座標補正を`scripts/voxel-game-e2e/drive-harness.mjs`で共有します。canonicalの

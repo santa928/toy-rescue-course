@@ -45,9 +45,9 @@
 
 ## Task 6: App・HUD・telemetry
 
-- [ ] query seed解析とsession seed生成をpure testでREDにする。
-- [ ] current job ID、label、cycle、seed、対象座標を`render_game_to_text()`へ同期する。
-- [ ] job札と色札のアンカー、aria、操作可能性を3 viewportで数値検証する。
+- [x] query seed解析とsession seed生成をpure testでREDにする。
+- [x] current job ID、label、cycle、seed、対象座標を`render_game_to_text()`へ同期する。
+- [x] job札と色札のアンカー、aria、操作可能性を3 viewportで数値検証する。
 - [ ] 日本語commit、secret scan、push、公開確認を行う。
 
 ## Task 7: 専用E2Eと総合公開

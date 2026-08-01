@@ -44,7 +44,8 @@ declare global {
       readonly fireSprayTarget: readonly [number, number, number];
       readonly garage: readonly [number, number, number];
     };
-    readonly mission: import('./voxel-game/domain/VehicleMissionCoordinator').VehicleMissionSnapshot & Omit<
+    readonly mission: import('./voxel-game/domain/VehicleMissionCoordinator').VehicleMissionSnapshot
+    & import('./voxel-game/domain/jobTelemetry').MissionJobTelemetry & Omit<
       import('./voxel-game/scene/WaterAndFire').MissionTelemetry,
       'waterPath'
     > & {

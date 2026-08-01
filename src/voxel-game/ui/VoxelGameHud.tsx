@@ -111,6 +111,7 @@ export function VoxelGameHud({
   const colorEffectLabel = visibleColorId === null
     ? null
     : `${COLOR_EFFECT_LABELS[visibleColorId]} ${colorEffect.remainingSeconds}びょう`;
+  const missionProgressLabel = `${mission.jobCycle}しゅうめ・${mission.progress.current}/${mission.progress.target}`;
 
   return (
     <aside
@@ -138,6 +139,7 @@ export function VoxelGameHud({
       ) : null}
       <div className="status-stack">
         <p
+          aria-label={`${mission.jobLabel}。${mission.objectiveLabel}。${missionProgressLabel}`}
           aria-live="polite"
           className="mission-pill"
           data-phase={mission.phase}
@@ -148,7 +150,15 @@ export function VoxelGameHud({
             <span />
             <span />
           </span>
-          <span className="mission-pill__label">{mission.objectiveLabel}</span>
+          <span className="mission-pill__copy">
+            <span className="mission-pill__job">{mission.jobLabel}</span>
+            <span className="mission-pill__details">
+              <span className="mission-pill__objective">{mission.objectiveLabel}</span>
+              <span aria-hidden="true" className="mission-pill__progress">
+                {missionProgressLabel}
+              </span>
+            </span>
+          </span>
         </p>
         {colorEffectLabel === null ? null : (
           <p
