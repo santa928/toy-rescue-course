@@ -62,7 +62,7 @@ feature固有scenarioの4層に分ける。
 - [x] build後budget検査を`npm run build`の`postbuild`へ接続する。
 - [x] game entry 350kB以下、通常chunk 600kB以下、Three 750kB以下、Rapier 2.25MB以下を達成する。
 - [x] 3 entryのasset URLとroot／互換URL／Vehicle Lab smokeを確認する。
-- [ ] `production bundleを責務別に分割する`でcommit・scan・push・公開確認する。
+- [x] `production bundleを責務別に分割する`でcommit・scan・push・公開確認する。
 
 ## Task 4: 共有drive harnessをTDD実装する
 
