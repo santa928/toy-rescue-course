@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-01
 
-**状態:** ローカル総合回帰・物理GPU認証済み、最終公開同期待ち
+**状態:** 完了・GitHub Pages公開検証済み
 
 ## 1. 目的と範囲
 
@@ -60,4 +60,6 @@ Chrome console errorは0。`@dimforge/rapier3d-compat` 0.19系の初期化時に
 
 ## 7. 最終公開結果
 
-最終検証commitのGitHub Pages deployと公開E2E完了後に、commit SHA、Actions run、公開manifestを追記する。
+最終検証commit`e56dd04c784b56a100ebbed6edd1e37d6781424a`を`origin/main`へpushし、remote SHA一致、ahead／behind `0/0`を確認した。GitHub Pages workflow [30717940398](https://github.com/santa928/toy-rescue-course/actions/runs/30717940398)はunit、Pages base付きproduction build、artifact upload、deployをすべて成功した。
+
+公開URL`https://santa928.github.io/toy-rescue-course/`に対する更新後の車両E2Eは、1280×720、1024×768 touch、844×390 touchの3 viewportで、5台selector、ブルドーザー2仕事、帰庫後の次仕事、消防車復帰、放水、HUD実寸を完走した。公開manifestは`2026-08-01T20:59:22.887Z`、browser／page／request errorは0だった。公開production smokeもroot、`voxel-game.html`、`vehicle-lab.html`の3入口でWebGL canvas起動を確認した。

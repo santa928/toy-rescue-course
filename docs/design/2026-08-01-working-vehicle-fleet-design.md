@@ -210,3 +210,4 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - 現行成果物の代表10画像を原寸目視し、水流、破壊、5台、色シャワー、患者、追加2地区、HUD、操作系に見切れ・意図しない重なり・はみ出し・操作阻害がないことを確認した。
 - 公開96×96版をApple M4物理GPUで5台測定し、全車median 59.88fps、p10 56.82〜58.48fps、scene 28〜31 calls、車体7 callsを確認した。目標を満たすためchunk streaming／LODは不要と確定した。
 - 本設計で非対象だった音・振動と追加地区は、後続の独立設計・実装タスクで完成済みであり、当時の境界を遡って変更しない。
+- 最終検証commit`e56dd04`をmainへpushし、remote SHA一致、ahead／behind `0/0`、Pages run `30717940398`のunit／build／deploy successを確認した。公開車両E2Eはmanifest `2026-08-01T20:59:22.887Z`で全3 viewport成功し、公開root・互換URL・Vehicle Labもsmokeを通過した。

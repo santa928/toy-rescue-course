@@ -52,4 +52,4 @@
 - [x] 代表viewportの全画像を原寸目視し、内部HUD境界も数値確認する。
 - [x] Apple M4 physical GPUで各車両のdraw call、median、p10を再測定する。
 - [x] README、設計、計画、progressへ実測と公開結果を同期する。
-- [ ] 全commit範囲をsecret scanし、日本語commit、main push、remote／Actions／Pages／公開物を確認する。
+- [x] 全commit範囲をsecret scanし、日本語commit、main push、remote／Actions／Pages／公開物を確認する。
