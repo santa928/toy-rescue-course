@@ -115,8 +115,11 @@ Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状�
 共有境界のpure／fake page契約はDocker内のNode testで単独確認できます。
 
 ```bash
-docker compose run --rm web node --test scripts/voxel-game-e2e/drive-harness.node-test.mjs
+docker compose run --rm web node --test scripts/voxel-game-e2e/drive-harness.node-test.mjs scripts/voxel-game-e2e/scenario-progress.node-test.mjs
 ```
+共有走行8件とscenario進捗3件のNode test 11件を実行します。canonical fullの最新manifestは
+18 scenarioすべて成功、33 artifacts＝33 screenshot proofs、contract failure 0、browser error 0/0/0です。
+
 `production-smoke-e2e`は生成済みbundleをVite previewで配信し、root、互換URL、Vehicle LabのWebGL起動と
 console／page／request errorがないことを実ブラウザで確認します。
 

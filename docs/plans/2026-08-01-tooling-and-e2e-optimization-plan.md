@@ -104,11 +104,11 @@ feature固有scenarioの4層に分ける。
 - Modify: `docs/plans/2026-08-01-tooling-and-e2e-optimization-plan.md`
 - Modify: `progress.md`（git管理外）
 
-- [ ] fresh full unit、budget付きbuild、Vehicle Lab、canonical、二車種、色替えE2Eを通す。
-- [ ] 代表3 viewportを目視し、見た目・HUD・操作に差分がないことを確認する。
-- [ ] renderer calls 28／27、vehicle calls 7、station calls 5を確認する。
-- [ ] scene code／calls不変なら物理GPU再認証不要を根拠付きで記録する。
-- [ ] README、要件台帳、受け入れ条件、非対象、リスク、性能目標、作業ログを同期する。
+- [x] fresh full unit、budget付きbuild、Vehicle Lab、canonical、二車種、色替えE2Eを通す。
+- [x] 代表3 viewportを目視し、見た目・HUD・操作に差分がないことを確認する。
+- [x] renderer calls 28／27、vehicle calls 7、station calls 5を確認する。
+- [x] scene code／calls不変なら物理GPU再認証不要を根拠付きで記録する。
+- [x] README、要件台帳、受け入れ条件、非対象、リスク、性能目標、作業ログを同期する。
 - [ ] `最適化を本番検証する`でcommit・全範囲scan・pushする。
 - [ ] Actions／Pages、公開URL smoke、remote SHA 0/0を確認し、完了記録を追加pushする。
 
@@ -117,4 +117,4 @@ feature固有scenarioの4層に分ける。
 - 受け入れ条件: bundle、Vitest、shared harness、focus、回帰、公開の8項目を証拠へ対応させる。
 - 非対象: runtime／visual／physics／dependency versionを変更しない。
 - リスクと対策: 循環依存、Rapier例外、既定除外、診断、touch、長距離flakyを検証する。
-- 性能目標: entry 350kB、通常chunk 600kB、Three 750kB、Rapier 2.25MB、303 tests、calls 28／27を維持する。
+- 性能目標: entry 350kB、通常chunk 600kB、Three 750kB、Rapier 2.25MB、315 tests、calls 28／27を維持する。

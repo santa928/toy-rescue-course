@@ -121,8 +121,8 @@ Docker Composeは`VOXEL_GAME_FOCUS`を明示的に渡せるfocus serviceを追�
 - [x] Vitestがrootのtest filesを一度だけ収集し、`.worktrees/**`を除外する。
 - [x] canonical、二車種、色替えE2Eが共有走行harnessを使う。
 - [x] production-map、nonbreak、collision、break focusが単独実行でき、scenario時間を記録する。
-- [ ] canonical full、二車種、色替え、Vehicle Labの回帰がPASSする。
-- [ ] 公開画面、操作、物理、telemetry、renderer callsが変更前と一致する。
+- [x] canonical full、二車種、色替え、Vehicle Labの回帰がPASSする。
+- [x] 公開画面、操作、物理、telemetry、renderer callsが変更前と一致する。
 - [ ] Actions／Pages、公開URL smoke、remote SHA 0/0がPASSする。
 
 ## 非対象
@@ -144,7 +144,15 @@ Docker Composeは`VOXEL_GAME_FOCUS`を明示的に渡せるfocus serviceを追�
 ## 性能目標
 
 - buildのgame entry 350kB以下、通常JS chunk 600kB以下、Three 750kB以下、Rapier 2.25MB以下。
-- Vitest 303件を維持し、`.worktrees`が存在しても重複収集0件。
+- baseline 303件と追加tooling 12件のVitest 315件を一度ずつ実行し、`.worktrees`が存在しても重複収集0件。
 - focus runは失敗scenario名と経過時間を60秒以内にstdoutへ更新する。
 - scene／vehicle／station draw callsは消防車28／7、ブルドーザー27／7、station 5を維持する。
 - runtime差分がないため物理GPU再認証は必須としない。renderer callsまたはscene codeが変わった場合だけApple M4でmedian 55／p10 45を再測定する。
+
+## 最終検証結果
+
+- fresh Docker Vitestは34 files／315 tests、production buildは637 modules。game 84,583 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで全budgetを満たした。
+- canonical fullは18 scenario、33 artifacts＝33 proofs、contract failure 0、browser error 0/0/0でPASS。全viewport scene calls 28を記録した。
+- 二車種E2Eは3 viewportで消防車→ブルドーザー→仕事完了→帰庫→消防車復帰を完走。色替えE2Eはpool／showerとstation 5 calls、Vehicle Labは15画像・verification failure 0でPASSした。
+- 車両render planは消防車／ブルドーザーとも7 calls。公開済み色遊び実装時の物理GPU実測は消防車scene 28、ブルドーザーscene 27であり、最適化開始前`0682fc4`から`src/voxel-game`／`src/vehicle-lab`に差分がないため再認証条件は成立しない。
+- Desktop、Tablet landscape、Mobile landscapeのcanonical 5枚、二車種／色替え／Vehicle Lab 9枚を原寸目視し、車両、station、水、炎、破片、HUD、操作系に欠け・意図しない重なり・はみ出しなし。
