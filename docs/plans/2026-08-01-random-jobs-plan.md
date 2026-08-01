@@ -17,7 +17,7 @@
 - [x] `JobDeck.test.ts`で同seed同順、bag内非重複、補充境界の非連続、不正seed正規化をREDにする。
 - [x] `vehicleJobs.test.ts`で全車種3件、ID・文言・座標・地区・対象数・routeをREDにする。
 - [x] 最小domain実装を追加しfocused／full unitをGREENにする。
-- [ ] 日本語commit、secret scan、push、Actions／Pages／公開smokeを確認する。
+- [x] 日本語commit、secret scan、push、Actions／Pages／公開smokeを確認する。
 
 ## Task 3: coordinatorの仕事割当
 
