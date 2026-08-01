@@ -120,7 +120,7 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - [x] 72×72で性能達成ならchunk streaming／LOD不要を記録する。
 - [x] READMEと要件台帳、受け入れ条件、非対象、リスク、性能目標、作業ログを同期する。
 - [x] `色替え遊びを本番検証する`でcommit・全範囲scan・pushする。
-- [ ] Actions／Pages success、公開URLへの専用E2E、remote SHA 0/0を確認し、完了記録を追加pushする。
+- [x] Actions／Pages success、公開URLへの専用E2E、remote SHA 0/0を確認し、完了記録を追加pushする。
 
 ## Final checklist
 

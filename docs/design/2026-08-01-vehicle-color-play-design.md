@@ -187,3 +187,5 @@ React stateはactivation、色変更、秒境界、期限、切替時だけ更�
 - 72×72の現mapで性能目標を満たしたため、chunk streaming／LODは実装しない。96×96超への拡張または物理GPU性能未達を再検討条件とする。
 - Docker内fresh unitは32 files／303 tests、production build、canonical full、二車種専用E2EがすべてPASSした。canonicalは`completed/full`、browser errorはconsole／page／requestとも0件だった。
 - canonicalで再現した中央交差点の過剰な中心合わせと、背面放水経路の東端driftは、道路幅に沿う許容差と「Xを内側へ退避→Z→X再補正」の経路順へ限定修正した。production-map、collision、nonbreakの各focusと最終fullで実走回帰した。
+- main commit `10be9bf`のGitHub Pages run `30690142015`はunit、build、deployがsuccess。remote SHAは一致し、ahead／behindは`0/0`だった。
+- 公開URLへの専用E2Eも3 viewportでPASSし、manifestは`2026-08-01T07:42:08.393Z`。公開配信物から撮り直した6画像を原寸確認し、station、青／黄の車体、shower滴、HUD、操作系に欠け・意図しない重なり・はみ出しがないことを確認した。
