@@ -138,7 +138,9 @@ describe('worldCollisionLayout', () => {
       PRODUCTION_WORLD_MAP.visualBoxes[3],
       PRODUCTION_WORLD_MAP.visualBoxes[4],
     ]);
-    expect(FIRE_BUILDING_BODY).toBe(PRODUCTION_WORLD_MAP.visualBoxes[15]);
+    expect(FIRE_BUILDING_BODY).toBe(
+      PRODUCTION_WORLD_MAP.visualBoxes.find(({ id }) => id === 'fire-building-body'),
+    );
   });
 
   it('72×72 groundを±36境界と同じhalf extentsで構成する', () => {

@@ -123,9 +123,25 @@ describe('PRODUCTION_WORLD_MAP', () => {
   });
 
   it('visualとsolidを同じbox定義で共有する', () => {
-    expect(PRODUCTION_WORLD_MAP.visualBoxes).toHaveLength(25);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes).toHaveLength(27);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)).toHaveLength(12);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.every(({ id }) => id.length > 0)).toBe(true);
+  });
+
+  it('車庫屋根は中央の車体確認用開口を残す3辺フレームである', () => {
+    const roofFrames = PRODUCTION_WORLD_MAP.visualBoxes.filter(({ id }) => (
+      id.startsWith('garage-roof-')
+    ));
+    expect(roofFrames.map(({ id }) => id)).toEqual([
+      'garage-roof-left',
+      'garage-roof-right',
+      'garage-roof-back',
+    ]);
+    expect(roofFrames.every(({ solid }) => !solid)).toBe(true);
+    expect(roofFrames.some(({ position, scale }) => (
+      Math.abs(position[0]) <= scale[0] / 2
+      && Math.abs(7.2 - position[2]) <= scale[2] / 2
+    ))).toBe(false);
   });
 
   it('ゲームプレイ座標を型付きlandmarksとして一意に公開する', () => {
