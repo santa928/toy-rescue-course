@@ -264,16 +264,25 @@ selectedVehicleId === 'bulldozer'
 
 ## 受け入れ条件
 
-- [ ] 消防車とブルドーザーを車庫内・停止中に選べる。
-- [ ] 2台の外形と役割を一目で区別できる。
-- [ ] ブルドーザーで3個のがれきを、厳しい位置合わせなしに片付けられる。
-- [ ] がれき破壊にボクセル破片とブレード動作がある。
-- [ ] 通常積み木破壊と消防車の消火循環に回帰がない。
-- [ ] キーボードとタッチで同じ縦切りを完遂できる。
-- [ ] HUD文言、aria-label、操作可否が選択車両と一致する。
-- [ ] 3 viewportで重なり、はみ出し、操作阻害がない。
-- [ ] telemetryが見えている車両、仕事、がれき、HUD状態と一致する。
-- [ ] unit、build、E2E、目視、performance確認がすべて通る。
+- [x] 消防車とブルドーザーを車庫内・停止中に選べる。
+- [x] 2台の外形と役割を一目で区別できる。
+- [x] ブルドーザーで3個のがれきを、厳しい位置合わせなしに片付けられる。
+- [x] がれき破壊にボクセル破片とブレード動作がある。
+- [x] 通常積み木破壊と消防車の消火循環に回帰がない。
+- [x] キーボードとタッチで同じ縦切りを完遂できる。
+- [x] HUD文言、aria-label、操作可否が選択車両と一致する。
+- [x] 3 viewportで重なり、はみ出し、操作阻害がない。
+- [x] telemetryが見えている車両、仕事、がれき、HUD状態と一致する。
+- [x] unit、build、E2E、目視、performance確認がすべて通る。
+
+### 完了時の検証記録
+
+- Docker unit: 29 files / 266 tests PASS。
+- production build: TypeScriptとVite buildがPASS。既知の500 kB超chunk warningは次のbundle分割タスクで扱う。
+- 専用E2E: 1280×720 keyboard、1024×768 touch、844×390 touchで乗り換え、3がれき、帰庫、消防車復帰、放水を完走。
+- canonical回帰: fullおよび`nonbreak` focusがcompleted、console/page/request error 0件。
+- 物理GPU: Apple M4 / ANGLE Metal、消防車 median 59.8802 fps・p10 56.8182 fps、ブルドーザー median 59.8802 fps・p10 56.8182 fps。
+- 描画上限: 消防車23 calls / 車両7 calls、ブルドーザー22 calls / 車両7 calls。
 
 ## 非対象
 

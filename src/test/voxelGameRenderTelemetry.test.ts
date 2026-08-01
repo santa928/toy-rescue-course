@@ -37,10 +37,23 @@ describe('vehicle controller config', () => {
 });
 
 describe('advanceRenderTelemetry', () => {
-  it('実描画frame数を単調増加させ、最新draw call数を保持する', () => {
-    expect(advanceRenderTelemetry({ renderedFrames: 9, rendererCalls: 31 }, 34)).toEqual({
+  it('実描画frame数、最新draw call数、物理renderer、車体batch数を保持する', () => {
+    expect(advanceRenderTelemetry({
+      renderedFrames: 9,
+      rendererCalls: 31,
+      rendererName: 'unknown',
+      rendererVendor: 'unknown',
+      vehicleDrawCalls: 7,
+    }, 34, {
+      rendererName: 'ANGLE Metal Renderer: Apple M4',
+      rendererVendor: 'Apple',
+      vehicleDrawCalls: 7,
+    })).toEqual({
       renderedFrames: 10,
       rendererCalls: 34,
+      rendererName: 'ANGLE Metal Renderer: Apple M4',
+      rendererVendor: 'Apple',
+      vehicleDrawCalls: 7,
     });
   });
 });

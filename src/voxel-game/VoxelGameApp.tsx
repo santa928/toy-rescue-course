@@ -64,6 +64,8 @@ import {
   resolveVehicleDistrict,
 } from './scene/worldLayout';
 import { VoxelGameHud } from './ui/VoxelGameHud';
+import { PhysicalGpuProbe } from './performance/PhysicalGpuCertificationProbe';
+import { isPhysicalGpuProbeEnabled } from './performance/physicalGpuProbe';
 
 const INITIAL_VEHICLE_ID: VehicleId = 'fire-truck';
 
@@ -176,6 +178,9 @@ export function VoxelGameApp(): ReactElement {
   const renderTelemetryRef = useRef<VoxelGameRenderTelemetry>({
     renderedFrames: 0,
     rendererCalls: 0,
+    rendererName: 'unknown',
+    rendererVendor: 'unknown',
+    vehicleDrawCalls: 0,
   });
   const [coordinatorSnapshot, setCoordinatorSnapshot] = useState<VehicleMissionCoordinatorSnapshot>(
     () => coordinator.getSnapshot(),
@@ -186,6 +191,7 @@ export function VoxelGameApp(): ReactElement {
   const telemetryRef = useRef<VehicleTelemetry>(
     createInitialVehicleTelemetry(INITIAL_VEHICLE_ID),
   );
+  const physicalGpuProbeEnabled = isPhysicalGpuProbeEnabled(window.location.search);
 
   /** 実際の車庫・速度条件を再確認し、成功時だけ車体と入力を選択車両へ同期する。 */
   const handleSelectVehicle = useCallback((vehicleId: VehicleId): boolean => {
@@ -423,6 +429,10 @@ export function VoxelGameApp(): ReactElement {
         onSelectVehicle={handleSelectVehicle}
         onToggleFullscreen={handleToggleFullscreen}
         selectedVehicleId={coordinatorSnapshot.selectedVehicleId}
+      />
+      <PhysicalGpuProbe
+        enabled={physicalGpuProbeEnabled}
+        renderTelemetryRef={renderTelemetryRef}
       />
     </main>
   );

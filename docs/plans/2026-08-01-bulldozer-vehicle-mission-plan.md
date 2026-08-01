@@ -64,7 +64,7 @@
 - Produces: `VehicleDefinition`, `VEHICLE_DEFINITIONS`, `getVehicleDefinition(id)`, `canSwitchVehicle(context)`
 - Consumes: `MissionPhase`はまだ使わず、静的な`missionId`だけを定義する。
 
-- [ ] **Step 1: registryと切替条件のfailing testを書く**
+- [x] **Step 1: registryと切替条件のfailing testを書く**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -100,13 +100,13 @@ describe('vehicle definitions', () => {
 });
 ```
 
-- [ ] **Step 2: DockerでREDを確認する**
+- [x] **Step 2: DockerでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/vehicleDefinitions.test.ts`
 
 Expected: `vehicleDefinitions` import不在でFAILする。
 
-- [ ] **Step 3: 型と値を実装する**
+- [x] **Step 3: 型と値を実装する**
 
 ```ts
 export type VehicleId = 'fire-truck' | 'bulldozer';
@@ -145,7 +145,7 @@ export const VEHICLE_DEFINITIONS = [
 ] as const satisfies readonly VehicleDefinition[];
 ```
 
-- [ ] **Step 4: focused testとbuildを確認する**
+- [x] **Step 4: focused testとbuildを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/vehicleDefinitions.test.ts`
 
@@ -153,7 +153,7 @@ Run: `docker compose run --rm web npm run build`
 
 Expected: test PASS、既存入力consumerを変更していない状態でbuild exit 0。
 
-- [ ] **Step 5: commit・security scan・pushする**
+- [x] **Step 5: commit・security scan・pushする**
 
 ```bash
 git add src/voxel-game/domain/vehicleDefinitions.ts src/test/vehicleDefinitions.test.ts
@@ -175,7 +175,7 @@ git push origin main
 - Produces: `BULLDOZER_VOXELS`, `BULLDOZER_RENDER_PLAN`, `BULLDOZER_PALETTE`, `VoxelBulldozer`
 - Produces: `VoxelBulldozerProps.actionActiveRef?: RefObject<boolean>`。showroomでは省略できる。
 
-- [ ] **Step 1: 造形bounds・上限・特徴のfailing testを書く**
+- [x] **Step 1: 造形bounds・上限・特徴のfailing testを書く**
 
 ```ts
 describe('BULLDOZER_VOXELS', () => {
@@ -198,13 +198,13 @@ describe('BULLDOZER_VOXELS', () => {
 });
 ```
 
-- [ ] **Step 2: DockerでREDを確認する**
+- [x] **Step 2: DockerでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerVoxels.test.ts`
 
 Expected: model import不在でFAILする。
 
-- [ ] **Step 3: modelとpalette batch rendererを実装する**
+- [x] **Step 3: modelとpalette batch rendererを実装する**
 
 12×8×13以内のgridを使い、次の領域をloopで生成する。
 
@@ -221,7 +221,7 @@ addBox(cells, 'blade', { x: [-6, 6], y: [0, 2], z: [-6, -5] });
 `useFrame`で`actionActiveRef?.current`を読み、blade groupのYを`0`と`-0.12`の間でdampする。
 入力commandの`primaryAction`移行は全consumerを同時に変えるTask 7で行う。
 
-- [ ] **Step 4: focused testとbuildを通す**
+- [x] **Step 4: focused testとbuildを通す**
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerVoxels.test.ts src/test/voxelRenderPlan.test.ts`
 
@@ -229,7 +229,7 @@ Run: `docker compose run --rm web npm run build`
 
 Expected: test PASS、TypeScript／Vite build exit 0。
 
-- [ ] **Step 5: commit・scan・pushする**
+- [x] **Step 5: commit・scan・pushする**
 
 ```bash
 git add src/vehicle-lab/model/bulldozerVoxels.ts src/vehicle-lab/scene/VoxelBulldozer.tsx \
@@ -253,7 +253,7 @@ git push origin main
 - Produces: `PRODUCTION_WORLD_MAP.landmarks.bulldozerDebris`、`bulldozerRouteMarkers`
 - Produces: `BULLDOZER_DEBRIS`, `BULLDOZER_ROUTE_MARKER_POSITIONS`
 
-- [ ] **Step 1: 3個の一意landmarkと共有参照のfailing testを書く**
+- [x] **Step 1: 3個の一意landmarkと共有参照のfailing testを書く**
 
 ```ts
 it('西地区へ3個の非重複がれきと道しるべを公開する', () => {
@@ -271,13 +271,13 @@ it('西地区へ3個の非重複がれきと道しるべを公開する', () => 
 validator testへ、world外、通常積み木から3unit未満、がれき同士2.5unit未満、重複IDをそれぞれ追加し、
 具体的なerror stringを期待する。
 
-- [ ] **Step 2: DockerでREDを確認する**
+- [x] **Step 2: DockerでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/productionWorldMap.test.ts src/test/worldLayout.test.ts`
 
 Expected: 新landmark不在でFAILする。
 
-- [ ] **Step 3: map定義とvalidatorを実装する**
+- [x] **Step 3: map定義とvalidatorを実装する**
 
 ```ts
 bulldozerDebris: [
@@ -294,13 +294,13 @@ bulldozerRouteMarkers: [
 validatorは各がれきが`blocks`地区内、world内、通常積み木から3unit以上、がれき同士2.5unit以上かを
 XZ距離で検証する。route markerは有限値とworld内だけを検証する。
 
-- [ ] **Step 4: focused testと既存map testを通す**
+- [x] **Step 4: focused testと既存map testを通す**
 
 Run: `docker compose run --rm web npm test -- src/test/productionWorldMap.test.ts src/test/worldLayout.test.ts src/test/worldCollisionLayout.test.ts src/test/productionWorldRender.test.ts`
 
 Expected: 新旧map契約がすべてPASS。
 
-- [ ] **Step 5: commit・scan・pushする**
+- [x] **Step 5: commit・scan・pushする**
 
 ```bash
 git add src/voxel-game/scene/productionWorldMap.ts src/voxel-game/scene/worldLayout.ts \
@@ -325,7 +325,7 @@ git push origin main
 - Produces: `VehicleMissionSnapshot`, `VehicleMissionCoordinator.selectVehicle(id, context)`
 - Produces: coordinatorの`fireRuntime`を共有積み木runtimeとして公開する。
 
-- [ ] **Step 1: runtime遷移と切替gateのfailing testを書く**
+- [x] **Step 1: runtime遷移と切替gateのfailing testを書く**
 
 ```ts
 it('3個を一度ずつ片付けて成功、自由走行、帰庫再開へ進む', () => {
@@ -351,13 +351,13 @@ it('車庫内停止時だけ車種を切り替えて対象仕事をresetする',
 });
 ```
 
-- [ ] **Step 2: DockerでREDを確認する**
+- [x] **Step 2: DockerでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerMissionRuntime.test.ts src/test/vehicleMissionCoordinator.test.ts`
 
 Expected: class import不在でFAILする。
 
-- [ ] **Step 3: runtimeとcoordinatorを実装する**
+- [x] **Step 3: runtimeとcoordinatorを実装する**
 
 ```ts
 export interface VehicleMissionSnapshot {
@@ -382,13 +382,13 @@ export interface VehicleMissionCoordinatorSnapshot {
 coordinatorは既存`VoxelGameRuntime`をconstructorで1回だけ生成し、車種切替時は選択先missionだけをresetする。
 `advance(milliseconds)`は共有積み木timerのためfire runtimeを常時進め、工事runtimeは選択中だけ進める。
 
-- [ ] **Step 4: focused testと消防runtime回帰を通す**
+- [x] **Step 4: focused testと消防runtime回帰を通す**
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerMissionRuntime.test.ts src/test/vehicleMissionCoordinator.test.ts src/test/voxelGameRuntime.test.ts`
 
 Expected: 新規testと既存消防／積み木runtime testがPASS。
 
-- [ ] **Step 5: commit・scan・pushする**
+- [x] **Step 5: commit・scan・pushする**
 
 ```bash
 git add src/voxel-game/domain/BulldozerMissionRuntime.ts \
@@ -414,7 +414,7 @@ git push origin main
 - Produces: `BulldozerMissionTelemetry`と`BulldozerMissionTelemetryRef`
 - Produces: `BulldozerDebrisMission`。runtime登録は1 frame最大1件。
 
-- [ ] **Step 1: 全gateと固定poolのfailing testを書く**
+- [x] **Step 1: 全gateと固定poolのfailing testを書く**
 
 ```ts
 const validContact = {
@@ -441,13 +441,13 @@ it('3個のがれきと固定破片slotだけを返す', () => {
 });
 ```
 
-- [ ] **Step 2: DockerでREDを確認する**
+- [x] **Step 2: DockerでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerVfx.test.ts src/test/bulldozerDebrisMission.test.ts`
 
 Expected: helper／component不在でFAIL。
 
-- [ ] **Step 3: pure frame helperとInstancedMeshを実装する**
+- [x] **Step 3: pure frame helperとInstancedMeshを実装する**
 
 `BULLDOZER_CHIP_POOL_SIZE = 18`とし、1がれき6slotを固定割当する。slotは非active時に
 position `[0, -40, 0]`、scale `0`を返す。componentはpalette別にがれき最大3 mesh、chip最大3 mesh、
@@ -465,7 +465,7 @@ export function getBladeCenter(telemetry: VehicleTelemetry): WorldPoint {
 }
 ```
 
-- [ ] **Step 4: focused testとallocation制約を確認する**
+- [x] **Step 4: focused testとallocation制約を確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerVfx.test.ts src/test/bulldozerDebrisMission.test.ts`
 
@@ -473,7 +473,7 @@ Run: `rg -n "useState|new THREE|\.map\(" src/voxel-game/scene/BulldozerDebrisMis
 
 Expected: `useState`なし。`new THREE`と配列生成はmoduleまたはmount初期化だけで、`useFrame`内にない。
 
-- [ ] **Step 5: commit・scan・pushする**
+- [x] **Step 5: commit・scan・pushする**
 
 ```bash
 git add src/voxel-game/scene/bulldozerVfx.ts src/voxel-game/scene/BulldozerDebrisMission.tsx \
@@ -498,7 +498,7 @@ git push origin main
 - Produces: `VehicleTelemetry.id`と`VehicleControllerProps.vehicleId`
 - Produces: Appが未統合の中間commitでは`vehicleId='fire-truck'`を明示し、既存scene挙動を保つ。
 
-- [ ] **Step 1: 車種別physics/modelのfailing testを書く**
+- [x] **Step 1: 車種別physics/modelのfailing testを書く**
 
 ```ts
 it('telemetryへ車種IDを含める', () => {
@@ -512,13 +512,13 @@ it('telemetryへ車種IDを含める', () => {
 render testではcontrollerが`vehicleId='bulldozer'`時に`VoxelBulldozer`、
 `vehicleId='fire-truck'`時に`VoxelFireTruck`を各1つ選ぶrender plan helperを検証する。
 
-- [ ] **Step 2: DockerでREDを確認する**
+- [x] **Step 2: DockerでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/voxelGameRenderTelemetry.test.ts`
 
 Expected: `VehicleTelemetry.id`とscene props不在でFAIL。
 
-- [ ] **Step 3: controllerとsceneをregistry駆動へ変更する**
+- [x] **Step 3: controllerとsceneをregistry駆動へ変更する**
 
 `VehicleController`は`const definition = getVehicleDefinition(vehicleId)`を1回解決し、
 response、yaw clamp、mass、colliderを定義から読む。model分岐は1か所だけにする。
@@ -540,7 +540,7 @@ controller内の`actionActiveRef.current`は既存`commandRef.current.spray`か�
 この中間commitではAppとsceneから固定`'fire-truck'`を渡して公開挙動を変えず、Task 7で入力名と
 coordinator／専用visualを同時に統合する。
 
-- [ ] **Step 4: focused test、full unit、buildを通す**
+- [x] **Step 4: focused test、full unit、buildを通す**
 
 Run: `docker compose run --rm web npm test -- src/test/voxelGameRenderTelemetry.test.ts src/test/screenRelativeMovement.test.ts`
 
@@ -550,7 +550,7 @@ Run: `docker compose run --rm web npm run build`
 
 Expected: 全unit PASS、build exit 0。
 
-- [ ] **Step 5: commit・scan・pushする**
+- [x] **Step 5: commit・scan・pushする**
 
 ```bash
 git add src/voxel-game/scene/VehicleController.tsx src/voxel-game/scene/VoxelGameScene.tsx \
@@ -587,7 +587,7 @@ git push origin main
 - Produces: text stateの`vehicle.id`、`mission.id/progress/destinationDistrict`、`vehicleSelection`、工事visual actual。
 - Produces: `isHudLayoutSafe(rectangles, minimumGap)`。
 
-- [ ] **Step 1: HUD文言、切替UI、矩形helperのfailing testを書く**
+- [x] **Step 1: HUD文言、切替UI、矩形helperのfailing testを書く**
 
 ```ts
 it('仕事snapshotを幼児向け文言へそのまま表示する', () => {
@@ -608,13 +608,13 @@ it('矩形間が8px未満ならunsafeを返す', () => {
 component testは2つのbutton、選択中`aria-pressed=true`、車庫外ではselector非表示、
 ブルドーザー時の`aria-label='ブレードを動かす'`を検証する。
 
-- [ ] **Step 2: DockerでREDを確認する**
+- [x] **Step 2: DockerでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/hudLayout.test.ts src/test/voxelGameRenderTelemetry.test.ts`
 
 Expected: helperと新telemetry field不在でFAIL。
 
-- [ ] **Step 3: App stateとHUDを実装する**
+- [x] **Step 3: App stateとHUDを実装する**
 
 最初に`DigitalAction`の`'spray'`を`'primaryAction'`、`DriveCommand.spray`を
 `DriveCommand.primaryAction`、hookの`setSpray/sprayPressed`を
@@ -648,7 +648,7 @@ sceneはcoordinator、選択車種、工事telemetryを受け取り、clockでco
 HUD rootの固定`aria-label="消防車の操作パネル"`は`"働く車の操作パネル"`へ変える。
 primary buttonのclassは汎用`primary-action-button`へ移し、消防は青、工事は黄橙のmodifierを付ける。
 
-- [ ] **Step 4: text telemetryとwindow test hookを同期する**
+- [x] **Step 4: text telemetryとwindow test hookを同期する**
 
 `render_game_to_text()`へ次を必ず含める。
 
@@ -668,7 +668,7 @@ landmarks: {
 `window.select_voxel_game_vehicle(id)`をE2E用に公開しても、内部で同じ切替gateを通す。
 cleanupでhookを削除する。
 
-- [ ] **Step 5: focused test、full unit、buildを通す**
+- [x] **Step 5: focused test、full unit、buildを通す**
 
 Run: `docker compose run --rm web npm test -- src/test/hudLayout.test.ts src/test/voxelGameControls.test.ts src/test/waterAndFire.test.ts src/test/voxelGameRenderTelemetry.test.ts src/test/fullscreenControls.test.ts`
 
@@ -678,7 +678,7 @@ Run: `docker compose run --rm web npm run build`
 
 Expected: 全unit PASS、build exit 0、文言と操作可否に矛盾なし。
 
-- [ ] **Step 6: commit・scan・pushする**
+- [x] **Step 6: commit・scan・pushする**
 
 ```bash
 git add src/voxel-game/ui/hudLayout.ts src/test/hudLayout.test.ts \
@@ -707,7 +707,7 @@ git push origin main
 - Produces: `output/voxel-game-vehicles/manifest.json`、3 viewport screenshot、E2E pass/fail。
 - Produces: Compose service `voxel-game-vehicles-e2e`。
 
-- [ ] **Step 1: 専用E2E scriptをREDで作る**
+- [x] **Step 1: 専用E2E scriptをREDで作る**
 
 scriptは少なくとも次をassertする。
 
@@ -728,7 +728,7 @@ PCはkeyboard、touch 2 viewportはDOM pointerで、車庫退出、3がれき除
 各viewportでselector／mission／fullscreenの`getBoundingClientRect()`を読み、8px以上、画面内、
 844×390 selector右端42%以下を数値assertする。車庫外切替が拒否されることも確認する。
 
-- [ ] **Step 2: Compose serviceを追加し、実装前のREDを確認する**
+- [x] **Step 2: Compose serviceを追加し、実装前のREDを確認する**
 
 ```yaml
   voxel-game-vehicles-e2e:
@@ -748,7 +748,7 @@ Run: `docker compose --profile e2e run --rm voxel-game-vehicles-e2e`
 
 Expected: 未完成scenarioの具体的assertでFAILする。server／browser起動失敗ではない。
 
-- [ ] **Step 3: E2EをGREENへし、画像を目視する**
+- [x] **Step 3: E2EをGREENへし、画像を目視する**
 
 Run: `docker compose --profile e2e run --rm voxel-game-vehicles-e2e`
 
@@ -763,7 +763,7 @@ E2E後に次の3画像を必ず目視する。
 確認項目は、黄色い車体／黒い履帯／灰色bladeの識別、がれき3塊、仕事文言、selector、
 下部操作、はみ出し、主要対象との重なり、旧消防車の火が非選択時に仕事として誤表示されないこと。
 
-- [ ] **Step 4: 全回帰、build、physical GPUをfreshに確認する**
+- [x] **Step 4: 全回帰、build、physical GPUをfreshに確認する**
 
 Run: `docker compose run --rm web npm test`
 
@@ -774,13 +774,13 @@ Run: `docker compose --profile e2e run --rm voxel-game-e2e`
 physical GPUは既存のlocal browser手順で1280×720を10秒以上計測し、manifestへ
 `medianFps >= 55`、`p10Fps >= 45`、renderer calls、vehicle draw callsを記録する。
 
-- [ ] **Step 5: READMEと作業ログを同期する**
+- [x] **Step 5: READMEと作業ログを同期する**
 
 READMEの操作を「Space／右ボタン＝車種別アクション」へ更新し、車庫内停止時の乗り換え、
 消防と工事の仕事、ゲームオーバーなしを追記する。`progress.md`へunit／build／E2E／目視／性能の
 実測値と残課題を追記する。
 
-- [ ] **Step 6: 参照残り・成果物・差分を最終確認する**
+- [x] **Step 6: 参照残り・成果物・差分を最終確認する**
 
 Run: `rg -n "command\.spray|controls\.spray|setSpray|sprayPressed" src scripts README.md`
 

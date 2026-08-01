@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { MutableRefObject, ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
+import type { WebGLRenderer } from 'three';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
+import { FIRE_TRUCK_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelFireTruck';
+import { BULLDOZER_RENDER_PLAN } from '../../vehicle-lab/scene/VoxelBulldozer';
 import type { DriveCommand } from '../input/controlState';
 import {
   canSwitchVehicle,
@@ -60,6 +63,9 @@ interface VoxelGameSceneProps {
 export interface VoxelGameRenderTelemetry {
   readonly renderedFrames: number;
   readonly rendererCalls: number;
+  readonly rendererName: string;
+  readonly rendererVendor: string;
+  readonly vehicleDrawCalls: number;
 }
 
 export type VoxelGameRenderTelemetryRef = MutableRefObject<VoxelGameRenderTelemetry>;
@@ -89,24 +95,57 @@ export function syncVehicleMissionSpatialSignals(
 export function advanceRenderTelemetry(
   current: VoxelGameRenderTelemetry,
   rendererCalls: number,
+  metadata: Pick<
+    VoxelGameRenderTelemetry,
+    'rendererName' | 'rendererVendor' | 'vehicleDrawCalls'
+  >,
 ): VoxelGameRenderTelemetry {
   return {
+    ...metadata,
     renderedFrames: current.renderedFrames + 1,
     rendererCalls,
   };
 }
 
+/** WebGL debug extensionから物理renderer名を読み、未提供環境は保守的にunknownへする。 */
+function readRendererIdentity(gl: WebGLRenderer): Pick<
+  VoxelGameRenderTelemetry,
+  'rendererName' | 'rendererVendor'
+> {
+  const context = gl.getContext();
+  const debugInfo = context.getExtension('WEBGL_debug_renderer_info');
+  if (!debugInfo) return { rendererName: 'unknown', rendererVendor: 'unknown' };
+  return {
+    rendererName: String(context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)),
+    rendererVendor: String(context.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)),
+  };
+}
+
+/** 選択車両を構成するpalette別InstancedMeshの実render plan数を返す。 */
+function readVehicleDrawCalls(vehicleId: VehicleId): number {
+  return vehicleId === 'fire-truck'
+    ? FIRE_TRUCK_RENDER_PLAN.drawCalls
+    : BULLDOZER_RENDER_PLAN.drawCalls;
+}
+
 /** 複数frameとdraw callを確認してから自動検証へscene readyを通知する。 */
-function SceneReadySignal({ renderTelemetryRef }: {
+function SceneReadySignal({ renderTelemetryRef, vehicleId }: {
   readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
+  readonly vehicleId: VehicleId;
 }): null {
   const renderedFrameCount = useRef(0);
+  const rendererIdentityRef = useRef<ReturnType<typeof readRendererIdentity> | null>(null);
 
   useFrame(({ gl }) => {
     renderedFrameCount.current += 1;
+    rendererIdentityRef.current ??= readRendererIdentity(gl);
     renderTelemetryRef.current = advanceRenderTelemetry(
       renderTelemetryRef.current,
       gl.info.render.calls,
+      {
+        ...rendererIdentityRef.current,
+        vehicleDrawCalls: readVehicleDrawCalls(vehicleId),
+      },
     );
     if (renderedFrameCount.current >= 3 && gl.info.render.calls > 0) {
       document.documentElement.dataset.voxelSceneReady = 'true';
@@ -180,7 +219,7 @@ export function VoxelGameScene({
     <>
       <color attach="background" args={['#ead4b3']} />
       <WorldFixedCamera cameraTelemetryRef={cameraTelemetryRef} telemetryRef={telemetryRef} />
-      <SceneReadySignal renderTelemetryRef={renderTelemetryRef} />
+      <SceneReadySignal renderTelemetryRef={renderTelemetryRef} vehicleId={vehicleId} />
       <RuntimeClock
         breakablePoolHandleRef={breakablePoolHandleRef}
         coordinator={coordinator}
