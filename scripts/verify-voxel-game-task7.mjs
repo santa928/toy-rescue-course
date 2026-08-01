@@ -138,7 +138,7 @@ async function measureLayout(page, viewport) {
     fullscreen: '.fullscreen-button',
     joystick: '.touch-joystick',
     mission: '.mission-pill',
-    spray: '.spray-button',
+    spray: '.primary-action-button',
   };
   const raw = {};
   for (const [name, selector] of Object.entries(selectors)) {
@@ -165,7 +165,7 @@ async function measureLayout(page, viewport) {
   }
 
   const thumbBox = await page.locator('.touch-joystick__thumb').boundingBox();
-  const sprayGlyphBox = await page.locator('.spray-button__glyph').boundingBox();
+  const sprayGlyphBox = await page.locator('.primary-action-button__glyph').boundingBox();
   assert(thumbBox && sprayGlyphBox, `${viewport.name}: inner control box unavailable.`);
   assert(!rectanglesOverlap(toEdges(thumbBox), {
     bottom: boxes.joystick.top,
@@ -216,15 +216,15 @@ async function verifyDesktop(browser, errors, results) {
     const pressed = await readGameState(page);
     assert(Math.abs(pressed.controls.moveX + Math.SQRT1_2) < 0.001
       && Math.abs(pressed.controls.moveY - Math.SQRT1_2) < 0.001
-      && pressed.controls.spray,
+      && pressed.controls.primaryAction,
       `Keyboard command is wrong: ${JSON.stringify(pressed.controls)}`);
-    assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'true',
+    assert(await page.locator('.primary-action-button').getAttribute('aria-pressed') === 'true',
       'Keyboard spray command did not update aria-pressed true.');
     await page.getByText('おみずをかけよう', { exact: true }).waitFor({ state: 'visible' });
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
     await waitForFrames(page, 1);
     const blurred = await readGameState(page);
-    assert(blurred.controls.moveX === 0 && blurred.controls.moveY === 0 && !blurred.controls.spray,
+    assert(blurred.controls.moveX === 0 && blurred.controls.moveY === 0 && !blurred.controls.primaryAction,
       `Blur did not release all controls: ${JSON.stringify(blurred.controls)}`);
     await page.keyboard.up('KeyW');
     await page.keyboard.up('KeyA');
@@ -271,12 +271,12 @@ async function verifyTouch(browser, errors, results) {
     await page.evaluate(() => {
       window.__task7TouchPointers = [];
       document.addEventListener('pointerdown', (event) => {
-        const control = event.target.closest('.touch-joystick, .spray-button');
+        const control = event.target.closest('.touch-joystick, .primary-action-button');
         if (control) window.__task7TouchPointers.push({ className: control.className, pointerId: event.pointerId });
       }, { capture: true });
     });
     const joystick = await page.locator('.touch-joystick').boundingBox();
-    const spray = await page.locator('.spray-button').boundingBox();
+    const spray = await page.locator('.primary-action-button').boundingBox();
     assert(joystick && spray, 'Touch controls lack bounding boxes.');
     for (const attribute of ['role', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'tabindex']) {
       assert(await page.locator('.touch-joystick').getAttribute(attribute) === null,
@@ -380,16 +380,16 @@ async function verifyTouch(browser, errors, results) {
     });
     await waitForFrames(page, 1);
     const simultaneous = await readGameState(page);
-    assert(simultaneous.controls.moveX > 0.45 && simultaneous.controls.moveY > 0.45 && simultaneous.controls.spray,
+    assert(simultaneous.controls.moveX > 0.45 && simultaneous.controls.moveY > 0.45 && simultaneous.controls.primaryAction,
       `Spray start released the held joystick: ${JSON.stringify(simultaneous.controls)}`);
-    assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'true',
+    assert(await page.locator('.primary-action-button').getAttribute('aria-pressed') === 'true',
       'Simultaneous spray did not set aria-pressed true.');
     await page.screenshot({ path: `${outputDirectory}/touch-active.png` });
     const activePointers = await page.evaluate(() => window.__task7TouchPointers);
     const joystickPointer = activePointers.find((pointer) => pointer.className === 'touch-joystick');
-    const sprayPointer = activePointers.find((pointer) => pointer.className === 'spray-button');
+    const sprayPointer = activePointers.find((pointer) => pointer.className === 'primary-action-button');
     assert(joystickPointer && sprayPointer, `CDP pointer mapping is incomplete: ${JSON.stringify(activePointers)}`);
-    await page.locator('.spray-button').dispatchEvent('pointerup', {
+    await page.locator('.primary-action-button').dispatchEvent('pointerup', {
       bubbles: true,
       clientX: sprayCenter.x,
       clientY: sprayCenter.y,
@@ -399,7 +399,7 @@ async function verifyTouch(browser, errors, results) {
     await waitForFrames(page, 1);
     const stickAfterSprayRelease = await readGameState(page);
     assert(stickAfterSprayRelease.controls.moveX > 0.45 && stickAfterSprayRelease.controls.moveY > 0.45
-      && !stickAfterSprayRelease.controls.spray,
+      && !stickAfterSprayRelease.controls.primaryAction,
     `Spray release did not preserve the held joystick: ${JSON.stringify(stickAfterSprayRelease.controls)}`);
 
     await page.locator('.touch-joystick').dispatchEvent('pointerup', {
@@ -423,16 +423,16 @@ async function verifyTouch(browser, errors, results) {
       type: 'touchStart',
     });
     await waitForFrames(page, 1);
-    assert((await readGameState(page)).controls.spray, 'Touch spray hold did not set command true.');
-    assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'true',
+    assert((await readGameState(page)).controls.primaryAction, 'Touch spray hold did not set command true.');
+    assert(await page.locator('.primary-action-button').getAttribute('aria-pressed') === 'true',
       'Touch spray hold did not set aria-pressed true.');
     await page.screenshot({ path: `${outputDirectory}/spray-active.png` });
     await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
-    assert(!(await readGameState(page)).controls.spray, 'Touch spray release did not set command false.');
-    assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'false',
+    assert(!(await readGameState(page)).controls.primaryAction, 'Touch spray release did not set command false.');
+    assert(await page.locator('.primary-action-button').getAttribute('aria-pressed') === 'false',
       'Touch spray release did not set aria-pressed false.');
 
-    await page.locator('.spray-button').dispatchEvent('pointerdown', {
+    await page.locator('.primary-action-button').dispatchEvent('pointerdown', {
       bubbles: true,
       button: 0,
       clientX: sprayCenter.x,
@@ -440,9 +440,9 @@ async function verifyTouch(browser, errors, results) {
       pointerId: 41,
       pointerType: 'touch',
     });
-    await page.locator('.spray-button').dispatchEvent('pointercancel', { bubbles: true, pointerId: 41, pointerType: 'touch' });
-    assert(!(await readGameState(page)).controls.spray, 'Spray pointercancel left command stuck.');
-    await page.locator('.spray-button').dispatchEvent('pointerdown', {
+    await page.locator('.primary-action-button').dispatchEvent('pointercancel', { bubbles: true, pointerId: 41, pointerType: 'touch' });
+    assert(!(await readGameState(page)).controls.primaryAction, 'Spray pointercancel left command stuck.');
+    await page.locator('.primary-action-button').dispatchEvent('pointerdown', {
       bubbles: true,
       button: 0,
       clientX: sprayCenter.x,
@@ -450,15 +450,15 @@ async function verifyTouch(browser, errors, results) {
       pointerId: 42,
       pointerType: 'touch',
     });
-    await page.locator('.spray-button').dispatchEvent('lostpointercapture', {
+    await page.locator('.primary-action-button').dispatchEvent('lostpointercapture', {
       bubbles: true,
       pointerId: 42,
       pointerType: 'touch',
     });
-    assert(!(await readGameState(page)).controls.spray, 'Spray lostpointercapture left command stuck.');
-    assert(await page.locator('.spray-button').getAttribute('aria-pressed') === 'false',
+    assert(!(await readGameState(page)).controls.primaryAction, 'Spray lostpointercapture left command stuck.');
+    assert(await page.locator('.primary-action-button').getAttribute('aria-pressed') === 'false',
       'Spray lostpointercapture left aria-pressed stuck.');
-    await page.locator('.spray-button').dispatchEvent('pointerdown', {
+    await page.locator('.primary-action-button').dispatchEvent('pointerdown', {
       bubbles: true,
       button: 0,
       clientX: sprayCenter.x,
@@ -475,7 +475,7 @@ async function verifyTouch(browser, errors, results) {
       pointerType: 'touch',
     });
     const inverseActive = await readGameState(page);
-    assert(inverseActive.controls.moveX > 0.45 && inverseActive.controls.moveY > 0.45 && inverseActive.controls.spray,
+    assert(inverseActive.controls.moveX > 0.45 && inverseActive.controls.moveY > 0.45 && inverseActive.controls.primaryAction,
       `Spray-first input did not preserve both commands: ${JSON.stringify(inverseActive.controls)}`);
     await page.locator('.touch-joystick').dispatchEvent('pointercancel', {
       bubbles: true,
@@ -484,15 +484,15 @@ async function verifyTouch(browser, errors, results) {
     });
     const inverseJoystickCancelled = await readGameState(page);
     assert(inverseJoystickCancelled.controls.moveX === 0 && inverseJoystickCancelled.controls.moveY === 0
-      && inverseJoystickCancelled.controls.spray,
+      && inverseJoystickCancelled.controls.primaryAction,
     `Joystick cancel did not preserve the earlier spray: ${JSON.stringify(inverseJoystickCancelled.controls)}`);
-    await page.locator('.spray-button').dispatchEvent('lostpointercapture', {
+    await page.locator('.primary-action-button').dispatchEvent('lostpointercapture', {
       bubbles: true,
       pointerId: 53,
       pointerType: 'touch',
     });
     const inverseReleased = await readGameState(page);
-    assert(!inverseReleased.controls.spray, 'Spray lostpointercapture did not release the spray-first sequence.');
+    assert(!inverseReleased.controls.primaryAction, 'Spray lostpointercapture did not release the spray-first sequence.');
     results.touch = {
       afterVisibilityRestart: afterVisibilityRestart.controls,
       cancelled: cancelled.controls,

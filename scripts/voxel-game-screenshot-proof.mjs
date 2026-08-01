@@ -14,8 +14,8 @@ export const HUD_CAPTURE_TARGETS = Object.freeze({
     selector: '.mission-pill',
   },
   spray: {
-    labelSelector: '.spray-button__label',
-    selector: '.spray-button',
+    labelSelector: '.primary-action-button__label',
+    selector: '.primary-action-button',
   },
 });
 

@@ -154,7 +154,7 @@ async function openGamePage(
 async function createTouchDriver(page) {
   const cdp = await page.context().newCDPSession(page);
   const joystick = await page.locator('.touch-joystick').boundingBox();
-  const spray = await page.locator('.spray-button').boundingBox();
+  const spray = await page.locator('.primary-action-button').boundingBox();
   assert(joystick && spray, 'Touch controls lack bounding boxes.');
   const joystickCenter = {
     x: joystick.x + joystick.width / 2,

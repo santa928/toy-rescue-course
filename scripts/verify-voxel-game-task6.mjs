@@ -594,7 +594,7 @@ async function readHudControlRects(page) {
   return page.evaluate(() => [
     '.fullscreen-button',
     '.mission-pill',
-    '.spray-button',
+    '.primary-action-button',
     '.touch-joystick',
   ].map((selector) => {
     const element = document.querySelector(selector);
