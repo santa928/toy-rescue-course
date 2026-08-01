@@ -99,9 +99,20 @@ async function measureHudLayout(page, viewport) {
     assert(rectDistance(boxes[left], boxes[right]) >= 8,
       `${viewport.name}: ${left}/${right} lack 8px safety gap: ${JSON.stringify(boxes)}.`);
   }
-  if (viewport.name === 'mobile-landscape') {
-    assert(boxes.selector.right <= viewport.width * 0.42,
-      `${viewport.name}: selector right edge exceeds 42%: ${boxes.selector.right}.`);
+  const selector = boxes.selector;
+  const buttonBoxes = await page.locator('.vehicle-selector__button').evaluateAll((buttons) => (
+    buttons.map((button) => {
+      const rect = button.getBoundingClientRect();
+      return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top };
+    })
+  ));
+  assert.equal(buttonBoxes.length, 5, `${viewport.name}: selector must contain five vehicle buttons.`);
+  for (const button of buttonBoxes) {
+    assert(
+      button.left >= selector.left && button.top >= selector.top
+      && button.right <= selector.right && button.bottom <= selector.bottom,
+      `${viewport.name}: vehicle button exceeds selector: ${JSON.stringify({ button, selector })}.`,
+    );
   }
   return boxes;
 }
@@ -256,7 +267,13 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(initial.vehicle.id, 'fire-truck', `${viewport.name}: initial vehicle is not fire-truck.`);
     assert.equal(initial.vehicleSelection.selected, 'fire-truck');
     assert.equal(initial.vehicleSelection.canSwitch, true, `${viewport.name}: selector is unavailable at garage.`);
-    assert.deepEqual(initial.vehicleSelection.available, ['fire-truck', 'bulldozer', 'excavator']);
+    assert.deepEqual(initial.vehicleSelection.available, [
+      'fire-truck',
+      'bulldozer',
+      'excavator',
+      'ambulance',
+      'police',
+    ]);
     assert.equal(initial.controls.primaryAction, false);
     assert.equal(await page.getByTestId('physical-gpu-probe').count(), 0,
       `${viewport.name}: opt-in physical GPU probe leaked into normal play.`);

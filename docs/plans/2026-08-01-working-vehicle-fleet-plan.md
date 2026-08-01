@@ -48,8 +48,8 @@
 
 ## Task 6: 5台総合回帰と性能再認証
 
-- [ ] fresh full unit、budget付きbuild、canonical、既存二車種、色遊び、5台専用E2E、Vehicle Lab、production smokeを通す。
-- [ ] 代表viewportの全画像を原寸目視し、内部HUD境界も数値確認する。
-- [ ] Apple M4 physical GPUで各車両のdraw call、median、p10を再測定する。
-- [ ] README、設計、計画、progressへ実測と公開結果を同期する。
+- [x] fresh full unit、budget付きbuild、canonical、既存二車種、色遊び、5台専用E2E、Vehicle Lab、production smokeを通す。
+- [x] 代表viewportの全画像を原寸目視し、内部HUD境界も数値確認する。
+- [x] Apple M4 physical GPUで各車両のdraw call、median、p10を再測定する。
+- [x] README、設計、計画、progressへ実測と公開結果を同期する。
 - [ ] 全commit範囲をsecret scanし、日本語commit、main push、remote／Actions／Pages／公開物を確認する。

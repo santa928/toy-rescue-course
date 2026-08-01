@@ -117,10 +117,10 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - [x] ショベル3山、救急1体、警察3地点の速度・距離・継続時間gateがpure testと実走で一致する。
 - [x] 未完了帰庫と乗り換えでは仕事を変えず、完了帰庫だけで次仕事へ進む。
 - [x] bodyだけが一時塗装され、役割部品の色とdraw call数を維持する。
-- [ ] 既存消防、ブルドーザー、自由積み木、色遊び、物理衝突を回帰させない。
+- [x] 既存消防、ブルドーザー、自由積み木、色遊び、物理衝突を回帰させない。
 - [x] 1280×720、1024×768、844×390でselector、仕事、主操作に欠け・重なり・操作阻害がない。
 - [x] console／page／request error 0、telemetryと実描画一致、代表画像原寸目視を満たす。
-- [ ] fresh unit、budget付きbuild、専用E2E、canonical、production smoke、公開E2EがPASSする。
+- [x] fresh unit、budget付きbuild、専用E2E、canonical、production smoke、公開E2EがPASSする。
 
 ## 非対象
 
@@ -201,3 +201,12 @@ bucket／灯火、target粒子は毎frame refと既存clockへ閉じる。
 - 最大3対象のbody 18、accent 9、particle 18、route 7、star 12 slotを一度だけ確保し、固定5 batchで描く共通sceneを追加した。非選択時は全slotを非activeにする。
 - focusedは3 files／20 tests、fresh full unitは40 files／378 testsがPASSした。
 - production buildは641 modulesでPASSし、game 93,654 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで全budget内だった。共通sceneは未接続のため配信bundleと既存draw callはまだ変えていない。
+
+### 2026-08-01 Task 6 最終総合回帰
+
+- Docker内fresh unitは46 files／448 tests、production buildは656 modulesでPASSした。game entry 144,786 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで全budget内だった。
+- canonical full、Vehicle Lab、既存車両、色遊び、5台fleet、実AudioContext、96×96map、production smokeをすべて実ブラウザで完走した。browser／page／request errorは0だった。
+- 旧車両E2Eに残っていた3台固定の期待値を5台へ更新し、mobile selectorの旧42%比率を、viewport内包・全5子ボタンの親境界内包・missionとの実寸余白へ置き換えた。修正後は全3 viewportでPASSした。
+- 現行成果物の代表10画像を原寸目視し、水流、破壊、5台、色シャワー、患者、追加2地区、HUD、操作系に見切れ・意図しない重なり・はみ出し・操作阻害がないことを確認した。
+- 公開96×96版をApple M4物理GPUで5台測定し、全車median 59.88fps、p10 56.82〜58.48fps、scene 28〜31 calls、車体7 callsを確認した。目標を満たすためchunk streaming／LODは不要と確定した。
+- 本設計で非対象だった音・振動と追加地区は、後続の独立設計・実装タスクで完成済みであり、当時の境界を遡って変更しない。

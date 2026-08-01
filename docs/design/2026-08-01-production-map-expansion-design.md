@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-01
 
-**状態:** 実装・公開検証済み・物理GPU再認証待ち
+**状態:** 実装・公開・物理GPU再認証済み
 
 **対象:** world bounds、追加2地区、道路、静的ランドマーク、物理、telemetry、E2E、chunk判断
 
@@ -166,10 +166,24 @@ HUDは各画面でCanvas内包と主要要素間8px以上を満たし、追加�
 
 関連unit 94件、全unit 448件、production build、bundle budget、5車種15仕事のfleet E2E、production smokeは成功した。canonical総合E2Eはマップ、左右直進、消火、3画面の実ミッション、放水タイムライン、既存衝突入力を実行し、追加solidの監査理由を更新後にcollision focusも成功した。Docker wall clockとsoftware rendererのfpsは性能認証へ使用しない。
 
-96×96ちょうど、27 collider、既存InstancedMesh構造、追加asset fetch 0のため、chunk streaming／LODは導入しない。96×96版の物理GPU再認証は最終リリース工程で行い、Desktop median 55fps／p10 45fpsを下回った場合だけ再検討する。
+96×96ちょうど、27 collider、既存InstancedMesh構造、追加asset fetch 0のため、chunk streaming／LODは導入しない。完成版のApple M4物理GPU認証では5台すべてmedian 59.88fps、最低p10 56.82fpsで目標を上回ったため、性能条件による再検討も不要と確定した。
 
 ## 15. 公開検証結果
 
 実装コミット`c9e711a54dfb5212c334e363dd443849ffcea0fe`を`origin/main`へpushし、ahead／behind 0/0とremote SHA一致を確認した。GitHub Pages workflow [30715514999](https://github.com/santa928/toy-rescue-course/actions/runs/30715514999)はunit、production build、artifact upload、deployをすべて成功した。
 
 公開URL`https://santa928.github.io/toy-rescue-course/`では、root、`voxel-game.html`、`vehicle-lab.html`の3入口がWebGL canvasを起動した。追加地区専用E2Eも1280×720、1024×768 touch、844×390 touchの3画面を一括完走し、7地区、27 solid、こうじヤード68unit、おもちゃのまち71unit、代表solid衝突、別出口、HUD実寸、browser／page／request error 0を確認した。公開版6画像も目視し、見切れ、HUD重なり、操作阻害がないことを確認した。
+
+## 16. 物理GPU再認証結果
+
+公開版の96×96完成マップを1280×720の`ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)`で各車2秒warm-up後に12秒測定した。
+
+| 車両 | median fps | p10 fps | 平均 fps | scene calls | 車体 calls |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 消防車 | 59.88 | 56.82 | 60.00 | 29 | 7 |
+| ブルドーザー | 59.88 | 56.82 | 60.00 | 28 | 7 |
+| ショベルカー | 59.88 | 57.80 | 60.00 | 31 | 7 |
+| 救急車 | 59.88 | 58.14 | 59.84 | 31 | 7 |
+| パトカー | 59.88 | 58.48 | 60.00 | 31 | 7 |
+
+全車がmedian 55fps／p10 45fpsの目標を満たし、Chrome console errorは0だった。したがってREQ-079のどちらの再開条件も成立せず、chunk streaming／LODは実装しない。
