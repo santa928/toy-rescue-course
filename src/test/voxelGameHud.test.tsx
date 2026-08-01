@@ -24,6 +24,9 @@ function createControls(): VoxelGameControls {
 const bulldozerMission: VehicleMissionSnapshot = {
   destinationDistrict: 'blocks',
   id: 'debris-clearance',
+  jobCycle: 1,
+  jobId: 'debris-north',
+  jobLabel: 'きたのがれきをかたづけよう',
   objectiveLabel: 'こうじげんばへ いこう',
   phase: 'assigned',
   progress: { current: 0, target: 3 },

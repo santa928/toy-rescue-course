@@ -83,4 +83,23 @@ describe('BulldozerMissionRuntime', () => {
       'Duplicate bulldozer debris id: same',
     );
   });
+
+  it('次仕事のがれきIDへ同じruntimeを再割当し、進捗とphaseを初期化する', () => {
+    const runtime = new BulldozerMissionRuntime(DEBRIS_IDS);
+    runtime.registerDebrisClear('debris-a');
+
+    runtime.assignDebris(['next-a', 'next-b', 'next-c']);
+
+    expect(runtime.getSnapshot()).toMatchObject({
+      clearedCount: 0,
+      debris: [
+        { cleared: false, id: 'next-a' },
+        { cleared: false, id: 'next-b' },
+        { cleared: false, id: 'next-c' },
+      ],
+      missionPhase: 'assigned',
+      targetCount: 3,
+    });
+    expect(runtime.registerDebrisClear('debris-a')).toBe(false);
+  });
 });

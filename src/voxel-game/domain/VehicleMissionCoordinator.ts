@@ -17,6 +17,13 @@ import {
   type VehicleMissionId,
   type VehicleSwitchContext,
 } from './vehicleDefinitions';
+import { JobDeck, normalizeJobSeed } from './JobDeck';
+import {
+  VEHICLE_JOBS,
+  type BulldozerVehicleJobDefinition,
+  type FireVehicleJobDefinition,
+  type VehicleJobId,
+} from './vehicleJobs';
 
 /** 車種coordinatorのadvance直前に最新空間signalを同期するcallback。 */
 export type VehicleMissionBeforeAdvance = () => void;
@@ -25,6 +32,9 @@ export type VehicleMissionBeforeAdvance = () => void;
 export interface VehicleMissionSnapshot {
   readonly destinationDistrict: 'fire' | 'blocks';
   readonly id: VehicleMissionId;
+  readonly jobCycle: number;
+  readonly jobId: VehicleJobId;
+  readonly jobLabel: string;
   readonly objectiveLabel: string;
   readonly phase: MissionPhase;
   readonly progress: { readonly current: number; readonly target: number };
@@ -35,7 +45,12 @@ export interface VehicleMissionSnapshot {
 /** 選択車両、共有消防runtime、工事runtimeをまとめた外部snapshot。 */
 export interface VehicleMissionCoordinatorSnapshot {
   readonly bulldozer: BulldozerMissionSnapshot;
+  readonly currentJobs: {
+    readonly bulldozer: BulldozerVehicleJobDefinition;
+    readonly fire: FireVehicleJobDefinition;
+  };
   readonly fire: VoxelGameSnapshot;
+  readonly jobSeed: number;
   readonly mission: VehicleMissionSnapshot;
   readonly selectedVehicleId: VehicleId;
 }
@@ -50,18 +65,31 @@ export interface VehicleMissionSpatialSignals {
   readonly atGarage: boolean;
 }
 
+/** coordinator初期化時に外部境界から渡す再現用設定。 */
+export interface VehicleMissionCoordinatorOptions {
+  readonly jobSeed?: unknown;
+  readonly rotateJobsOnCompletion?: boolean;
+}
+
 /** 消防仕事snapshotを車種共通の表示契約へ変換する。 */
-function createFireMissionSnapshot(snapshot: VoxelGameSnapshot): VehicleMissionSnapshot {
+function createFireMissionSnapshot(
+  snapshot: VoxelGameSnapshot,
+  job: FireVehicleJobDefinition,
+  jobCycle: number,
+): VehicleMissionSnapshot {
   const completed = snapshot.missionPhase === 'celebrating' || snapshot.missionPhase === 'freeRoam';
   const labels: Readonly<Record<MissionPhase, string>> = {
     active: 'おみずをかけよう',
-    assigned: '火のところへいこう',
+    assigned: job.label,
     celebrating: 'できた！',
     freeRoam: 'じゆうにあそぼう',
   };
   return {
     destinationDistrict: 'fire',
     id: 'fire-rescue',
+    jobCycle,
+    jobId: job.id,
+    jobLabel: job.label,
     objectiveLabel: labels[snapshot.missionPhase],
     phase: snapshot.missionPhase,
     progress: { current: completed ? 1 : 0, target: 1 },
@@ -73,17 +101,22 @@ function createFireMissionSnapshot(snapshot: VoxelGameSnapshot): VehicleMissionS
 /** 工事仕事snapshotを残り数つきの車種共通表示契約へ変換する。 */
 function createBulldozerMissionSnapshot(
   snapshot: BulldozerMissionSnapshot,
+  job: BulldozerVehicleJobDefinition,
+  jobCycle: number,
 ): VehicleMissionSnapshot {
   const remaining = snapshot.targetCount - snapshot.clearedCount;
   const labels: Readonly<Record<MissionPhase, string>> = {
     active: `がれき あと${remaining}こ`,
-    assigned: 'こうじげんばへ いこう',
+    assigned: job.label,
     celebrating: 'できた！',
     freeRoam: 'じゆうにあそぼう',
   };
   return {
     destinationDistrict: 'blocks',
     id: 'debris-clearance',
+    jobCycle,
+    jobId: job.id,
+    jobLabel: job.label,
     objectiveLabel: labels[snapshot.missionPhase],
     phase: snapshot.missionPhase,
     progress: { current: snapshot.clearedCount, target: snapshot.targetCount },
@@ -99,6 +132,8 @@ function createObservableSignature(snapshot: VehicleMissionCoordinatorSnapshot):
     snapshot.mission.phase,
     snapshot.mission.progress.current,
     snapshot.mission.progress.target,
+    snapshot.mission.jobId,
+    snapshot.mission.jobCycle,
   ].join(':');
 }
 
@@ -106,14 +141,33 @@ function createObservableSignature(snapshot: VehicleMissionCoordinatorSnapshot):
 export class VehicleMissionCoordinator {
   public readonly bulldozerRuntime: BulldozerMissionRuntime;
   public readonly fireRuntime: VoxelGameRuntime;
+  public readonly jobSeed: number;
+  private currentBulldozerJob: BulldozerVehicleJobDefinition;
+  private currentFireJob: FireVehicleJobDefinition;
+  private readonly bulldozerJobDeck: JobDeck<BulldozerVehicleJobDefinition>;
+  private bulldozerJobCycle = 1;
+  private readonly fireJobDeck: JobDeck<FireVehicleJobDefinition>;
+  private fireJobCycle = 1;
   private readonly listeners = new Set<VehicleMissionCoordinatorListener>();
   private observableSignature: string;
+  private readonly rotateJobsOnCompletion: boolean;
   private selectedVehicleId: VehicleId = 'fire-truck';
 
-  /** 共有積み木IDと工事がれきIDから両仕事runtimeを1回だけ作る。 */
-  public constructor(blockIds: readonly string[], debrisIds: readonly string[]) {
+  /** 共有積み木IDとsession seedから両仕事runtimeと独立job deckを1回だけ作る。 */
+  public constructor(
+    blockIds: readonly string[],
+    options: VehicleMissionCoordinatorOptions = {},
+  ) {
+    this.jobSeed = normalizeJobSeed(options.jobSeed ?? 1);
+    this.rotateJobsOnCompletion = options.rotateJobsOnCompletion ?? false;
+    this.fireJobDeck = new JobDeck(VEHICLE_JOBS['fire-truck'], this.jobSeed);
+    this.bulldozerJobDeck = new JobDeck(VEHICLE_JOBS.bulldozer, this.jobSeed);
+    this.currentFireJob = this.fireJobDeck.draw();
+    this.currentBulldozerJob = this.bulldozerJobDeck.draw();
     this.fireRuntime = new VoxelGameRuntime(blockIds);
-    this.bulldozerRuntime = new BulldozerMissionRuntime(debrisIds);
+    this.bulldozerRuntime = new BulldozerMissionRuntime(
+      this.currentBulldozerJob.debris.map(({ id }) => id),
+    );
     this.observableSignature = createObservableSignature(this.getSnapshot());
   }
 
@@ -169,9 +223,34 @@ export class VehicleMissionCoordinator {
 
   /** 共有積み木timerと選択中の専用仕事を同じ有限時間だけ進める。 */
   public advance(milliseconds: number): void {
+    const firePhaseBeforeAdvance = this.fireRuntime.getSnapshot().missionPhase;
+    const bulldozerPhaseBeforeAdvance = this.bulldozerRuntime.getSnapshot().missionPhase;
     this.fireRuntime.advance(milliseconds);
     if (this.selectedVehicleId === 'bulldozer') {
       this.bulldozerRuntime.advance(milliseconds);
+    }
+    const firePhaseAfterAdvance = this.fireRuntime.getSnapshot().missionPhase;
+    const bulldozerPhaseAfterAdvance = this.bulldozerRuntime.getSnapshot().missionPhase;
+    if (
+      this.selectedVehicleId === 'fire-truck'
+      && this.rotateJobsOnCompletion
+      && firePhaseBeforeAdvance === 'freeRoam'
+      && firePhaseAfterAdvance === 'assigned'
+    ) {
+      this.currentFireJob = this.fireJobDeck.draw();
+      this.fireJobCycle += 1;
+    }
+    if (
+      this.selectedVehicleId === 'bulldozer'
+      && this.rotateJobsOnCompletion
+      && bulldozerPhaseBeforeAdvance === 'freeRoam'
+      && bulldozerPhaseAfterAdvance === 'assigned'
+    ) {
+      this.currentBulldozerJob = this.bulldozerJobDeck.draw();
+      this.bulldozerJobCycle += 1;
+      this.bulldozerRuntime.assignDebris(
+        this.currentBulldozerJob.debris.map(({ id }) => id),
+      );
     }
     this.publishObservableChanges();
   }
@@ -182,10 +261,19 @@ export class VehicleMissionCoordinator {
     const bulldozer = this.bulldozerRuntime.getSnapshot();
     return {
       bulldozer,
+      currentJobs: {
+        bulldozer: this.currentBulldozerJob,
+        fire: this.currentFireJob,
+      },
       fire,
+      jobSeed: this.jobSeed,
       mission: this.selectedVehicleId === 'fire-truck'
-        ? createFireMissionSnapshot(fire)
-        : createBulldozerMissionSnapshot(bulldozer),
+        ? createFireMissionSnapshot(fire, this.currentFireJob, this.fireJobCycle)
+        : createBulldozerMissionSnapshot(
+          bulldozer,
+          this.currentBulldozerJob,
+          this.bulldozerJobCycle,
+        ),
       selectedVehicleId: this.selectedVehicleId,
     };
   }

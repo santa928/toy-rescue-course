@@ -19,25 +19,38 @@ export interface BulldozerMissionSnapshot {
 
 const CELEBRATION_DURATION_MS = 1_800;
 
+/** がれきIDを変更前に検証し、外部配列から切り離したcopyを返す。 */
+function requireValidDebrisIds(debrisIds: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  for (const id of debrisIds) {
+    if (id.trim().length === 0) throw new Error('Bulldozer mission requires non-empty debris ids');
+    if (seen.has(id)) throw new Error(`Duplicate bulldozer debris id: ${id}`);
+    seen.add(id);
+  }
+  if (debrisIds.length === 0) throw new Error('Bulldozer mission requires debris');
+  return [...debrisIds];
+}
+
 /** 3がれきの冪等進捗、成功、自由走行、帰庫再開を管理するpure runtime。 */
 export class BulldozerMissionRuntime {
   private atGarage = false;
   private atWorksite = false;
   private celebrationRemainingMs = 0;
   private readonly clearedIds = new Set<string>();
-  private readonly debrisIds: readonly string[];
+  private debrisIds: readonly string[];
   private elapsedMs = 0;
   private missionPhase: MissionPhase = 'assigned';
 
   /** 一意で空でないがれきIDを受け取り、仕事の初期状態を作る。 */
   public constructor(debrisIds: readonly string[]) {
-    const seen = new Set<string>();
-    for (const id of debrisIds) {
-      if (seen.has(id)) throw new Error(`Duplicate bulldozer debris id: ${id}`);
-      seen.add(id);
-    }
-    if (debrisIds.length === 0) throw new Error('Bulldozer mission requires debris');
-    this.debrisIds = [...debrisIds];
+    this.debrisIds = requireValidDebrisIds(debrisIds);
+  }
+
+  /** 次仕事の一意ながれきIDへ同じruntimeを再割当し、全進捗を開始状態へ戻す。 */
+  public assignDebris(debrisIds: readonly string[]): void {
+    const nextDebrisIds = requireValidDebrisIds(debrisIds);
+    this.debrisIds = nextDebrisIds;
+    this.resetMission();
   }
 
   /** 車両が中央車庫の仕事再開領域にいるか同期する。 */

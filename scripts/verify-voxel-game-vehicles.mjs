@@ -198,7 +198,10 @@ async function verifyViewport(browser, viewport, errors) {
     const selected = await readGameState(page);
     assert.equal(selected.vehicle.id, 'bulldozer', `${viewport.name}: bulldozer switch failed.`);
     assert.equal(selected.mission.id, 'debris-clearance');
-    assert.equal(selected.mission.objectiveLabel, 'こうじげんばへ いこう');
+    assert.equal(selected.mission.jobId, 'debris-north');
+    assert.equal(selected.mission.jobLabel, 'きたのがれきをかたづけよう');
+    assert.equal(selected.mission.jobCycle, 1);
+    assert.equal(selected.mission.objectiveLabel, selected.mission.jobLabel);
     assert.equal(await page.locator('.primary-action-button').getAttribute('aria-label'), 'ブレードを動かす');
     assert.equal(await bulldozerButton.getAttribute('aria-pressed'), 'true');
     const layout = await measureHudLayout(page, viewport);
@@ -270,6 +273,10 @@ async function verifyViewport(browser, viewport, errors) {
     await waitForFrames(page, 4);
     const restarted = await readGameState(page);
     assert.equal(restarted.mission.phase, 'assigned', `${viewport.name}: garage did not restart mission.`);
+    assert.equal(restarted.mission.jobId, 'debris-north',
+      `${viewport.name}: hidden job rotation changed the fixed scene.`);
+    assert.equal(restarted.mission.jobCycle, 1,
+      `${viewport.name}: hidden job rotation advanced before scene integration.`);
     assert.equal(restarted.bulldozer.clearedCount, 0, `${viewport.name}: debris did not reset at garage.`);
     assert.equal(restarted.vehicleSelection.canSwitch, true, `${viewport.name}: switch did not reopen at garage.`);
 

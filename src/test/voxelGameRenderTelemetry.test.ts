@@ -87,7 +87,7 @@ describe('buildWorldTelemetry', () => {
 
 describe('syncVehicleMissionSpatialSignals', () => {
   it('ブルドーザーで工事地区へ着くと工事仕事を開始する', () => {
-    const coordinator = new VehicleMissionCoordinator([], ['debris-a']);
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
     coordinator.selectVehicle('bulldozer', { atGarage: true, speed: 0 });
 
     syncVehicleMissionSpatialSignals(coordinator, [-24, 0.8, 13]);
@@ -111,7 +111,7 @@ describe('vehicle color integration', () => {
   });
 
   it('拒否切替では色を維持し、成功した別車種切替だけ解除する', () => {
-    const coordinator = new VehicleMissionCoordinator([], ['debris-a']);
+    const coordinator = new VehicleMissionCoordinator([], { jobSeed: 1 });
     const runtime = new VehicleColorEffectRuntime(COLOR_PLAY_SOURCES);
     runtime.syncVehiclePosition('fire-truck', COLOR_PLAY_SOURCES[1].position);
 

@@ -169,7 +169,7 @@ export function VoxelGameApp(): ReactElement {
   if (coordinatorRef.current === null) {
     coordinatorRef.current = new VehicleMissionCoordinator(
       BREAKABLE_BLOCKS.map(({ id }) => id),
-      BULLDOZER_DEBRIS.map(({ id }) => id),
+      { jobSeed: 1 },
     );
   }
   const coordinator = coordinatorRef.current;
@@ -338,6 +338,9 @@ export function VoxelGameApp(): ReactElement {
           destinationDistrict: currentMission.destinationDistrict,
           direction: [...missionTelemetry.direction],
           id: currentMission.id,
+          jobCycle: currentMission.jobCycle,
+          jobId: currentMission.jobId,
+          jobLabel: currentMission.jobLabel,
           nozzleOrigin: [...missionTelemetry.nozzleOrigin],
           objectiveLabel: currentMission.objectiveLabel,
           phase: currentMission.phase,

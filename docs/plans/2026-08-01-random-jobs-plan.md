@@ -21,11 +21,13 @@
 
 ## Task 3: coordinatorの仕事割当
 
-- [ ] 完了帰庫だけでcurrent jobを進めるcoordinator testをREDにする。
-- [ ] 車種別bag、current job、cycle、seedをsnapshotへ追加する。
-- [ ] ブルドーザーruntimeへ同じinstanceで対象IDを再割当するAPIを追加する。
-- [ ] 乗り換え、未完了帰庫、timer、既存通知回数の回帰をGREENにする。
+- [x] 完了帰庫だけでcurrent jobを進めるcoordinator testをREDにする。
+- [x] 車種別bag、current job、cycle、seedをsnapshotへ追加する。
+- [x] ブルドーザーruntimeへ同じinstanceで対象IDを再割当するAPIを追加する。
+- [x] 乗り換え、未完了帰庫、timer、既存通知回数の回帰をGREENにする。
 - [ ] 日本語commit、secret scan、push、公開確認を行う。
+
+本番の仕事ローテーションはTask 4・5で両sceneが仕事座標を反映するまで安全ゲートをOFFにし、coordinatorのoptionを有効化したtestだけで先に契約を固定する。片側だけを先行公開して表示対象と判定対象をずらさない。
 
 ## Task 4: 複数火災scene
 
