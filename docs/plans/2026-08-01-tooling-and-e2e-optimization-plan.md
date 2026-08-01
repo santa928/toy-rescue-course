@@ -33,13 +33,14 @@ feature固有scenarioの4層に分ける。
 
 **Files:**
 - Modify: `vite.config.ts`
+- Create: `src/tooling/vitestDiscovery.ts`
 - Create: `src/test/toolingConfig.test.ts`
 
-- [ ] RED: Vitest設定が`.worktrees`を除外していないassertを確認する。
-- [ ] `configDefaults.exclude`を維持し、`**/.worktrees/**`を追加する。
-- [ ] root testは一致し、worktree fixture pathは一致しないpure matcherを実装する。
-- [ ] focused/full unitをDocker内で通し、32 files／303 testsを維持する。
-- [ ] `Vitestのworktree重複収集を防ぐ`でcommit・scan・push・公開確認する。
+- [x] RED: Vitest設定が`.worktrees`を除外していないassertを確認する。
+- [x] `configDefaults.exclude`を維持し、`**/.worktrees/**`を追加する。
+- [x] root testは一致し、worktree fixture pathは一致しないpure matcherを実装する。
+- [x] focused/full unitをDocker内で通し、既存32 files／303 testsと新規2 testsを一度ずつ維持する。
+- [x] `Vitestのworktree重複収集を防ぐ`でcommit・scan・push・公開確認する。
 
 ## Task 3: production bundleを責務分割する
 
