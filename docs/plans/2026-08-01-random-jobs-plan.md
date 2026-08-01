@@ -38,9 +38,9 @@
 
 ## Task 5: 複数がれきscene
 
-- [ ] jobごとの3対象、route、clear判定、VFX transformをpure testでREDにする。
-- [ ] 既存12本体／18chip／7route／12star slotへcurrent job座標をin-place転送する。
-- [ ] 3仕事、冪等進捗、reset、通常積み木非干渉をGREENにする。
+- [x] jobごとの3対象、route、clear判定、VFX transformをpure testでREDにする。
+- [x] 既存12本体／18chip／7route／12star slotへcurrent job座標をin-place転送する。
+- [x] 3仕事、冪等進捗、reset、通常積み木非干渉をGREENにする。
 - [ ] 日本語commit、secret scan、push、公開確認を行う。
 
 ## Task 6: App・HUD・telemetry

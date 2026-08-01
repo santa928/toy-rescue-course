@@ -1,4 +1,8 @@
 import type { BulldozerMissionSnapshot } from '../domain/BulldozerMissionRuntime';
+import {
+  VEHICLE_JOBS,
+  type BulldozerVehicleJobDefinition,
+} from '../domain/vehicleJobs';
 import type { BulldozerDebrisPaletteId } from './productionWorldMap';
 import { BULLDOZER_DEBRIS, BULLDOZER_ROUTE_MARKER_POSITIONS } from './worldLayout';
 
@@ -14,7 +18,7 @@ export type BulldozerVfxPaletteId = BulldozerDebrisPaletteId | 'route' | 'star';
 /** 固定pool内の1 voxelを毎frame in-place更新する描画target。 */
 export interface BulldozerVoxelTransform {
   active: boolean;
-  readonly palette: BulldozerVfxPaletteId;
+  palette: BulldozerVfxPaletteId;
   readonly position: [number, number, number];
   readonly scale: [number, number, number];
   readonly slot: number;
@@ -23,6 +27,7 @@ export interface BulldozerVoxelTransform {
 
 /** がれき、chip、route、成功星の固定slotをまとめた再利用frame。 */
 export interface BulldozerVfxFrame {
+  readonly celebrationCenter: [number, number, number];
   readonly chips: BulldozerVoxelTransform[];
   readonly debris: BulldozerVoxelTransform[];
   readonly routeMarkers: BulldozerVoxelTransform[];
@@ -82,6 +87,7 @@ export function hideBulldozerTransform(transform: BulldozerVoxelTransform): void
 /** 全slotを一度だけ確保した非active frameを返す。 */
 export function createBulldozerVfxFrame(): BulldozerVfxFrame {
   return {
+    celebrationCenter: [0, HIDDEN_Y, 0],
     debris: Array.from({ length: BULLDOZER_DEBRIS_VOXEL_POOL_SIZE }, (_, slot) => {
       const sourceIndex = Math.floor(slot / BULLDOZER_DEBRIS_VOXELS_PER_SOURCE);
       return createTransform(slot, sourceIndex, BULLDOZER_DEBRIS[sourceIndex].palette);
@@ -99,17 +105,38 @@ export function createBulldozerVfxFrame(): BulldozerVfxFrame {
   };
 }
 
+/** 3対象の平均を玩具グリッドへ丸め、成功星の中心を既存tupleへ書き戻す。 */
+export function updateBulldozerCelebrationCenter(
+  job: BulldozerVehicleJobDefinition,
+  target: [number, number, number],
+): void {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (const { position } of job.debris) {
+    x += position[0];
+    y += position[1];
+    z += position[2];
+  }
+  const count = job.debris.length || 1;
+  target[0] = Math.round(x / count * 2) / 2;
+  target[1] = y / count + 0.7;
+  target[2] = Math.round(z / count * 2) / 2;
+}
+
 /** 現在snapshotとclear時刻から全固定slotを配列再生成なしで更新する。 */
 export function updateBulldozerVfxFrame(
   frame: BulldozerVfxFrame,
   snapshot: BulldozerMissionSnapshot,
   clearTimesSeconds: Float64Array,
   elapsedSeconds: number,
+  job: BulldozerVehicleJobDefinition = VEHICLE_JOBS.bulldozer[0],
 ): void {
   const safeElapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0;
+  updateBulldozerCelebrationCenter(job, frame.celebrationCenter);
 
   for (const transform of frame.debris) {
-    const source = BULLDOZER_DEBRIS[transform.sourceIndex];
+    const source = job.debris[transform.sourceIndex];
     const debrisState = snapshot.debris[transform.sourceIndex];
     if (!source || !debrisState || debrisState.cleared) {
       hideBulldozerTransform(transform);
@@ -117,6 +144,7 @@ export function updateBulldozerVfxFrame(
     }
     const voxel = DEBRIS_VOXELS[transform.slot % BULLDOZER_DEBRIS_VOXELS_PER_SOURCE];
     transform.active = true;
+    transform.palette = source.palette;
     transform.position[0] = source.position[0] + voxel.offset[0];
     transform.position[1] = source.position[1] + voxel.offset[1];
     transform.position[2] = source.position[2] + voxel.offset[2];
@@ -126,7 +154,7 @@ export function updateBulldozerVfxFrame(
   }
 
   for (const transform of frame.chips) {
-    const source = BULLDOZER_DEBRIS[transform.sourceIndex];
+    const source = job.debris[transform.sourceIndex];
     const clearTime = clearTimesSeconds[transform.sourceIndex] ?? -1;
     const age = safeElapsed - clearTime;
     if (!source || clearTime < 0 || age < 0 || age >= CHIP_LIFETIME_SECONDS) {
@@ -137,6 +165,7 @@ export function updateBulldozerVfxFrame(
     const remaining = 1 - age / CHIP_LIFETIME_SECONDS;
     const size = 0.28 * remaining;
     transform.active = true;
+    transform.palette = source.palette;
     transform.position[0] = source.position[0] + direction[0] * age * 2.4;
     transform.position[1] = source.position[1] + 0.3
       + direction[1] * age * 3.2 - 4.8 * age * age;
@@ -147,7 +176,7 @@ export function updateBulldozerVfxFrame(
   }
 
   for (const transform of frame.routeMarkers) {
-    const position = BULLDOZER_ROUTE_MARKER_POSITIONS[transform.slot];
+    const position = job.routeMarkers[transform.slot];
     if (!snapshot.routeVisible || !position) {
       hideBulldozerTransform(transform);
       continue;
@@ -170,9 +199,10 @@ export function updateBulldozerVfxFrame(
     }
     const pulse = 0.24 + Math.sin(safeElapsed * 8 + transform.slot) * 0.05;
     transform.active = true;
-    transform.position[0] = -24 + offset[0];
-    transform.position[1] = 1.5 + offset[1] + Math.sin(safeElapsed * 5 + transform.slot) * 0.12;
-    transform.position[2] = 12.5 + offset[2];
+    transform.position[0] = frame.celebrationCenter[0] + offset[0];
+    transform.position[1] = frame.celebrationCenter[1] + offset[1]
+      + Math.sin(safeElapsed * 5 + transform.slot) * 0.12;
+    transform.position[2] = frame.celebrationCenter[2] + offset[2];
     transform.scale[0] = pulse;
     transform.scale[1] = pulse;
     transform.scale[2] = pulse;

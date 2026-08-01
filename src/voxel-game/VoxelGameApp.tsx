@@ -62,7 +62,6 @@ import {
 import { WORLD_SOLID_BOXES } from './scene/worldCollisionLayout';
 import {
   BLOCK_PLAZA,
-  BULLDOZER_DEBRIS,
   BREAKABLE_BLOCKS,
   COLOR_PLAY_SOURCES,
   GARAGE_POSITION,
@@ -174,6 +173,7 @@ export function VoxelGameApp(): ReactElement {
   }
   const colorEffectRuntime = colorEffectRuntimeRef.current;
   const bulldozerMissionSnapshotRef = useRef(coordinator.getSnapshot().bulldozer);
+  const bulldozerJobRef = useRef(coordinator.getSnapshot().currentJobs.bulldozer);
   const bulldozerMissionTelemetryRef = useRef<BulldozerMissionTelemetry>(
     createBulldozerMissionTelemetry(),
   );
@@ -233,6 +233,7 @@ export function VoxelGameApp(): ReactElement {
     telemetryRef.current = createInitialVehicleTelemetry(vehicleId);
     const snapshot = coordinator.getSnapshot();
     bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
+    bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
     setCoordinatorSnapshot(snapshot);
     return true;
   }, [colorEffectRuntime, controls.reset, coordinator]);
@@ -256,6 +257,7 @@ export function VoxelGameApp(): ReactElement {
   useEffect(() => {
     const unsubscribe = coordinator.subscribe((snapshot) => {
       bulldozerMissionSnapshotRef.current = snapshot.bulldozer;
+      bulldozerJobRef.current = snapshot.currentJobs.bulldozer;
       setCoordinatorSnapshot(snapshot);
     });
     const unsubscribeColorEffect = colorEffectRuntime.subscribe((snapshot) => {
@@ -307,11 +309,9 @@ export function VoxelGameApp(): ReactElement {
         landmarks: {
           breakableBlocks: BREAKABLE_BLOCKS.map(({ id, position }) => ({ id, position })),
           blockPlaza: BLOCK_PLAZA,
-          bulldozerDebris: BULLDOZER_DEBRIS.map(({ id, position, radius }) => ({
-            id,
-            position,
-            radius,
-          })),
+          bulldozerDebris: coordinatorState.currentJobs.bulldozer.debris.map(
+            ({ id, position, radius }) => ({ id, position, radius }),
+          ),
           colorPlaySources: COLOR_PLAY_SOURCES.map((source) => ({
             ...source,
             position: [...source.position],
@@ -457,6 +457,7 @@ export function VoxelGameApp(): ReactElement {
           <VoxelGameScene
             breakablePoolHandleRef={breakablePoolHandleRef}
             breakableTelemetryRef={breakableTelemetryRef}
+            bulldozerJobRef={bulldozerJobRef}
             bulldozerMissionSnapshotRef={bulldozerMissionSnapshotRef}
             bulldozerMissionTelemetryRef={bulldozerMissionTelemetryRef}
             cameraTelemetryRef={cameraTelemetryRef}

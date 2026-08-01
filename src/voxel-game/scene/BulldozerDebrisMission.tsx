@@ -5,12 +5,10 @@ import * as THREE from 'three';
 import type { BulldozerMissionSnapshot } from '../domain/BulldozerMissionRuntime';
 import type { VehicleMissionCoordinator } from '../domain/VehicleMissionCoordinator';
 import type { VehicleId } from '../domain/vehicleDefinitions';
+import type { BulldozerVehicleJobDefinition } from '../domain/vehicleJobs';
 import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetryRef } from './VehicleController';
 import type { WorldPoint } from './productionWorldMap';
-import {
-  BULLDOZER_DEBRIS,
-} from './worldLayout';
 import {
   createBulldozerVfxFrame,
   hideBulldozerTransform,
@@ -49,11 +47,13 @@ export interface BulldozerMissionTelemetry {
 
 export type BulldozerMissionTelemetryRef = MutableRefObject<BulldozerMissionTelemetry>;
 export type BulldozerMissionSnapshotRef = MutableRefObject<BulldozerMissionSnapshot>;
+export type BulldozerJobRef = MutableRefObject<BulldozerVehicleJobDefinition>;
 
 interface BulldozerDebrisMissionProps {
   readonly commandRef: RefObject<DriveCommand>;
   readonly coordinator: VehicleMissionCoordinator;
   readonly enabled: boolean;
+  readonly jobRef: BulldozerJobRef;
   readonly missionTelemetryRef: BulldozerMissionTelemetryRef;
   readonly snapshotRef: BulldozerMissionSnapshotRef;
   readonly vehicleId: VehicleId;
@@ -161,11 +161,15 @@ export function BulldozerDebrisMission({
   commandRef,
   coordinator,
   enabled,
+  jobRef,
   missionTelemetryRef,
   snapshotRef,
   vehicleId,
   vehicleTelemetryRef,
 }: BulldozerDebrisMissionProps): ReactElement {
+  const initialJob = jobRef.current;
+  const initialSource = initialJob.debris[0];
+  if (!initialSource) throw new Error('Bulldozer job requires at least one debris source');
   const debrisTimberRef = useRef<THREE.InstancedMesh>(null);
   const debrisStoneRef = useRef<THREE.InstancedMesh>(null);
   const debrisCrateRef = useRef<THREE.InstancedMesh>(null);
@@ -178,7 +182,7 @@ export function BulldozerDebrisMission({
   if (matrixRef.current === null) matrixRef.current = new THREE.Matrix4();
   const clearTimesRef = useRef<Float64Array | null>(null);
   if (clearTimesRef.current === null) {
-    clearTimesRef.current = new Float64Array(BULLDOZER_DEBRIS.length);
+    clearTimesRef.current = new Float64Array(initialJob.debris.length);
     clearTimesRef.current.fill(-1);
   }
 
@@ -187,8 +191,8 @@ export function BulldozerDebrisMission({
     contactRef.current = {
       actionActive: false,
       bladeCenter: missionTelemetryRef.current.bladeCenter,
-      debrisPosition: BULLDOZER_DEBRIS[0].position,
-      debrisRadius: BULLDOZER_DEBRIS[0].radius,
+      debrisPosition: initialSource.position,
+      debrisRadius: initialSource.radius,
       speed: 0,
       vehicleId,
     };
@@ -199,6 +203,7 @@ export function BulldozerDebrisMission({
     const clearTimes = clearTimesRef.current;
     if (!clearTimes) return;
 
+    const job = jobRef.current;
     let snapshot = snapshotRef.current;
     const vehicle = vehicleTelemetryRef.current;
     const bladeCenter = getBladeCenter(vehicle, missionTelemetryRef.current.bladeCenter);
@@ -209,8 +214,9 @@ export function BulldozerDebrisMission({
     }
 
     if (enabled && commandRef.current.primaryAction) {
-      for (let index = 0; index < BULLDOZER_DEBRIS.length; index += 1) {
-        const source = BULLDOZER_DEBRIS[index];
+      for (let index = 0; index < job.debris.length; index += 1) {
+        const source = job.debris[index];
+        if (!source) continue;
         if (snapshot.debris[index]?.cleared) continue;
         const contact = contactRef.current;
         if (!contact) return;
@@ -231,7 +237,7 @@ export function BulldozerDebrisMission({
     }
 
     const frame = missionTelemetryRef.current.frame;
-    updateBulldozerVfxFrame(frame, snapshot, clearTimes, elapsedSeconds);
+    updateBulldozerVfxFrame(frame, snapshot, clearTimes, elapsedSeconds, job);
     if (!enabled) {
       for (const transform of frame.chips) hideBulldozerTransform(transform);
       for (const transform of frame.routeMarkers) hideBulldozerTransform(transform);

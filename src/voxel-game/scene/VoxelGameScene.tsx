@@ -35,6 +35,7 @@ import { VehicleColorPlayground } from './VehicleColorPlayground';
 import { WaterAndFire, type MissionTelemetryRef } from './WaterAndFire';
 import {
   BulldozerDebrisMission,
+  type BulldozerJobRef,
   type BulldozerMissionSnapshotRef,
   type BulldozerMissionTelemetryRef,
 } from './BulldozerDebrisMission';
@@ -51,6 +52,7 @@ interface VoxelGameSceneProps {
   readonly breakableTelemetryRef: BreakableTelemetryRef;
   readonly bulldozerMissionSnapshotRef: BulldozerMissionSnapshotRef;
   readonly bulldozerMissionTelemetryRef: BulldozerMissionTelemetryRef;
+  readonly bulldozerJobRef: BulldozerJobRef;
   readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
   readonly commandRef: RefObject<DriveCommand>;
   readonly colorEffectRuntime: VehicleColorEffectRuntime;
@@ -237,6 +239,7 @@ function RuntimeClock({
 export function VoxelGameScene({
   breakablePoolHandleRef,
   breakableTelemetryRef,
+  bulldozerJobRef,
   bulldozerMissionSnapshotRef,
   bulldozerMissionTelemetryRef,
   cameraTelemetryRef,
@@ -291,6 +294,7 @@ export function VoxelGameScene({
           commandRef={commandRef}
           coordinator={coordinator}
           enabled={vehicleId === 'bulldozer'}
+          jobRef={bulldozerJobRef}
           missionTelemetryRef={bulldozerMissionTelemetryRef}
           snapshotRef={bulldozerMissionSnapshotRef}
           vehicleId={vehicleId}
