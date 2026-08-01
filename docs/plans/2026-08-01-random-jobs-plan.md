@@ -10,7 +10,7 @@
 
 - [x] REQ-046〜REQ-052、差分、世界観辞書、受け入れ条件、非対象、性能、リスクを定義する。
 - [x] 各車種3仕事、shuffle bag、完了帰庫だけで再抽選する契約を決める。
-- [ ] 文書を日本語commitし、secret scan後にmainへpushする。
+- [x] 文書を日本語commitし、secret scan後にmainへpushする。
 
 ## Task 2: pure job deckと仕事registry
 
