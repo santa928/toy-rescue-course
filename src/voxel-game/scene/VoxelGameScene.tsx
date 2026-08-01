@@ -11,6 +11,7 @@ import {
   type VehicleId,
 } from '../domain/vehicleDefinitions';
 import type { VehicleColorEffectRuntime } from '../domain/VehicleColorEffectRuntime';
+import type { FireVehicleJobDefinition } from '../domain/vehicleJobs';
 import {
   advanceVehicleMissionFrame,
   type VehicleMissionCoordinator,
@@ -55,6 +56,7 @@ interface VoxelGameSceneProps {
   readonly colorEffectRuntime: VehicleColorEffectRuntime;
   readonly coordinator: VehicleMissionCoordinator;
   readonly controllerRef: RefObject<VehicleControllerHandle | null>;
+  readonly fireJob: FireVehicleJobDefinition;
   readonly manualClockRef: React.MutableRefObject<boolean>;
   readonly missionTelemetryRef: MissionTelemetryRef;
   readonly onVehicleSwitchAvailabilityChange: (available: boolean) => void;
@@ -242,6 +244,7 @@ export function VoxelGameScene({
   colorEffectRuntime,
   coordinator,
   controllerRef,
+  fireJob,
   manualClockRef,
   missionTelemetryRef,
   renderTelemetryRef,
@@ -279,6 +282,7 @@ export function VoxelGameScene({
         <WaterAndFire
           commandRef={commandRef}
           enabled={vehicleId === 'fire-truck'}
+          job={fireJob}
           missionTelemetryRef={missionTelemetryRef}
           runtime={coordinator.fireRuntime}
           telemetryRef={telemetryRef}

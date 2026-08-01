@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from 'react';
 import type * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { VoxelGameRuntime } from '../voxel-game/domain/VoxelGameRuntime';
+import { VEHICLE_JOBS } from '../voxel-game/domain/vehicleJobs';
 import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import * as WaterAndFireModule from '../voxel-game/scene/WaterAndFire';
 import {
@@ -16,6 +17,7 @@ import {
   FireHazardCollider,
   ROUTE_BOXES,
   advanceWaterVfxClock,
+  createFireJobSceneLayout,
   createFireBatchScratch,
   getFireLayerCount,
   isFireHazardEnabled,
@@ -54,6 +56,8 @@ vi.mock('react', async (importOriginal) => {
 });
 
 interface FireHazardColliderElementProps {
+  readonly args?: readonly [number, number, number];
+  readonly position?: readonly [number, number, number];
   readonly ref?: FireHazardTestRef;
 }
 
@@ -103,6 +107,31 @@ function attachFireHazardCollider(ref: FireHazardTestRef, collider: TestCollider
 }
 
 describe('WaterAndFire', () => {
+  it.each(VEHICLE_JOBS['fire-truck'])(
+    '$idの照準点から炎・hazard・道しるべ・成功星を同じscene layoutへ導出する',
+    (job) => {
+      const layout = createFireJobSceneLayout(job);
+
+      expect(layout.hazardBox.position).toEqual([
+        job.sprayTarget[0],
+        Number((job.sprayTarget[1] - 0.55).toFixed(6)),
+        job.sprayTarget[2],
+      ]);
+      expect(layout.fireAnchorOffset).toEqual([
+        Number((job.sprayTarget[0] - FIRE_SPRAY_TARGET_POSITION[0]).toFixed(6)),
+        Number((job.sprayTarget[1] - FIRE_SPRAY_TARGET_POSITION[1]).toFixed(6)),
+        Number((job.sprayTarget[2] - FIRE_SPRAY_TARGET_POSITION[2]).toFixed(6)),
+      ]);
+      expect(layout.routeBoxes.map(({ position }) => position)).toEqual(job.routeMarkers);
+      expect(layout.starGroups).toHaveLength(6);
+      expect(layout.starGroups.map(([center]) => center?.position)).toEqual(
+        job.celebrationStarCenters,
+      );
+      expect(layout.yellowStarBoxes).toHaveLength(15);
+      expect(layout.whiteStarBoxes).toHaveLength(15);
+    },
+  );
+
   it('中央車庫から東の火災地区へ12個の非solid道しるべを置く', () => {
     expect(ROUTE_BOXES.map(({ position }) => position)).toEqual([
       [0, 0.26, 3], [0, 0.26, 0], [4, 0.26, 0], [8, 0.26, 0],
@@ -175,6 +204,21 @@ describe('WaterAndFire', () => {
     renderFireHazardCollider(false);
     expect(enabledHistory).toEqual([false, true, false]);
     expect(colliderEnabled).toBe(false);
+  });
+
+  it('選ばれた仕事のhazard boxを唯一のcolliderへ渡す', () => {
+    fireHazardLifecycle.refs.length = 0;
+    fireHazardLifecycle.refCursor = 0;
+    const box = createFireJobSceneLayout(VEHICLE_JOBS['fire-truck'][1]).hazardBox;
+    const rigidBody = FireHazardCollider({ box, enabled: true }) as ReactElement<{
+      readonly children?: ReactNode;
+    }>;
+    const collider = Children.only(rigidBody.props.children) as ReactElement<
+      FireHazardColliderElementProps
+    >;
+
+    expect(collider.props.position).toBe(box.position);
+    expect(collider.props.args).toEqual([0.6, 0.9, 0.6]);
   });
 
   it('本番火災地区へhazardと3層の炎を同じ相対形状で移す', () => {
@@ -293,6 +337,30 @@ describe('WaterAndFire', () => {
     expect(mesh.instanceMatrix.needsUpdate).toBe(true);
   });
 
+  it('仕事anchor差分を固定炎slotのmatrixへ加算する', () => {
+    const matrices: number[][] = [];
+    const setMatrixAt = vi.fn((_index: number, matrix: THREE.Matrix4) => {
+      matrices.push([...matrix.elements]);
+    });
+    const mesh = {
+      instanceMatrix: { needsUpdate: false },
+      setMatrixAt,
+      visible: false,
+    } as unknown as THREE.InstancedMesh;
+    const frame = createFireVoxelFrame({ elapsedSeconds: 0.2, layerCount: 3 });
+    const firstOuter = frame.instances.find(({ role }) => role === 'outer');
+    const offset = createFireJobSceneLayout(
+      VEHICLE_JOBS['fire-truck'][2],
+    ).fireAnchorOffset;
+
+    updateFireBatch(mesh, 'outer', frame.instances, createFireBatchScratch(), offset);
+
+    expect(firstOuter).toBeDefined();
+    expect(matrices[0]?.[12]).toBeCloseTo((firstOuter?.position[0] ?? 0) + offset[0], 6);
+    expect(matrices[0]?.[13]).toBeCloseTo((firstOuter?.position[1] ?? 0) + offset[1], 6);
+    expect(matrices[0]?.[14]).toBeCloseTo((firstOuter?.position[2] ?? 0) + offset[2], 6);
+  });
+
   it('消火後も固定batch全slotへzero scale matrixを書き、batchを非表示にする', () => {
     const setMatrixAt = vi.fn();
     const mesh = {
@@ -357,6 +425,39 @@ describe('WaterAndFire', () => {
     expect(forgiving.distance).toBeGreaterThan(5);
     expect(outside).toMatchObject({ sprayOnFire: false, targeted: false });
     expect(behind).toMatchObject({ sprayOnFire: false, targeted: false });
+  });
+
+  it('選ばれた仕事のspray targetへ放水照準と水流終点をそろえる', () => {
+    const job = VEHICLE_JOBS['fire-truck'][2];
+    const telemetry = {
+      forward: [0, 0, -1] as const,
+      id: 'fire-truck' as const,
+      mass: 1.4,
+      position: [job.sprayTarget[0], 0.8, job.sprayTarget[2] + 5.8] as const,
+      resetCount: 0,
+      speed: 0,
+    };
+    const frame = resolveWaterAndFireFrame(
+      telemetry,
+      { moveX: 0, moveY: 0, primaryAction: true },
+      0,
+      0,
+      true,
+      job.sprayTarget,
+    );
+    const legacyTargetFrame = resolveWaterAndFireFrame(
+      telemetry,
+      { moveX: 0, moveY: 0, primaryAction: true },
+    );
+    const targetToEndpointDistance = Math.hypot(
+      job.sprayTarget[0] - frame.waterPath.endX,
+      job.sprayTarget[1] - frame.waterPath.endY,
+      job.sprayTarget[2] - frame.waterPath.endZ,
+    );
+
+    expect(frame).toMatchObject({ sprayActive: true, sprayOnFire: true, targeted: true });
+    expect(targetToEndpointDistance).toBeCloseTo(0.55, 6);
+    expect(legacyTargetFrame).toMatchObject({ sprayOnFire: false, targeted: false });
   });
 
   it('targeted放水signalだけが2500msの消火chainを完了する', () => {

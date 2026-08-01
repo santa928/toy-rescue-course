@@ -37,10 +37,7 @@ import {
   type BulldozerMissionTelemetry,
 } from './scene/BulldozerDebrisMission';
 import {
-  CELEBRATION_STAR_GROUPS,
-  FIRE_HAZARD_BOX,
-  FIRE_LAYER_BOXES,
-  ROUTE_BOXES,
+  createFireJobSceneLayout,
   getFireLayerCount,
   isFireHazardEnabled,
   type MissionTelemetry,
@@ -68,8 +65,6 @@ import {
   BULLDOZER_DEBRIS,
   BREAKABLE_BLOCKS,
   COLOR_PLAY_SOURCES,
-  FIRE_POSITION,
-  FIRE_SPRAY_TARGET_POSITION,
   GARAGE_POSITION,
   WORLD_BOUNDS,
   isInsideGarageRestartArea,
@@ -270,6 +265,8 @@ export function VoxelGameApp(): ReactElement {
       const coordinatorState = coordinator.getSnapshot();
       const runtime = coordinatorState.fire;
       const currentMission = coordinatorState.mission;
+      const fireJob = coordinatorState.currentJobs.fire;
+      const fireSceneLayout = createFireJobSceneLayout(fireJob);
       const command = controls.commandRef.current;
       const missionTelemetry = missionTelemetryRef.current;
       const bulldozerTelemetry = bulldozerMissionTelemetryRef.current;
@@ -304,7 +301,7 @@ export function VoxelGameApp(): ReactElement {
         controls: { ...command },
         fire: {
           intensity: runtime.fireIntensity,
-          position: [...FIRE_POSITION],
+          position: [...fireSceneLayout.firePosition],
           targeted: missionTelemetry.targeted,
         },
         landmarks: {
@@ -320,8 +317,8 @@ export function VoxelGameApp(): ReactElement {
             position: [...source.position],
             triggerBounds: { ...source.triggerBounds },
           })),
-          fire: FIRE_POSITION,
-          fireSprayTarget: FIRE_SPRAY_TARGET_POSITION,
+          fire: fireSceneLayout.firePosition,
+          fireSprayTarget: fireJob.sprayTarget,
           garage: GARAGE_POSITION,
         },
         mode: 'drive-ready',
@@ -372,10 +369,10 @@ export function VoxelGameApp(): ReactElement {
           position: [...vehicle.position],
         },
         visualLayout: {
-          fireHazard: FIRE_HAZARD_BOX,
-          fireLayers: FIRE_LAYER_BOXES,
-          routeMarkers: ROUTE_BOXES,
-          starGroups: CELEBRATION_STAR_GROUPS,
+          fireHazard: fireSceneLayout.hazardBox,
+          fireLayers: fireSceneLayout.layerBoxes,
+          routeMarkers: fireSceneLayout.routeBoxes,
+          starGroups: fireSceneLayout.starGroups,
           vehicleBounds: vehicleDefinition.visualBounds,
           worldSolids: WORLD_SOLID_BOXES.map(({ id, position, rotation, scale }) => ({
             id,
@@ -395,7 +392,7 @@ export function VoxelGameApp(): ReactElement {
           bulldozerChipCubeCount: bulldozerTelemetry.activeChipCount,
           bulldozerDebrisCubeCount: bulldozerTelemetry.debrisVisibleVoxelCount,
           routeCubeCount: coordinatorState.selectedVehicleId === 'fire-truck'
-            ? (runtime.routeVisible ? ROUTE_BOXES.length : 0)
+            ? (runtime.routeVisible ? fireSceneLayout.routeBoxes.length : 0)
             : bulldozerTelemetry.routeMarkerCount,
           starCubeCount: coordinatorState.selectedVehicleId === 'fire-truck'
             ? (runtime.missionPhase === 'celebrating' ? 30 : 0)
@@ -467,6 +464,7 @@ export function VoxelGameApp(): ReactElement {
             colorEffectRuntime={colorEffectRuntime}
             coordinator={coordinator}
             controllerRef={controllerRef}
+            fireJob={coordinatorSnapshot.currentJobs.fire}
             manualClockRef={manualClockRef}
             missionTelemetryRef={missionTelemetryRef}
             onVehicleSwitchAvailabilityChange={handleVehicleSwitchAvailabilityChange}

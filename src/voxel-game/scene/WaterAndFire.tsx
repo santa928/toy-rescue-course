@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
@@ -8,6 +8,7 @@ import {
 } from '@react-three/rapier';
 import * as THREE from 'three';
 import type { VoxelGameRuntime, VoxelGameSnapshot } from '../domain/VoxelGameRuntime';
+import type { FireVehicleJobDefinition } from '../domain/vehicleJobs';
 import { resolveSprayTarget } from '../domain/sprayTargeting';
 import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetry, VehicleTelemetryRef } from './VehicleController';
@@ -30,6 +31,7 @@ import {
 import { scaleToHalfExtents } from './worldCollisionLayout';
 import {
   CELEBRATION_STAR_CENTER_POSITIONS,
+  FIRE_POSITION,
   FIRE_ROUTE_MARKER_POSITIONS,
   FIRE_SPRAY_TARGET_POSITION,
 } from './worldLayout';
@@ -45,6 +47,19 @@ export interface FireAnchorLayout {
   readonly layerPositions: readonly (readonly [number, number, number])[];
 }
 
+/** 1件の消防仕事から描画・衝突・telemetryへ共有するscene配置。 */
+export interface FireJobSceneLayout {
+  readonly fireAnchorOffset: readonly [number, number, number];
+  readonly firePosition: readonly [number, number, number];
+  readonly hazardBox: VoxelBox;
+  readonly layerBoxes: readonly VoxelBox[];
+  readonly layerPositions: readonly (readonly [number, number, number])[];
+  readonly routeBoxes: readonly VoxelBox[];
+  readonly starGroups: readonly (readonly VoxelBox[])[];
+  readonly whiteStarBoxes: readonly VoxelBox[];
+  readonly yellowStarBoxes: readonly VoxelBox[];
+}
+
 interface StaticVoxelBatchProps {
   readonly boxes: readonly VoxelBox[];
   readonly color: string;
@@ -54,6 +69,7 @@ interface StaticVoxelBatchProps {
 interface WaterAndFireProps {
   readonly commandRef: RefObject<DriveCommand>;
   readonly enabled: boolean;
+  readonly job: FireVehicleJobDefinition;
   readonly missionTelemetryRef: MissionTelemetryRef;
   readonly runtime: VoxelGameRuntime;
   readonly telemetryRef: VehicleTelemetryRef;
@@ -61,6 +77,7 @@ interface WaterAndFireProps {
 
 /** 低頻度な火勢状態を常設Rapier colliderへ渡すcomponent入力。 */
 interface FireHazardColliderProps {
+  readonly box?: VoxelBox;
   readonly enabled: boolean;
 }
 
@@ -112,10 +129,17 @@ const WATER_SPLASH_CYCLE_SECONDS = 0.22;
 const WATER_BLUE_INSTANCE_COUNT = 22;
 const WATER_WHITE_INSTANCE_COUNT = WATER_INSTANCE_COUNT - WATER_BLUE_INSTANCE_COUNT;
 
-export const ROUTE_BOXES: readonly VoxelBox[] = FIRE_ROUTE_MARKER_POSITIONS.map((position) => ({
-  position,
-  scale: [0.62, 0.12, 0.62],
-}));
+/** route座標を薄い非solid cubeへ変換する。 */
+function createRouteBoxes(
+  positions: readonly (readonly [number, number, number])[],
+): readonly VoxelBox[] {
+  return positions.map((position) => ({
+    position,
+    scale: [0.62, 0.12, 0.62],
+  }));
+}
+
+export const ROUTE_BOXES: readonly VoxelBox[] = createRouteBoxes(FIRE_ROUTE_MARKER_POSITIONS);
 
 const FIRE_HAZARD_POSITION_OFFSET = [0, -0.55, 0] as const;
 const FIRE_LAYER_POSITION_OFFSETS = [
@@ -179,8 +203,38 @@ function createStarBoxes(centers: readonly (readonly [number, number, number])[]
 
 export const CELEBRATION_STAR_GROUPS: readonly (readonly VoxelBox[])[] = CELEBRATION_STAR_CENTERS
   .map((center) => createStarBoxes([center]));
-const YELLOW_STAR_BOXES = CELEBRATION_STAR_GROUPS.filter((_, index) => index % 2 === 0).flat();
-const WHITE_STAR_BOXES = CELEBRATION_STAR_GROUPS.filter((_, index) => index % 2 === 1).flat();
+
+/** canonical targetとの差分を小数誤差なくworld座標へ加算する。 */
+function createFireAnchorOffset(
+  sprayTarget: readonly [number, number, number],
+): readonly [number, number, number] {
+  return sprayTarget.map((coordinate, axis) => Number((
+    coordinate - FIRE_SPRAY_TARGET_POSITION[axis]
+  ).toFixed(6))) as [number, number, number];
+}
+
+/** 消防仕事のtargetから炎・hazard・route・成功星を一括して導出する。 */
+export function createFireJobSceneLayout(job: FireVehicleJobDefinition): FireJobSceneLayout {
+  const anchor = createFireAnchorLayout(job.sprayTarget);
+  const fireAnchorOffset = createFireAnchorOffset(job.sprayTarget);
+  const starGroups = job.celebrationStarCenters.map((center) => createStarBoxes([center]));
+  const layerBoxes = [
+    { position: anchor.layerPositions[0], scale: FIRE_LAYER_BOXES[0].scale },
+    { position: anchor.layerPositions[1], scale: FIRE_LAYER_BOXES[1].scale },
+    { position: anchor.layerPositions[2], scale: FIRE_LAYER_BOXES[2].scale },
+  ];
+  return {
+    fireAnchorOffset,
+    firePosition: addFirePositionOffset(FIRE_POSITION, fireAnchorOffset),
+    hazardBox: anchor.hazardBox,
+    layerBoxes,
+    layerPositions: anchor.layerPositions,
+    routeBoxes: createRouteBoxes(job.routeMarkers),
+    starGroups,
+    whiteStarBoxes: starGroups.filter((_, index) => index % 2 === 1).flat(),
+    yellowStarBoxes: starGroups.filter((_, index) => index % 2 === 0).flat(),
+  };
+}
 
 /** 有限な正の火勢だけを進入防止対象とする。 */
 export function isFireHazardEnabled(fireIntensity: number): boolean {
@@ -202,7 +256,10 @@ export function syncColliderEnabled(
 }
 
 /** 遅延attachと低頻度な火勢変化の両方を、常設する1個のfixed colliderへ同期する。 */
-export function FireHazardCollider({ enabled }: FireHazardColliderProps): ReactElement {
+export function FireHazardCollider({
+  box = FIRE_HAZARD_BOX,
+  enabled,
+}: FireHazardColliderProps): ReactElement {
   const colliderRef = useRef<RapierCollider>(null);
 
   useEffect(() => {
@@ -213,8 +270,8 @@ export function FireHazardCollider({ enabled }: FireHazardColliderProps): ReactE
   return (
     <RigidBody colliders={false} type="fixed">
       <CuboidCollider
-        args={scaleToHalfExtents(FIRE_HAZARD_BOX.scale)}
-        position={FIRE_HAZARD_BOX.position}
+        args={scaleToHalfExtents(box.scale)}
+        position={box.position}
         ref={(collider: RapierCollider | null) => {
           colliderRef.current = collider;
           if (collider) syncColliderEnabled(collider, enabled);
@@ -296,6 +353,7 @@ export function updateFireBatch(
   role: FireVoxelRole,
   instances: readonly FireVoxelTransform[],
   scratch: FireBatchScratch,
+  positionOffset: readonly [number, number, number] = [0, 0, 0],
 ): void {
   if (!mesh) return;
   let batchIndex = 0;
@@ -303,7 +361,11 @@ export function updateFireBatch(
 
   for (const instance of instances) {
     if (instance.role !== role) continue;
-    scratch.position.fromArray(instance.position);
+    scratch.position.set(
+      instance.position[0] + positionOffset[0],
+      instance.position[1] + positionOffset[1],
+      instance.position[2] + positionOffset[2],
+    );
     if (instance.active) {
       scratch.scale.fromArray(instance.scale);
     } else {
@@ -329,6 +391,7 @@ export function resolveWaterAndFireFrame(
   sprayElapsedSeconds = 0,
   splashElapsedSeconds = 0,
   enabled = true,
+  sprayTarget: readonly [number, number, number] = FIRE_SPRAY_TARGET_POSITION,
 ): MissionTelemetry {
   const horizontalLength = Math.hypot(telemetry.forward[0], telemetry.forward[2]) || 1;
   const forward: readonly [number, number, number] = [
@@ -341,11 +404,11 @@ export function resolveWaterAndFireFrame(
     telemetry.position[1] + NOZZLE_HEIGHT,
     telemetry.position[2] + forward[2] * NOZZLE_FORWARD_OFFSET,
   ];
-  const target = resolveSprayTarget(nozzleOrigin, forward, FIRE_SPRAY_TARGET_POSITION);
+  const target = resolveSprayTarget(nozzleOrigin, forward, sprayTarget);
   const waterPath = createWaterFlowPath({
     initialDirection: target.direction,
     nozzleOrigin,
-    targetPosition: FIRE_SPRAY_TARGET_POSITION,
+    targetPosition: sprayTarget,
     targeted: target.targeted,
   });
   const sprayActive = enabled && command.primaryAction;
@@ -424,10 +487,12 @@ function updateWaterBatch(
 export function WaterAndFire({
   commandRef,
   enabled,
+  job,
   missionTelemetryRef,
   runtime,
   telemetryRef,
 }: WaterAndFireProps): ReactElement {
+  const layout = useMemo(() => createFireJobSceneLayout(job), [job]);
   const [visualState, setVisualState] = useState(() => selectMissionVisualState(runtime.getSnapshot()));
   const blueWaterRef = useRef<THREE.InstancedMesh>(null);
   const whiteWaterRef = useRef<THREE.InstancedMesh>(null);
@@ -484,18 +549,21 @@ export function WaterAndFire({
         'outer',
         fireFrame.instances,
         fireBatchScratch,
+        layout.fireAnchorOffset,
       );
       updateFireBatch(
         middleFireRef.current,
         'middle',
         fireFrame.instances,
         fireBatchScratch,
+        layout.fireAnchorOffset,
       );
       updateFireBatch(
         coreFireRef.current,
         'core',
         fireFrame.instances,
         fireBatchScratch,
+        layout.fireAnchorOffset,
       );
     }
     previousFireLayerCountRef.current = fireLayerCount;
@@ -515,6 +583,7 @@ export function WaterAndFire({
       0,
       0,
       enabled,
+      job.sprayTarget,
     );
     const clock = advanceWaterVfxClock({
       deltaSeconds: delta,
@@ -545,7 +614,11 @@ export function WaterAndFire({
 
   return (
     <group>
-      <FireHazardCollider enabled={visualState.fireHazardEnabled} />
+      <FireHazardCollider
+        box={layout.hazardBox}
+        enabled={visualState.fireHazardEnabled}
+        key={job.id}
+      />
       <instancedMesh
         args={[undefined, undefined, FIRE_ROLE_CAPACITY.outer]}
         frustumCulled={false}
@@ -591,11 +664,11 @@ export function WaterAndFire({
         <boxGeometry args={[1, 1, 1]} />
         <meshLambertMaterial color="#f2fbff" />
       </instancedMesh>
-      {enabled && visualState.routeVisible ? <StaticVoxelBatch boxes={ROUTE_BOXES} color="#ffd23f" emissive="#d49d16" /> : null}
+      {enabled && visualState.routeVisible ? <StaticVoxelBatch boxes={layout.routeBoxes} color="#ffd23f" emissive="#d49d16" /> : null}
       {enabled && visualState.celebrating ? (
         <group>
-          <StaticVoxelBatch boxes={YELLOW_STAR_BOXES} color="#ffd23f" emissive="#d49d16" />
-          <StaticVoxelBatch boxes={WHITE_STAR_BOXES} color="#fff8dc" />
+          <StaticVoxelBatch boxes={layout.yellowStarBoxes} color="#ffd23f" emissive="#d49d16" />
+          <StaticVoxelBatch boxes={layout.whiteStarBoxes} color="#fff8dc" />
         </group>
       ) : null}
     </group>
