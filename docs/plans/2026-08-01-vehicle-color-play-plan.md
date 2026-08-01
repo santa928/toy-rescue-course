@@ -47,7 +47,7 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - [x] 12,000ms定数、snapshot、subscriber、秒境界signatureを実装する。
 - [x] rejected切替は呼ばず、成功切替の別vehicleだけclearできるAPIにする。
 - [x] focused testとfull unit、buildを通す。
-- [ ] `一時車体色の状態機械を追加する`でcommit・scan・push・公開確認する。
+- [x] `一時車体色の状態機械を追加する`でcommit・scan・push・公開確認する。
 
 ## Task 3: 二車種の限定palette tint
 
@@ -58,11 +58,11 @@ HUD／telemetryの一方向接続にする。station VFXは固定slot `Instanced
 - Modify: `src/vehicle-lab/scene/VoxelBulldozer.tsx`
 - Modify: `src/voxel-game/scene/VehicleController.tsx`
 
-- [ ] RED: fire-truckは`red`、bulldozerは`yellow`だけをpaintableとするtestを書く。
-- [ ] original色、赤青黄、不正値fallback、非paint部品不変を固定する。
-- [ ] modelへ`paintColor` propを追加し、material色だけを派生させる。
-- [ ] vehicle draw callとvoxel countが不変であるtestを追加する。
-- [ ] focused/full unit、buildを通す。
+- [x] RED: fire-truckは`red`、bulldozerは`yellow`だけをpaintableとするtestを書く。
+- [x] original色、赤青黄、不正値fallback、非paint部品不変を固定する。
+- [x] modelへ`paintColor` propを追加し、material色だけを派生させる。
+- [x] vehicle draw callとvoxel countが不変であるtestを追加する。
+- [x] focused/full unit、buildを通す。
 - [ ] `二車種へ一時塗装を描画する`でcommit・scan・push・公開確認する。
 
 ## Task 4: pool／showerの固定slot VFX

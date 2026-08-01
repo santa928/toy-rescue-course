@@ -14,6 +14,7 @@ import {
   createVoxelRenderPlan,
   type VoxelRenderBatch,
 } from '../model/voxelRenderPlan';
+import { resolveVehiclePaintColor } from '../model/vehiclePaint';
 
 const VOXEL_SIZE = 0.24;
 const VOXEL_EDGE = VOXEL_SIZE * 0.94;
@@ -30,10 +31,12 @@ export const BULLDOZER_RENDER_PLAN = createVoxelRenderPlan(
 
 interface VoxelBatchProps {
   readonly batch: VoxelRenderBatch<BulldozerPaletteId>;
+  readonly paintColor: string | null;
 }
 
 export type VoxelBulldozerProps = ThreeElements['group'] & {
   readonly actionActiveRef?: RefObject<boolean>;
+  readonly paintColor?: string | null;
 };
 
 /** bladeの現在Yを押下状態の目標へframe-rate非依存で近づける。 */
@@ -54,7 +57,7 @@ export function advanceBulldozerBladeOffset(
 }
 
 /** 同色voxelを1つのInstancedMeshとして描画する。 */
-function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
+function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const material = BULLDOZER_PALETTE[batch.paletteId];
 
@@ -80,7 +83,12 @@ function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
       ref={meshRef}
     >
       <meshLambertMaterial
-        color={material.color}
+        color={resolveVehiclePaintColor({
+          baseColor: material.color,
+          paintColor,
+          paletteId: batch.paletteId,
+          vehicleId: 'bulldozer',
+        })}
         emissive={'emissive' in material ? material.emissive : undefined}
         emissiveIntensity={'emissiveIntensity' in material ? material.emissiveIntensity : 0}
       />
@@ -91,6 +99,7 @@ function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
 /** 純voxelブルドーザーをpalette別batchで描画し、primary actionでbladeを下げる。 */
 export function VoxelBulldozer({
   actionActiveRef,
+  paintColor = null,
   ...groupProps
 }: VoxelBulldozerProps): ReactElement {
   const bladeGroupRef = useRef<THREE.Group>(null);
@@ -112,10 +121,10 @@ export function VoxelBulldozer({
         {BULLDOZER_RENDER_PLAN.batches.map((batch) => (
           batch.paletteId === 'blade' ? (
             <group key={batch.paletteId} ref={bladeGroupRef}>
-              <VoxelBatch batch={batch} />
+              <VoxelBatch batch={batch} paintColor={paintColor} />
             </group>
           ) : (
-            <VoxelBatch batch={batch} key={batch.paletteId} />
+            <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
           )
         ))}
       </group>

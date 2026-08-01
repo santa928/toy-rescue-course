@@ -13,6 +13,7 @@ import {
   createVoxelRenderPlan,
   type VoxelRenderBatch,
 } from '../model/voxelRenderPlan';
+import { resolveVehiclePaintColor } from '../model/vehiclePaint';
 
 const VOXEL_SIZE = 0.24;
 const VOXEL_EDGE = VOXEL_SIZE * 0.94;
@@ -27,12 +28,15 @@ export const FIRE_TRUCK_RENDER_PLAN = createVoxelRenderPlan(
 
 interface VoxelBatchProps {
   readonly batch: VoxelRenderBatch<FireTruckPaletteId>;
+  readonly paintColor: string | null;
 }
 
-type VoxelFireTruckProps = ThreeElements['group'];
+type VoxelFireTruckProps = ThreeElements['group'] & {
+  readonly paintColor?: string | null;
+};
 
 /** 同色ボクセルを1つのInstancedMeshとして描画する。 */
-function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
+function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const material = FIRE_TRUCK_PALETTE[batch.paletteId];
 
@@ -60,7 +64,12 @@ function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
       ref={meshRef}
     >
       <meshLambertMaterial
-        color={material.color}
+        color={resolveVehiclePaintColor({
+          baseColor: material.color,
+          paintColor,
+          paletteId: batch.paletteId,
+          vehicleId: 'fire-truck',
+        })}
         emissive={'emissive' in material ? material.emissive : undefined}
         emissiveIntensity={'emissiveIntensity' in material ? material.emissiveIntensity : 0}
       />
@@ -69,14 +78,17 @@ function VoxelBatch({ batch }: VoxelBatchProps): ReactElement {
 }
 
 /** 純ボクセル消防車を色別instanceバッチで描画する。 */
-export function VoxelFireTruck(props: VoxelFireTruckProps): ReactElement {
+export function VoxelFireTruck({
+  paintColor = null,
+  ...groupProps
+}: VoxelFireTruckProps): ReactElement {
   assertValidVoxelModel(FIRE_TRUCK_VOXELS, FIRE_TRUCK_PALETTE_IDS);
 
   return (
-    <group {...props}>
+    <group {...groupProps}>
       <group position={FIRE_TRUCK_RENDER_PLAN.offset}>
         {FIRE_TRUCK_RENDER_PLAN.batches.map((batch) => (
-          <VoxelBatch batch={batch} key={batch.paletteId} />
+          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
         ))}
       </group>
     </group>

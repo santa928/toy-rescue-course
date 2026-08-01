@@ -33,6 +33,7 @@ export interface VehicleControllerHandle {
 
 interface VehicleControllerProps {
   readonly commandRef: RefObject<DriveCommand>;
+  readonly paintColor?: string | null;
   readonly telemetryRef: VehicleTelemetryRef;
   readonly vehicleId: VehicleId;
 }
@@ -108,7 +109,12 @@ function updateTelemetry(
 
 /** 入力refを毎frame読み、消防車の速度・旋回・resetをRapierへ反映する。 */
 export const VehicleController = forwardRef<VehicleControllerHandle, VehicleControllerProps>(
-  function VehicleController({ commandRef, telemetryRef, vehicleId }, ref): ReactElement {
+  function VehicleController({
+    commandRef,
+    paintColor = null,
+    telemetryRef,
+    vehicleId,
+  }, ref): ReactElement {
     const bodyRef = useRef<RapierRigidBody>(null);
     const actionActiveRef = useRef(false);
     const config = resolveVehicleControllerConfig(vehicleId);
@@ -185,8 +191,8 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
         />
         <group rotation={[0, Math.PI, 0]}>
           {config.vehicleId === 'fire-truck'
-            ? <VoxelFireTruck />
-            : <VoxelBulldozer actionActiveRef={actionActiveRef} />}
+            ? <VoxelFireTruck paintColor={paintColor} />
+            : <VoxelBulldozer actionActiveRef={actionActiveRef} paintColor={paintColor} />}
         </group>
       </RigidBody>
     );
