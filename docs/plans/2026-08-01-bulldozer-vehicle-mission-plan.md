@@ -281,9 +281,9 @@ Expected: 新landmark不在でFAILする。
 
 ```ts
 bulldozerDebris: [
-  { id: 'debris-timber', palette: 'timber', position: [-29.5, 0.8, 13.5], radius: 1.15 },
-  { id: 'debris-stone', palette: 'stone', position: [-24, 0.8, 13.8], radius: 1.15 },
-  { id: 'debris-crate', palette: 'crate', position: [-18.2, 0.8, 12.8], radius: 1.15 },
+  { id: 'debris-timber', palette: 'timber', position: [-29.5, 0.8, 12.5], radius: 1.15 },
+  { id: 'debris-stone', palette: 'stone', position: [-24, 0.8, 13], radius: 1.15 },
+  { id: 'debris-crate', palette: 'crate', position: [-18.2, 0.8, 12], radius: 1.15 },
 ],
 bulldozerRouteMarkers: [
   [-3, 0.26, 0], [-7, 0.26, 0], [-11, 0.26, 0],

@@ -41,6 +41,17 @@ export interface BreakableBlockLandmarkDefinition {
   readonly position: WorldPoint;
 }
 
+/** 工事仕事でブルドーザーだけが片付けられるがれきの色種別。 */
+export type BulldozerDebrisPaletteId = 'timber' | 'stone' | 'crate';
+
+/** 工事現場へ置く1つのがれきと寛容な接触半径。 */
+export interface BulldozerDebrisLandmarkDefinition {
+  readonly id: string;
+  readonly palette: BulldozerDebrisPaletteId;
+  readonly position: WorldPoint;
+  readonly radius: number;
+}
+
 /** 積み木広場の土台となるboxの座標定義。 */
 export interface BlockPlazaLandmarkDefinition {
   readonly position: WorldPoint;
@@ -51,6 +62,8 @@ export interface BlockPlazaLandmarkDefinition {
 export interface WorldLandmarksDefinition {
   readonly blockPlaza: BlockPlazaLandmarkDefinition;
   readonly breakableBlocks: readonly BreakableBlockLandmarkDefinition[];
+  readonly bulldozerDebris: readonly BulldozerDebrisLandmarkDefinition[];
+  readonly bulldozerRouteMarkers: readonly WorldPoint[];
   readonly celebrationStarCenters: readonly WorldPoint[];
   readonly fire: WorldPoint;
   readonly fireRouteMarkers: readonly WorldPoint[];
@@ -97,6 +110,20 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
       { color: '#facc15', id: 'plaza-yellow', position: [-21.5, 0.75, 0] },
       { color: '#3b82f6', id: 'plaza-blue', position: [-21.3, 0.75, 4.6] },
       { color: '#65a30d', id: 'plaza-green', position: [-26.7, 0.75, 2.5] },
+    ],
+    bulldozerDebris: [
+      { id: 'debris-timber', palette: 'timber', position: [-29.5, 0.8, 12.5], radius: 1.15 },
+      { id: 'debris-stone', palette: 'stone', position: [-24, 0.8, 13], radius: 1.15 },
+      { id: 'debris-crate', palette: 'crate', position: [-18.2, 0.8, 12], radius: 1.15 },
+    ],
+    bulldozerRouteMarkers: [
+      [-3, 0.26, 0],
+      [-7, 0.26, 0],
+      [-11, 0.26, 0],
+      [-15, 0.26, 0],
+      [-19, 0.26, 2],
+      [-22, 0.26, 6],
+      [-24, 0.26, 9],
     ],
     celebrationStarCenters: [
       [24.8, 1, -11],
@@ -276,6 +303,7 @@ export function validateProductionWorldMap(
     ...map.roads.map(({ id }) => id),
     ...map.visualBoxes.map(({ id }) => id),
     ...map.landmarks.breakableBlocks.map(({ id }) => id),
+    ...map.landmarks.bulldozerDebris.map(({ id }) => id),
   ];
   const seen = new Set<string>();
   for (const id of ids) {
@@ -316,6 +344,14 @@ export function validateProductionWorldMap(
       name: `breakableBlock:${id}`,
       position,
     })),
+    ...map.landmarks.bulldozerRouteMarkers.map((position, index) => ({
+      name: `bulldozerRouteMarker:${index}`,
+      position,
+    })),
+    ...map.landmarks.bulldozerDebris.map(({ id, position }) => ({
+      name: `bulldozerDebris:${id}`,
+      position,
+    })),
   ];
   for (const landmark of landmarkPoints) {
     if (!landmark.position.every(Number.isFinite)) {
@@ -354,6 +390,40 @@ export function validateProductionWorldMap(
       || block.position[2] + breakableBlockHalfExtent > plazaBounds.maxZ
     ) {
       errors.push(`breakable outside block plaza: ${block.id}`);
+    }
+  }
+
+  const minimumDebrisClearance = 2.5;
+  const minimumBreakableClearance = 3;
+  for (const [index, debris] of map.landmarks.bulldozerDebris.entries()) {
+    if (!Number.isFinite(debris.radius) || debris.radius <= 0) {
+      errors.push(`invalid bulldozer debris radius: ${debris.id}`);
+    }
+    const receivedDistrict = resolveWorldDistrictInMap(map, debris.position);
+    if (receivedDistrict !== 'blocks') {
+      errors.push(
+        `landmark bulldozerDebris:${debris.id} expected blocks, received ${receivedDistrict}`,
+      );
+    }
+
+    for (const other of map.landmarks.bulldozerDebris.slice(index + 1)) {
+      const distance = Math.hypot(
+        other.position[0] - debris.position[0],
+        other.position[2] - debris.position[2],
+      );
+      if (distance < minimumDebrisClearance) {
+        errors.push(`bulldozer debris too close: ${debris.id}, ${other.id}`);
+      }
+    }
+
+    for (const block of map.landmarks.breakableBlocks) {
+      const distance = Math.hypot(
+        block.position[0] - debris.position[0],
+        block.position[2] - debris.position[2],
+      );
+      if (distance < minimumBreakableClearance) {
+        errors.push(`bulldozer debris overlaps breakable: ${debris.id}, ${block.id}`);
+      }
     }
   }
 

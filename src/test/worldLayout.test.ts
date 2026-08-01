@@ -4,6 +4,8 @@ import * as WorldLayoutModule from '../voxel-game/scene/worldLayout';
 import {
   BLOCK_PLAZA,
   BREAKABLE_BLOCKS,
+  BULLDOZER_DEBRIS,
+  BULLDOZER_ROUTE_MARKER_POSITIONS,
   FIRE_POSITION,
   FIRE_SPRAY_TARGET_POSITION,
   GARAGE_POSITION,
@@ -34,6 +36,14 @@ describe('voxel world layout', () => {
     expect(layout.CELEBRATION_STAR_CENTER_POSITIONS).toBe(
       map.landmarks.celebrationStarCenters,
     );
+  });
+
+  it('ブルドーザーのがれきと道しるべもproduction mapと同じ参照から公開する', () => {
+    expect(BULLDOZER_DEBRIS).toHaveLength(3);
+    expect(BULLDOZER_ROUTE_MARKER_POSITIONS).toHaveLength(7);
+    expect(BULLDOZER_DEBRIS).toBe(PRODUCTION_WORLD_MAP.landmarks.bulldozerDebris);
+    expect(BULLDOZER_ROUTE_MARKER_POSITIONS)
+      .toBe(PRODUCTION_WORLD_MAP.landmarks.bulldozerRouteMarkers);
   });
 
   it('全公開座標をproduction mapのlandmarksと同じ参照から導出する', () => {

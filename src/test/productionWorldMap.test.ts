@@ -18,6 +18,35 @@ const EXPECTED_LANDMARKS = {
     { color: '#3b82f6', id: 'plaza-blue', position: [-21.3, 0.75, 4.6] as const },
     { color: '#65a30d', id: 'plaza-green', position: [-26.7, 0.75, 2.5] as const },
   ],
+  bulldozerDebris: [
+    {
+      id: 'debris-timber',
+      palette: 'timber',
+      position: [-29.5, 0.8, 12.5] as const,
+      radius: 1.15,
+    },
+    {
+      id: 'debris-stone',
+      palette: 'stone',
+      position: [-24, 0.8, 13] as const,
+      radius: 1.15,
+    },
+    {
+      id: 'debris-crate',
+      palette: 'crate',
+      position: [-18.2, 0.8, 12] as const,
+      radius: 1.15,
+    },
+  ],
+  bulldozerRouteMarkers: [
+    [-3, 0.26, 0] as const,
+    [-7, 0.26, 0] as const,
+    [-11, 0.26, 0] as const,
+    [-15, 0.26, 0] as const,
+    [-19, 0.26, 2] as const,
+    [-22, 0.26, 6] as const,
+    [-24, 0.26, 9] as const,
+  ],
   celebrationStarCenters: [
     [24.8, 1, -11] as const,
     [22.5, 1.2, -11.4] as const,
@@ -105,6 +134,19 @@ describe('PRODUCTION_WORLD_MAP', () => {
     };
 
     expect(map.landmarks).toEqual(EXPECTED_LANDMARKS);
+  });
+
+  it('西地区へ3個の非重複がれきと7個の道しるべを公開する', () => {
+    const { bulldozerDebris, bulldozerRouteMarkers } = PRODUCTION_WORLD_MAP.landmarks;
+
+    expect(bulldozerDebris.map(({ id }) => id)).toEqual([
+      'debris-timber',
+      'debris-stone',
+      'debris-crate',
+    ]);
+    expect(bulldozerDebris.every(({ position }) => resolveWorldDistrict(position) === 'blocks'))
+      .toBe(true);
+    expect(bulldozerRouteMarkers).toHaveLength(7);
   });
 
   it('地区、道路、boxのIDと数値契約を検証する', () => {
@@ -258,6 +300,57 @@ describe('PRODUCTION_WORLD_MAP', () => {
     };
 
     expect(validateProductionWorldMap(duplicate)).toContain('duplicate id: road-hub-east-west');
+  });
+
+  it('がれきIDも全map IDとの重複を拒否する', () => {
+    const duplicate = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      landmarks: {
+        ...EXPECTED_LANDMARKS,
+        bulldozerDebris: EXPECTED_LANDMARKS.bulldozerDebris.map((debris, index) => (
+          index === 0 ? { ...debris, id: 'road-hub-east-west' } : debris
+        )),
+      },
+    };
+
+    expect(validateProductionWorldMap(duplicate)).toContain('duplicate id: road-hub-east-west');
+  });
+
+  it.each([
+    [
+      '非正のがれき半径',
+      EXPECTED_LANDMARKS.bulldozerDebris.map((debris, index) => (
+        index === 0 ? { ...debris, radius: 0 } : debris
+      )),
+      'invalid bulldozer debris radius: debris-timber',
+    ],
+    [
+      '西地区外のがれき',
+      EXPECTED_LANDMARKS.bulldozerDebris.map((debris, index) => (
+        index === 0 ? { ...debris, position: [0, 0.8, 6] as const } : debris
+      )),
+      'landmark bulldozerDebris:debris-timber expected blocks, received hub',
+    ],
+    [
+      'がれき同士の不足間隔',
+      EXPECTED_LANDMARKS.bulldozerDebris.map((debris, index) => (
+        index === 1 ? { ...debris, position: [-28.5, 0.8, 12.5] as const } : debris
+      )),
+      'bulldozer debris too close: debris-timber, debris-stone',
+    ],
+    [
+      '通常積み木との不足間隔',
+      EXPECTED_LANDMARKS.bulldozerDebris.map((debris, index) => (
+        index === 0 ? { ...debris, position: [-26.7, 0.8, 11.5] as const } : debris
+      )),
+      'bulldozer debris overlaps breakable: debris-timber, plaza-red',
+    ],
+  ])('%sを拒否する', (_description, bulldozerDebris, expectedError) => {
+    const map = {
+      ...MAP_WITH_LANDMARK_FIXTURE,
+      landmarks: { ...EXPECTED_LANDMARKS, bulldozerDebris },
+    };
+    expect(validateProductionWorldMap(map)).toContain(expectedError);
   });
 
   it.each([

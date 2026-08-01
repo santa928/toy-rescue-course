@@ -54,3 +54,10 @@ export const BLOCK_PLAZA = PRODUCTION_WORLD_MAP.landmarks.blockPlaza;
 
 /** 車体の回転外形を挟める間隔で並べた積み木広場の配置契約。 */
 export const BREAKABLE_BLOCKS = PRODUCTION_WORLD_MAP.landmarks.breakableBlocks;
+
+/** 西の工事現場でブルドーザーだけが片付けられる3個のがれき。 */
+export const BULLDOZER_DEBRIS = PRODUCTION_WORLD_MAP.landmarks.bulldozerDebris;
+
+/** 中央車庫から西の工事現場へ導く非solid道しるべのworld座標。 */
+export const BULLDOZER_ROUTE_MARKER_POSITIONS =
+  PRODUCTION_WORLD_MAP.landmarks.bulldozerRouteMarkers;
