@@ -34,7 +34,7 @@
 - [x] job targetからfire layout、route、star、targetingを導出するpure testをREDにする。
 - [x] `WaterAndFire`へcurrent fire jobを渡し、固定poolと1 colliderの座標を切り替える。
 - [x] 3火災の炎・水・hazard・telemetry一致をunit／component testでGREENにする。
-- [ ] 日本語commit、secret scan、push、公開確認を行う。
+- [x] 日本語commit、secret scan、push、公開確認を行う。
 
 ## Task 5: 複数がれきscene
 
