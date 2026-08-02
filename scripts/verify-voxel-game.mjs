@@ -244,7 +244,7 @@ function assertInitialWorldPhysicsContract(initial) {
   assert.equal(initial.visualLayout.routeMarkers.length, 12, 'Route marker layout is incomplete.');
   assert(initial.visualLayout.routeMarkers.every(({ scale }) => scale[1] <= 0.14),
     'Route marker is still obstacle-height.');
-  assert.equal(initial.visualLayout.worldSolids.length, 27, 'Production world solids are incomplete.');
+  assert.equal(initial.visualLayout.worldSolids.length, 40, 'Production world solids are incomplete.');
 }
 
 /** 実camera telemetryを使ってworld座標を現在viewportのscreen座標へ投影する。 */
@@ -683,7 +683,7 @@ async function verifyProductionMap(browser, errors) {
     });
     assert.equal(initial.world.currentDistrict, 'hub');
     assert.equal(initial.world.destinationDistrict, 'fire');
-    assert.equal(initial.visualLayout.worldSolids.length, 27);
+    assert.equal(initial.visualLayout.worldSolids.length, 40);
     const southSignPost = requireWorldSolid(initial, 'south-sign-post-west');
     const southCaptureTargetZ = southSignPost.position[2] - 2;
     const initialResetCount = initial.vehicle.resetCount;
@@ -3378,7 +3378,7 @@ async function verifyWorldCollisions(browser, errors) {
     sharedDefinitionOnly,
     sharedDefinitionOnlyReasons,
     testedIds,
-    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 27 production solids share one definition',
+    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 40 production solids share one definition',
   };
 }
 

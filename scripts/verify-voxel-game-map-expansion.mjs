@@ -19,8 +19,8 @@ const viewports = viewportFilter === null
   ? allViewports
   : allViewports.filter(({ name }) => name === viewportFilter);
 assert(viewports.length > 0, `Unknown VOXEL_GAME_MAP_VIEWPORT: ${viewportFilter}.`);
-const CONSTRUCTION_ROUTE_DISTANCE_UNITS = 68;
-const TOWN_ROUTE_DISTANCE_UNITS = 71;
+const CONSTRUCTION_ROUTE_DISTANCE_UNITS = 55;
+const TOWN_ROUTE_DISTANCE_UNITS = 55;
 assert(CONSTRUCTION_ROUTE_DISTANCE_UNITS <= 72 && TOWN_ROUTE_DISTANCE_UNITS <= 72,
   'Expansion route geometry exceeds the 72unit density budget.');
 
@@ -172,7 +172,7 @@ async function driveToConstruction(page, viewport, touchDriver) {
   await driveToCoordinate(page, {
     coordinateIndex: 0,
     description: `${viewport.name}: construction park lane`,
-    target: -14,
+    target: -12,
     tolerance: 0.35,
     touchDriver,
   });
@@ -185,8 +185,8 @@ async function driveToConstruction(page, viewport, touchDriver) {
   });
   const arrived = await driveAlongWorldAxis(page, {
     axis: 'negativeX',
-    description: `${viewport.name}: construction center`,
-    predicate: (state) => state.vehicle.position[0] <= -31,
+    description: `${viewport.name}: construction east entry`,
+    predicate: (state) => state.vehicle.position[0] <= -19,
     touchDriver,
   });
   const durationSeconds = (Date.now() - startedAtMs) / 1_000;
@@ -243,18 +243,25 @@ async function collideWithConstructionOffice(page, viewport, touchDriver, initia
 
 /** 公園側から入ったこうじヤードを南側から積み木地区へ抜ける。 */
 async function exitConstructionToBlocks(page, viewport, touchDriver) {
-  await driveAlongWorldAxis(page, {
-    axis: 'positiveZ',
-    brakeAfterArrival: false,
+  await driveToCoordinate(page, {
+    coordinateIndex: 0,
     description: `${viewport.name}: construction office recovery`,
-    predicate: (state) => state.vehicle.position[2] >= -31,
+    target: -31,
+    tolerance: 0.4,
     touchDriver,
   });
-  await driveAlongWorldAxis(page, {
-    axis: 'negativeX',
-    brakeAfterArrival: false,
+  await driveToCoordinate(page, {
+    coordinateIndex: 2,
+    description: `${viewport.name}: construction north recovery road`,
+    target: -44,
+    tolerance: 0.4,
+    touchDriver,
+  });
+  await driveToCoordinate(page, {
+    coordinateIndex: 0,
     description: `${viewport.name}: construction west exit`,
-    predicate: (state) => state.vehicle.position[0] <= -44,
+    target: -44,
+    tolerance: 0.4,
     touchDriver,
   });
   await driveAlongWorldAxis(page, {
@@ -279,7 +286,7 @@ async function exitConstructionToBlocks(page, viewport, touchDriver) {
   });
 }
 
-/** 車庫から火災地区を通り、西側道路からおもちゃのまち中心へ到達する。 */
+/** 車庫から火災地区を通り、おもちゃのまち西入口へ到達する。 */
 async function driveToTown(page, viewport, touchDriver) {
   const startedAtMs = Date.now();
   await driveAlongWorldAxis(page, {
@@ -303,24 +310,10 @@ async function driveToTown(page, viewport, touchDriver) {
     predicate: (state) => state.vehicle.position[2] >= 31,
     touchDriver,
   });
-  await driveToCoordinate(page, {
-    coordinateIndex: 2,
-    description: `${viewport.name}: town center crossing lane`,
-    target: 30,
-    tolerance: 0.35,
-    touchDriver,
-  });
-  await driveAlongWorldAxis(page, {
-    axis: 'positiveX',
-    brakeAfterArrival: false,
-    description: `${viewport.name}: town center longitude`,
-    predicate: (state) => state.vehicle.position[0] >= 31,
-    touchDriver,
-  });
   const arrived = await driveToCoordinate(page, {
-    coordinateIndex: 2,
-    description: `${viewport.name}: town capture heading`,
-    target: 32,
+    coordinateIndex: 0,
+    description: `${viewport.name}: town west entry alignment`,
+    target: 18,
     tolerance: 0.35,
     touchDriver,
   });
@@ -332,28 +325,21 @@ async function driveToTown(page, viewport, touchDriver) {
 /** 赤い家へ押し当て、おもちゃのまちの共有solidを貫通しないことを確認する。 */
 async function collideWithTownHouse(page, viewport, touchDriver, initialResetCount) {
   await driveToCoordinate(page, {
-    coordinateIndex: 0,
-    description: `${viewport.name}: town red house lane`,
+    coordinateIndex: 2,
+    description: `${viewport.name}: town red house staging`,
     target: 25,
     tolerance: 0.35,
     touchDriver,
   });
-  await driveToCoordinate(page, {
-    coordinateIndex: 2,
-    description: `${viewport.name}: town red house staging`,
-    target: 31,
-    tolerance: 0.35,
-    touchDriver,
-  });
   await pulseWorldAxis(page, {
-    axis: 'negativeZ',
+    axis: 'positiveX',
     description: `${viewport.name}: town red house collision`,
     frameCount: 90,
     touchDriver,
   });
   const collided = await readGameState(page);
   assert.equal(collided.vehicle.resetCount, initialResetCount);
-  assert(collided.vehicle.position[2] < 30.5 && collided.vehicle.position[2] >= 28.9,
+  assert(collided.vehicle.position[0] > 19.5 && collided.vehicle.position[0] <= 20.8,
     `${viewport.name}: town house collision failed: ${JSON.stringify(collided.vehicle)}.`);
   return collided;
 }
@@ -361,15 +347,8 @@ async function collideWithTownHouse(page, viewport, touchDriver, initialResetCou
 /** おもちゃのまち西側から南地区へ抜け、2方向接続を確認する。 */
 async function exitTownToSouth(page, viewport, touchDriver) {
   await driveToCoordinate(page, {
-    coordinateIndex: 2,
-    description: `${viewport.name}: town collision recovery`,
-    target: 31,
-    tolerance: 0.5,
-    touchDriver,
-  });
-  await driveToCoordinate(page, {
     coordinateIndex: 0,
-    description: `${viewport.name}: town west road`,
+    description: `${viewport.name}: town collision recovery`,
     target: 18,
     tolerance: 0.5,
     touchDriver,
@@ -423,7 +402,7 @@ async function verifyViewport(browser, viewport, errors) {
     ]);
     assert.deepEqual(initial.landmarks.construction, [-31, 0, -31]);
     assert.deepEqual(initial.landmarks.town, [31, 0, 31]);
-    assert.equal(initial.visualLayout.worldSolids.length, 27);
+    assert.equal(initial.visualLayout.worldSolids.length, 40);
     const initialResetCount = initial.vehicle.resetCount;
     const hud = await measureHud(page, viewport);
 
@@ -484,8 +463,8 @@ async function verifyViewport(browser, viewport, errors) {
     const town = await driveToTown(page, viewport, touchDriver);
     await waitForFrames(page, 6);
     const townState = await readGameState(page);
-    const townHouse = requireWorldSolid(townState, 'town-house-white-body');
-    const townProjection = assertLandmarkVisible(townState, townHouse, hud, viewport);
+    const townLandmark = requireWorldSolid(townState, 'town-west-lamp-post');
+    const townProjection = assertLandmarkVisible(townState, townLandmark, hud, viewport);
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-town.png` });
     const townCollision = await collideWithTownHouse(
       page,
