@@ -36,6 +36,18 @@ function createJobSnapshot(job: BulldozerVehicleJobDefinition): BulldozerMission
   };
 }
 
+/** activeなtarget囲い4辺のworld XZ中心を返す。 */
+function readTargetMarkerCenter(frame: ReturnType<typeof createBulldozerVfxFrame>): readonly [number, number] {
+  const markers = frame.routeMarkers.filter(({ active, sourceIndex }) => (
+    active && sourceIndex === -2
+  ));
+  expect(markers).toHaveLength(4);
+  return [
+    markers.reduce((sum, { position }) => sum + position[0], 0) / markers.length,
+    markers.reduce((sum, { position }) => sum + position[2], 0) / markers.length,
+  ];
+}
+
 describe('bulldozer VFX frame', () => {
   it('別車種選択中はがれき本体を含む全固定slotを隠す', () => {
     const frame = createBulldozerVfxFrame();
@@ -86,7 +98,9 @@ describe('bulldozer VFX frame', () => {
         expect(sourceVoxels.every(({ palette }) => palette === source.palette)).toBe(true);
         expect(sourceVoxels[0]?.position).toEqual([...source.position]);
       }
-      expect(frame.routeMarkers.map(({ position }) => [position[0], position[2]])).toEqual(
+      expect(frame.routeMarkers
+        .filter(({ sourceIndex }) => sourceIndex === -1)
+        .map(({ position }) => [position[0], position[2]])).toEqual(
         job.routeMarkers.map(([x, , z]) => [x, z]),
       );
     },
@@ -135,16 +149,16 @@ describe('bulldozer VFX frame', () => {
     },
   );
 
-  it('3塊×4 voxel、18 chip、7 route、固定成功星slotを一度だけ確保する', () => {
+  it('3塊×4 voxel、18 chip、7 route、4 target、固定成功星slotを一度だけ確保する', () => {
     const frame = createBulldozerVfxFrame();
 
     expect(frame.debris).toHaveLength(BULLDOZER_DEBRIS_VOXEL_POOL_SIZE);
     expect(frame.chips).toHaveLength(BULLDOZER_CHIP_POOL_SIZE);
-    expect(frame.routeMarkers).toHaveLength(BULLDOZER_ROUTE_MARKER_POSITIONS.length);
+    expect(frame.routeMarkers).toHaveLength(BULLDOZER_ROUTE_MARKER_POSITIONS.length + 4);
     expect(frame.stars).toHaveLength(BULLDOZER_STAR_POOL_SIZE);
   });
 
-  it('assigned中は3塊とrouteを表示し、chipと星を隠す', () => {
+  it('assigned中は3塊、7 route、次対象の4辺囲いを表示し、chipと星を隠す', () => {
     const frame = createBulldozerVfxFrame();
     const debrisReference = frame.debris;
     const clearTimes = new Float64Array([-1, -1, -1]);
@@ -154,9 +168,28 @@ describe('bulldozer VFX frame', () => {
 
     expect(frame.debris).toBe(debrisReference);
     expect(frame.debris.filter(({ active }) => active)).toHaveLength(12);
-    expect(frame.routeMarkers.filter(({ active }) => active)).toHaveLength(7);
+    expect(frame.routeMarkers.filter(({ active, sourceIndex }) => active && sourceIndex === -1))
+      .toHaveLength(7);
+    expect(readTargetMarkerCenter(frame)).toEqual([-29.5, 12.5]);
     expect(frame.chips.filter(({ active }) => active)).toHaveLength(0);
     expect(frame.stars.filter(({ active }) => active)).toHaveLength(0);
+  });
+
+  it('1塊片付けると黄色い囲いを次の未完了がれきへ移す', () => {
+    const frame = createBulldozerVfxFrame();
+    const snapshot: BulldozerMissionSnapshot = {
+      ...INITIAL_SNAPSHOT,
+      clearedCount: 1,
+      debris: INITIAL_SNAPSHOT.debris.map((debris, index) => ({
+        ...debris,
+        cleared: index === 0,
+      })),
+      missionPhase: 'active',
+    };
+
+    updateBulldozerVfxFrame(frame, snapshot, new Float64Array([0, -1, -1]), 0.25);
+
+    expect(readTargetMarkerCenter(frame)).toEqual([-24, 13]);
   });
 
   it('片付けた1塊を隠し、そのpaletteの6 chipを流動的に飛ばす', () => {

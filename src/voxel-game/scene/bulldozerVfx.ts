@@ -12,6 +12,9 @@ export const BULLDOZER_DEBRIS_VOXEL_POOL_SIZE =
   BULLDOZER_DEBRIS.length * BULLDOZER_DEBRIS_VOXELS_PER_SOURCE;
 export const BULLDOZER_CHIP_POOL_SIZE = BULLDOZER_DEBRIS.length * BULLDOZER_CHIPS_PER_SOURCE;
 export const BULLDOZER_STAR_POOL_SIZE = 12;
+export const BULLDOZER_TARGET_MARKER_SLOT_COUNT = 4;
+export const BULLDOZER_GUIDE_POOL_SIZE = BULLDOZER_ROUTE_MARKER_POSITIONS.length
+  + BULLDOZER_TARGET_MARKER_SLOT_COUNT;
 
 export type BulldozerVfxPaletteId = BulldozerDebrisPaletteId | 'route' | 'star';
 
@@ -55,6 +58,12 @@ const STAR_OFFSETS = [
   [0, 1, 0], [0.6, 0.35, 0.7], [1.2, 0.85, -0.2],
   [1.8, 0.15, 0.45], [-1.5, 1.4, 0.6], [-0.5, 1.7, -0.4],
   [0.5, 1.55, 0.45], [1.5, 1.35, -0.55], [0, 2.1, 0.2],
+] as const;
+const TARGET_MARKER_PARTS = [
+  { offset: [0, 0, -1.45], scale: [2.5, 0.12, 0.24] },
+  { offset: [0, 0, 1.45], scale: [2.5, 0.12, 0.24] },
+  { offset: [-1.45, 0, 0], scale: [0.24, 0.12, 2.5] },
+  { offset: [1.45, 0, 0], scale: [0.24, 0.12, 2.5] },
 ] as const;
 
 /** 指定paletteとsourceへ紐づく非active固定slotを作る。 */
@@ -104,8 +113,12 @@ export function createBulldozerVfxFrame(): BulldozerVfxFrame {
       const sourceIndex = Math.floor(slot / BULLDOZER_CHIPS_PER_SOURCE);
       return createTransform(slot, sourceIndex, BULLDOZER_DEBRIS[sourceIndex].palette);
     }),
-    routeMarkers: BULLDOZER_ROUTE_MARKER_POSITIONS.map((_, slot) => (
-      createTransform(slot, -1, 'route')
+    routeMarkers: Array.from({ length: BULLDOZER_GUIDE_POOL_SIZE }, (_, slot) => (
+      createTransform(
+        slot,
+        slot < BULLDOZER_ROUTE_MARKER_POSITIONS.length ? -1 : -2,
+        'route',
+      )
     )),
     stars: Array.from({ length: BULLDOZER_STAR_POOL_SIZE }, (_, slot) => (
       createTransform(slot, -1, 'star')
@@ -183,7 +196,27 @@ export function updateBulldozerVfxFrame(
     transform.scale[2] = size;
   }
 
+  const nextTargetIndex = snapshot.debris.findIndex(({ cleared }) => !cleared);
   for (const transform of frame.routeMarkers) {
+    if (transform.sourceIndex === -2) {
+      const target = job.debris[nextTargetIndex];
+      const part = TARGET_MARKER_PARTS[
+        transform.slot - BULLDOZER_ROUTE_MARKER_POSITIONS.length
+      ];
+      if (!snapshot.routeVisible || !target || !part) {
+        hideBulldozerTransform(transform);
+        continue;
+      }
+      const pulse = 1 + Math.sin(safeElapsed * 5) * 0.06;
+      transform.active = true;
+      transform.position[0] = target.position[0] + part.offset[0];
+      transform.position[1] = 0.3 + Math.sin(safeElapsed * 4) * 0.05;
+      transform.position[2] = target.position[2] + part.offset[2];
+      transform.scale[0] = part.scale[0] * pulse;
+      transform.scale[1] = part.scale[1];
+      transform.scale[2] = part.scale[2] * pulse;
+      continue;
+    }
     const position = job.routeMarkers[transform.slot];
     if (!snapshot.routeVisible || !position) {
       hideBulldozerTransform(transform);

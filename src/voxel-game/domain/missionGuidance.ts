@@ -13,7 +13,7 @@ export interface VehicleMissionGuidance {
 
 const ACTIVE_INSTRUCTIONS: Readonly<Record<VehicleId, string>> = {
   ambulance: 'ひとのそばで とまり てあてをおす',
-  bulldozer: 'がれきへ ブレードでぶつかる',
+  bulldozer: 'ブレードをおしながら がれきにぶつかる',
   excavator: 'つちのまえで とまり バケットをおす',
   'fire-truck': '火のちかくで ほうすいをなが押し',
   police: 'あおいゲートを サイレンでとおる',

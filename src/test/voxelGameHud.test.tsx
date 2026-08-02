@@ -103,7 +103,7 @@ const policeGuidance = {
 
 const bulldozerGuidance = {
   completionLabel: 'クリア 0/3',
-  instructionLabel: 'がれきへ ブレードでぶつかる',
+  instructionLabel: 'ブレードをおしながら がれきにぶつかる',
   targetLabel: 'つぎの がれき',
   targetPosition: [-29.5, 0.8, 12.5] as const,
 };
@@ -160,9 +160,9 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="ブレードを動かす"');
     expect(html).toContain('きたのがれきをかたづけよう');
-    expect(html).toContain('がれきへ ブレードでぶつかる');
+    expect(html).toContain('ブレードをおしながら がれきにぶつかる');
     expect(html).toContain('1しゅうめ・クリア 0/3');
-    expect(html).toContain('aria-label="きたのがれきをかたづけよう。がれきへ ブレードでぶつかる。1しゅうめ・クリア 0/3"');
+    expect(html).toContain('aria-label="きたのがれきをかたづけよう。ブレードをおしながら がれきにぶつかる。1しゅうめ・クリア 0/3"');
     expect(html).toContain('class="touch-drive-surface"');
     expect(html).toContain('aria-label="画面をスライドして運転"');
     expect(html).toContain('class="touch-joystick__label">どこでも');

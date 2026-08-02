@@ -407,6 +407,8 @@ export function VoxelGameApp(): ReactElement {
           missionPhase: coordinatorState.bulldozer.missionPhase,
           routeMarkerCount: bulldozerTelemetry.routeMarkerCount,
           starVoxelCount: bulldozerTelemetry.starVoxelCount,
+          targetMarkerCenter: [...bulldozerTelemetry.targetMarkerCenter],
+          targetMarkerCount: bulldozerTelemetry.targetMarkerCount,
           targetCount: coordinatorState.bulldozer.targetCount,
         },
         excavator: {
@@ -584,7 +586,7 @@ export function VoxelGameApp(): ReactElement {
             coordinatorState.selectedVehicleId,
             runtime.routeVisible,
             fireSceneLayout.targetBeaconBoxes.length,
-            0,
+            bulldozerTelemetry.targetMarkerCount,
           ),
           waterCubeCount: waterFrame.instances.filter(({ active }) => active).length,
           waterInstances: waterFrame.instances.map(({ active, kind, position, scale, slot }) => ({

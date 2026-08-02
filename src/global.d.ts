@@ -28,6 +28,8 @@ declare global {
       readonly missionPhase: import('./voxel-game/domain/VoxelGameRuntime').MissionPhase;
       readonly routeMarkerCount: number;
       readonly starVoxelCount: number;
+      readonly targetMarkerCenter: readonly [number, number, number];
+      readonly targetMarkerCount: number;
       readonly targetCount: number;
     };
     readonly excavator: {

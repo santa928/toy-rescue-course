@@ -10,6 +10,7 @@ import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetryRef } from './VehicleController';
 import type { WorldPoint } from './productionWorldMap';
 import {
+  BULLDOZER_GUIDE_POOL_SIZE,
   createBulldozerVfxFrame,
   hideBulldozerMissionFrame,
   updateBulldozerVfxFrame,
@@ -43,6 +44,8 @@ export interface BulldozerMissionTelemetry {
   readonly frame: BulldozerVfxFrame;
   routeMarkerCount: number;
   starVoxelCount: number;
+  readonly targetMarkerCenter: [number, number, number];
+  targetMarkerCount: number;
 }
 
 export type BulldozerMissionTelemetryRef = MutableRefObject<BulldozerMissionTelemetry>;
@@ -112,6 +115,8 @@ export function createBulldozerMissionTelemetry(): BulldozerMissionTelemetry {
     frame: createBulldozerVfxFrame(),
     routeMarkerCount: 0,
     starVoxelCount: 0,
+    targetMarkerCenter: [0, -40, 0],
+    targetMarkerCount: 0,
   };
 }
 
@@ -257,12 +262,31 @@ export function BulldozerDebrisMission({
     telemetry.debrisVisibleVoxelCount = 0;
     telemetry.routeMarkerCount = 0;
     telemetry.starVoxelCount = 0;
+    telemetry.targetMarkerCount = 0;
+    telemetry.targetMarkerCenter[0] = 0;
+    telemetry.targetMarkerCenter[1] = 0;
+    telemetry.targetMarkerCenter[2] = 0;
     for (const transform of frame.chips) telemetry.activeChipCount += Number(transform.active);
     for (const transform of frame.debris) {
       telemetry.debrisVisibleVoxelCount += Number(transform.active);
     }
     for (const transform of frame.routeMarkers) {
-      telemetry.routeMarkerCount += Number(transform.active);
+      if (!transform.active) continue;
+      if (transform.sourceIndex === -2) {
+        telemetry.targetMarkerCount += 1;
+        telemetry.targetMarkerCenter[0] += transform.position[0];
+        telemetry.targetMarkerCenter[1] += transform.position[1];
+        telemetry.targetMarkerCenter[2] += transform.position[2];
+      } else {
+        telemetry.routeMarkerCount += 1;
+      }
+    }
+    if (telemetry.targetMarkerCount > 0) {
+      telemetry.targetMarkerCenter[0] /= telemetry.targetMarkerCount;
+      telemetry.targetMarkerCenter[1] /= telemetry.targetMarkerCount;
+      telemetry.targetMarkerCenter[2] /= telemetry.targetMarkerCount;
+    } else {
+      telemetry.targetMarkerCenter[1] = -40;
     }
     for (const transform of frame.stars) telemetry.starVoxelCount += Number(transform.active);
   });
@@ -275,7 +299,7 @@ export function BulldozerDebrisMission({
       <VoxelPool count={6} meshRef={chipTimberRef} palette="timber" />
       <VoxelPool count={6} meshRef={chipStoneRef} palette="stone" />
       <VoxelPool count={6} meshRef={chipCrateRef} palette="crate" />
-      <VoxelPool count={7} meshRef={routeRef} palette="route" />
+      <VoxelPool count={BULLDOZER_GUIDE_POOL_SIZE} meshRef={routeRef} palette="route" />
       <VoxelPool count={12} meshRef={starRef} palette="star" />
     </group>
   );

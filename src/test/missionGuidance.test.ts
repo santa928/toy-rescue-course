@@ -8,7 +8,7 @@ const BLOCK_IDS = ['block-a'] as const;
 describe('buildMissionGuidance', () => {
   it.each([
     {
-      instructionLabel: 'がれきへ ブレードでぶつかる',
+      instructionLabel: 'ブレードをおしながら がれきにぶつかる',
       targetLabel: 'つぎの がれき',
       targetPosition: [-29.5, 0.8, 12.5],
       vehicleId: 'bulldozer',

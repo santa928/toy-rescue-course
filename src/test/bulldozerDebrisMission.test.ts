@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createBulldozerMissionTelemetry,
   getBladeCenter,
   shouldClearDebris,
 } from '../voxel-game/scene/BulldozerDebrisMission';
@@ -14,6 +15,14 @@ const VALID_CONTACT = {
 };
 
 describe('bulldozer debris mission', () => {
+  it('routeと次対象markerを別々に数える初期telemetryを持つ', () => {
+    expect(createBulldozerMissionTelemetry()).toMatchObject({
+      routeMarkerCount: 0,
+      targetMarkerCenter: [0, -40, 0],
+      targetMarkerCount: 0,
+    });
+  });
+
   it('車体前方1.75unitをblade中心として返す', () => {
     expect(getBladeCenter({
       forward: [0.6, 0, 0.8],
