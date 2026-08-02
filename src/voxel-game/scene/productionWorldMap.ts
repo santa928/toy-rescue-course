@@ -298,8 +298,8 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     },
     {
       boxes: [
-        { color: '#86552f', id: 'construction-work-lamp-post', position: [-22.1, 1.3, -35], scale: [0.6, 2.4, 0.6], solid: true },
-        { color: '#facc15', id: 'construction-work-lamp', position: [-22.1, 2.7, -35], scale: [1, 0.5, 1], solid: false },
+        { color: '#86552f', id: 'construction-work-lamp-post', position: [-22.1, 1.3, -31], scale: [0.6, 2.4, 0.6], solid: true },
+        { color: '#facc15', id: 'construction-work-lamp', position: [-22.1, 2.7, -31], scale: [1, 0.5, 1], solid: false },
       ],
       districtId: 'construction',
       id: 'construction-work-light',

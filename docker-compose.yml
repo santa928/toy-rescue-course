@@ -193,6 +193,32 @@ services:
           exit 1
         }
 
+  voxel-game-streetscape-e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    working_dir: /app
+    environment:
+      VOXEL_GAME_BASE_URL: http://127.0.0.1:4173
+      VOXEL_GAME_STREETSCAPE_OUTPUT: output/voxel-game-streetscape
+      VOXEL_GAME_STREETSCAPE_VIEWPORT: ${VOXEL_GAME_STREETSCAPE_VIEWPORT:-}
+    volumes:
+      - ./output:/app/output
+    command:
+      - sh
+      - -lc
+      - |
+        set -e
+        npm run build
+        npm run preview -- --host 127.0.0.1 > /tmp/voxel-game-streetscape-preview.log 2>&1 &
+        server_pid=$$!
+        trap 'kill "$$server_pid" 2>/dev/null || true' EXIT
+        node scripts/verify-voxel-game-streetscape.mjs || {
+          sed -n '1,220p' /tmp/voxel-game-streetscape-preview.log >&2
+          exit 1
+        }
+
   production-smoke-e2e:
     profiles: ["e2e"]
     build:
