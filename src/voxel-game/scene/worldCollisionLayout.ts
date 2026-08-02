@@ -1,4 +1,5 @@
 import { PRODUCTION_WORLD_MAP, type WorldBoxDefinition } from './productionWorldMap';
+import { flattenDecorationBoxes } from './worldStreetscape';
 
 /** R3F meshとRapier colliderで共有するEuler回転。 */
 export type BoxRotation = readonly [number, number, number];
@@ -11,7 +12,10 @@ export const VEHICLE_COLLIDER_HALF_EXTENTS = [1.45, 0.95, 1.7] as const;
 
 /** 本番mapのsolid定義だけを描画元と同じ順序・参照で公開する。 */
 export const WORLD_SOLID_BOXES: readonly WorldBoxDefinition[] = (
-  PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)
+  [
+    ...PRODUCTION_WORLD_MAP.visualBoxes,
+    ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),
+  ].filter(({ solid }) => solid)
 );
 
 /** 96×96の描画床とRapier ground colliderで共有する直方体。 */

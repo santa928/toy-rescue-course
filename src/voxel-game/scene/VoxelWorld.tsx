@@ -6,7 +6,9 @@ import {
   PRODUCTION_WORLD_MAP,
   type WorldBoxDefinition,
   type WorldRoadDefinition,
+  type WorldSurfaceTileDefinition,
 } from './productionWorldMap';
+import { flattenDecorationBoxes } from './worldStreetscape';
 import {
   WORLD_GROUND_BOX,
   WORLD_SOLID_BOXES,
@@ -75,7 +77,11 @@ export function groupWorldBoxesByColor(
 }
 
 const ROAD_MARKING_BOXES = PRODUCTION_WORLD_MAP.roads.flatMap(buildRoadMarkingBoxes);
-const WORLD_VISUAL_BATCHES = groupWorldBoxesByColor(PRODUCTION_WORLD_MAP.visualBoxes);
+const WORLD_RENDER_BOXES = [
+  ...PRODUCTION_WORLD_MAP.visualBoxes,
+  ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),
+] as const;
+const WORLD_VISUAL_BATCHES = groupWorldBoxesByColor(WORLD_RENDER_BOXES);
 
 /** 同じmaterialの直方体を1 draw callへまとめる。 */
 function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
@@ -113,6 +119,43 @@ function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
   );
 }
 
+/** 地区床の全matrixと色を1つのInstancedMeshへ固定し、palette数をdraw callへ反映させない。 */
+export function InstancedSurfaceTiles({
+  tiles,
+}: {
+  readonly tiles: readonly WorldSurfaceTileDefinition[];
+}): ReactElement {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const color = new THREE.Color();
+    const quaternion = new THREE.Quaternion();
+    tiles.forEach((tile, index) => {
+      position.fromArray(tile.position);
+      scale.fromArray(tile.scale);
+      matrix.compose(position, quaternion, scale);
+      mesh.setMatrixAt(index, matrix);
+      mesh.setColorAt(index, color.set(tile.color));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [tiles]);
+
+  return (
+    <instancedMesh args={[undefined, undefined, tiles.length]} ref={meshRef}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshLambertMaterial color="#ffffff" />
+    </instancedMesh>
+  );
+}
+
 /** 共有visual定義から静的solidを単一fixed bodyに構成する。 */
 export function WorldSolidColliders(): ReactElement {
   return (
@@ -137,6 +180,7 @@ export function VoxelWorld(): ReactElement {
         <boxGeometry args={WORLD_GROUND_BOX.scale} />
         <meshLambertMaterial color="#d7b07a" />
       </mesh>
+      <InstancedSurfaceTiles tiles={PRODUCTION_WORLD_MAP.surfaceTiles} />
       <InstancedBoxes boxes={PRODUCTION_WORLD_MAP.roads} color="#3f4248" />
       <InstancedBoxes boxes={ROAD_MARKING_BOXES} color="#f0c94a" />
       {WORLD_VISUAL_BATCHES.map(({ boxes, color }) => (
