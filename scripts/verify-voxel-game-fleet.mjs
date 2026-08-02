@@ -435,11 +435,25 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     await driveToCoordinate(page, {
       coordinateIndex: 2,
       description: `${viewport.name}: ambulance park entrance`,
-      target: -18,
+      target: -12,
       tolerance: 0.4,
       touchDriver,
     });
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-ambulance-patient-before.png` });
+    await driveToCoordinate(page, {
+      coordinateIndex: 0,
+      description: `${viewport.name}: ambulance park west bypass`,
+      target: -10,
+      tolerance: 0.4,
+      touchDriver,
+    });
+    await driveToCoordinate(page, {
+      coordinateIndex: 2,
+      description: `${viewport.name}: ambulance patient row`,
+      target: patient.position[2],
+      tolerance: 0.28,
+      touchDriver,
+    });
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: ambulance patient lane`,
@@ -448,16 +462,16 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       touchDriver,
     });
     await driveToCoordinate(page, {
-      coordinateIndex: 2,
-      description: `${viewport.name}: ambulance patient approach`,
-      target: patient.position[2],
-      tolerance: 0.28,
+      coordinateIndex: 0,
+      description: `${viewport.name}: ambulance park beside patient`,
+      target: patient.position[0] + 1.2,
+      tolerance: 0.15,
       touchDriver,
     });
     await driveToCoordinate(page, {
-      coordinateIndex: 0,
-      description: `${viewport.name}: ambulance park beside patient`,
-      target: patient.position[0] + 2.1,
+      coordinateIndex: 2,
+      description: `${viewport.name}: ambulance final patient alignment`,
+      target: patient.position[2],
       tolerance: 0.15,
       touchDriver,
     });
@@ -493,8 +507,8 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     });
     await driveToCoordinate(page, {
       coordinateIndex: 2,
-      description: `${viewport.name}: ambulance reverse patient lane`,
-      target: -16,
+      description: `${viewport.name}: ambulance reverse west bypass`,
+      target: -12,
       tolerance: 0.5,
       touchDriver,
     });
@@ -582,11 +596,26 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     const garageRightWall = policeSelected.visualLayout.worldSolids.find(
       ({ id }) => id === 'garage-right-wall',
     );
+    const hubToolRack = policeSelected.visualLayout.worldSolids.find(
+      ({ id }) => id === 'hub-tool-rack-post',
+    );
+    const southBench = policeSelected.visualLayout.worldSolids.find(
+      ({ id }) => id === 'south-viewing-bench',
+    );
     assert(garageRightWall, `${viewport.name}: garage right wall telemetry is unavailable.`);
-    const policeGarageBypassX = garageRightWall.position[0]
-      + garageRightWall.scale[0] / 2
-      + policeSelected.visualLayout.vehicleBounds.scale[0] / 2
-      + 1.5;
+    assert(hubToolRack, `${viewport.name}: hub tool rack telemetry is unavailable.`);
+    assert(southBench, `${viewport.name}: south bench telemetry is unavailable.`);
+    const policeVehicleHalfWidth = policeSelected.visualLayout.vehicleBounds.scale[0] / 2;
+    const policeGarageBypassX = Math.max(
+      garageRightWall.position[0] + garageRightWall.scale[0] / 2
+        + policeVehicleHalfWidth + 1.5,
+      hubToolRack.position[0] + hubToolRack.scale[0] / 2
+        + policeVehicleHalfWidth + 1.5,
+    );
+    const policeReturnBypassZ = southBench.position[2]
+      - southBench.scale[2] / 2
+      - policeSelected.visualLayout.vehicleBounds.scale[2] / 2
+      - 1.5;
 
     await driveToCoordinate(page, {
       coordinateIndex: 2,
@@ -666,15 +695,15 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal((await readGameState(page)).mission.phase, 'freeRoam');
     await driveToCoordinate(page, {
       coordinateIndex: 2,
-      description: `${viewport.name}: police clear south sign before return`,
-      target: 26,
+      description: `${viewport.name}: police clear south bench before return`,
+      target: policeReturnBypassZ,
       tolerance: 0.45,
       touchDriver,
     });
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: police enter east return road`,
-      target: 6,
+      target: policeGarageBypassX,
       tolerance: 0.5,
       touchDriver,
     });
