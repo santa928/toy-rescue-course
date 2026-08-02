@@ -277,16 +277,20 @@ async function verifyViewport(browser, viewport, errors) {
     const eastSignPost = initial.visualLayout.worldSolids.find(
       ({ id }) => id === 'south-sign-post-east',
     );
+    const southBench = initial.visualLayout.worldSolids.find(
+      ({ id }) => id === 'south-viewing-bench',
+    );
     assert(eastSignPost, `${viewport.name}: east sign post telemetry is missing.`);
+    assert(southBench, `${viewport.name}: south bench telemetry is missing.`);
     const vehiclePlanarHalfExtent = Math.max(
       initial.visualLayout.vehicleBounds.scale[0],
       initial.visualLayout.vehicleBounds.scale[2],
     ) / 2;
     const signPlanarHalfExtent = Math.max(eastSignPost.scale[0], eastSignPost.scale[2]) / 2;
-    const yellowShowerSignBypassZ = eastSignPost.position[2]
-      - vehiclePlanarHalfExtent
-      - signPlanarHalfExtent
-      - 1.5;
+    const yellowShowerSignBypassZ = Math.min(
+      eastSignPost.position[2] - vehiclePlanarHalfExtent - signPlanarHalfExtent - 1.5,
+      southBench.position[2] - vehiclePlanarHalfExtent - southBench.scale[2] / 2 - 1.5,
+    );
 
     const firstRed = await driveFromGarageToSource(
       page,

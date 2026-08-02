@@ -299,8 +299,11 @@ async function verifyViewport(browser, viewport, errors) {
     const layout = await measureHudLayout(page, viewport);
 
     const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-gate-post');
+    const blocksFence = selected.visualLayout.worldSolids.find(({ id }) => id === 'blocks-fence-post');
     assert(hubGate, `${viewport.name}: hub gate telemetry is unavailable.`);
+    assert(blocksFence, `${viewport.name}: blocks fence telemetry is unavailable.`);
     const gateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2 - 4;
+    const blocksFenceBypassZ = blocksFence.position[2] + blocksFence.scale[2] / 2 + 5;
     await driveToCoordinate(
       page,
       2,
@@ -314,6 +317,14 @@ async function verifyViewport(browser, viewport, errors) {
     const crate = selected.landmarks.bulldozerDebris.find(({ id }) => id === 'debris-crate');
     assert(crate, `${viewport.name}: crate debris telemetry is unavailable.`);
     const crateApproachX = crate.position[0] + 1.45;
+    await driveToCoordinate(
+      page,
+      2,
+      blocksFenceBypassZ,
+      `${viewport.name} blocks fence bypass`,
+      activeTouchDriver,
+      0.4,
+    );
     await driveToCoordinate(page, 0, crateApproachX, `${viewport.name} west road`, activeTouchDriver, 0.18);
     await driveToCoordinate(page, 2, 8, `${viewport.name} worksite approach`, activeTouchDriver, 0.45);
     await driveToCoordinate(page, 0, -23.5, `${viewport.name} worksite overview`, activeTouchDriver, 0.5);
