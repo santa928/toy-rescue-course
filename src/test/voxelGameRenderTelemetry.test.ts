@@ -28,6 +28,7 @@ describe('vehicle controller config', () => {
       physics: { idleResponse: 4.8, mass: 1.4, movingResponse: 7.5, yawClamp: 5.2 },
       vehicleId: 'fire-truck',
     });
+    expect(createInitialVehicleTelemetry('fire-truck').position).toEqual([0, 0, 6]);
   });
 
   it('ブルドーザーのcontroller値と車種付き初期telemetryを解決する', () => {
@@ -40,7 +41,7 @@ describe('vehicle controller config', () => {
       forward: [0, 0, 1],
       id: 'bulldozer',
       mass: 1.9,
-      position: [0, 0.8, 6],
+      position: [0, 0, 6],
       resetCount: 0,
       speed: 0,
     });
@@ -56,7 +57,7 @@ describe('vehicle controller config', () => {
       forward: [0, 0, 1],
       id: 'excavator',
       mass: 2,
-      position: [0, 0.8, 6],
+      position: [0, 0, 6],
       resetCount: 0,
       speed: 0,
     });
@@ -71,7 +72,7 @@ describe('vehicle controller config', () => {
     expect(createInitialVehicleTelemetry('ambulance')).toMatchObject({
       id: 'ambulance',
       mass: 1.6,
-      position: [0, 0.8, 6],
+      position: [0, 0, 6],
     });
   });
 
@@ -84,7 +85,7 @@ describe('vehicle controller config', () => {
     expect(createInitialVehicleTelemetry('police')).toMatchObject({
       id: 'police',
       mass: 1.45,
-      position: [0, 0.8, 6],
+      position: [0, 0, 6],
     });
   });
 });

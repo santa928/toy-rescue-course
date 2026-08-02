@@ -33,6 +33,7 @@ import {
   VehicleController,
   type VehicleControllerHandle,
   type VehicleTelemetryRef,
+  type VehicleVisualPositionRef,
 } from './VehicleController';
 import {
   BreakableBlockPlaza,
@@ -60,6 +61,7 @@ import {
   isInsideGarageRestartArea,
   resolveVehicleDistrict,
 } from './worldLayout';
+import { WORLD_FRAME_UPDATE_PRIORITIES } from './worldFrameUpdatePriorities';
 
 interface VoxelGameSceneProps {
   readonly actionTargetJob: ActionTargetMissionJob;
@@ -282,10 +284,18 @@ export function VoxelGameScene({
   telemetryRef,
   vehicleId,
 }: VoxelGameSceneProps): ReactElement {
+  const vehicleVisualPositionRef = useRef<VehicleVisualPositionRef['current']>(
+    [...telemetryRef.current.position],
+  );
+
   return (
     <>
       <color attach="background" args={['#ead4b3']} />
-      <WorldFixedCamera cameraTelemetryRef={cameraTelemetryRef} telemetryRef={telemetryRef} />
+      <WorldFixedCamera
+        cameraTelemetryRef={cameraTelemetryRef}
+        telemetryRef={telemetryRef}
+        visualPositionRef={vehicleVisualPositionRef}
+      />
       <SceneReadySignal renderTelemetryRef={renderTelemetryRef} vehicleId={vehicleId} />
       <RuntimeClock
         breakablePoolHandleRef={breakablePoolHandleRef}
@@ -299,7 +309,7 @@ export function VoxelGameScene({
       <ambientLight intensity={1.5} />
       <directionalLight intensity={2.1} position={[20, 34, 18]} />
       <directionalLight color="#cbe0ff" intensity={0.75} position={[-18, 20, -14]} />
-      <Physics gravity={[0, -18, 0]}>
+      <Physics gravity={[0, -18, 0]} updatePriority={WORLD_FRAME_UPDATE_PRIORITIES.physics}>
         <VoxelWorld />
         <VehicleColorPlayground />
         <BreakableBlockPlaza
@@ -349,6 +359,7 @@ export function VoxelGameScene({
           ref={controllerRef}
           telemetryRef={telemetryRef}
           vehicleId={vehicleId}
+          visualPositionRef={vehicleVisualPositionRef}
         />
       </Physics>
     </>

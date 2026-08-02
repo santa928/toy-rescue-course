@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
-import type { ReactElement, RefObject } from 'react';
+import type { MutableRefObject, ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, RigidBody, type RapierRigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
@@ -15,7 +15,8 @@ import {
   type VehiclePhysicsDefinition,
 } from '../domain/vehicleDefinitions';
 import type { DriveCommand } from '../input/controlState';
-import { GARAGE_POSITION, WORLD_BOUNDS } from './worldLayout';
+import { VEHICLE_GARAGE_POSITION, WORLD_BOUNDS } from './worldLayout';
+import { WORLD_FRAME_UPDATE_PRIORITIES } from './worldFrameUpdatePriorities';
 import { resolveScreenRelativeMovement, shortestAngleDelta } from './screenRelativeMovement';
 
 export interface VehicleTelemetry {
@@ -29,6 +30,9 @@ export interface VehicleTelemetry {
 
 export type VehicleTelemetryRef = React.MutableRefObject<VehicleTelemetry>;
 
+/** Rapierが描画補間した車体rootのworld位置をcameraへ渡すref。 */
+export type VehicleVisualPositionRef = MutableRefObject<readonly [number, number, number]>;
+
 /** 親から車両を車庫へ戻すための命令API。 */
 export interface VehicleControllerHandle {
   resetVehicle(): void;
@@ -39,6 +43,7 @@ interface VehicleControllerProps {
   readonly paintColor?: string | null;
   readonly telemetryRef: VehicleTelemetryRef;
   readonly vehicleId: VehicleId;
+  readonly visualPositionRef: VehicleVisualPositionRef;
 }
 
 /** controllerが毎frameとRapierへ渡す車種別設定。 */
@@ -51,6 +56,7 @@ export interface VehicleControllerConfig {
 const BASE_FORWARD = new THREE.Vector3(0, 0, 1);
 const quaternion = new THREE.Quaternion();
 const forward = new THREE.Vector3();
+const visualWorldPosition = new THREE.Vector3();
 
 /** 任意IDを既知車種へ解決し、controllerが使う設定だけを返す。 */
 export function resolveVehicleControllerConfig(id: unknown): VehicleControllerConfig {
@@ -69,7 +75,7 @@ export function createInitialVehicleTelemetry(vehicleId: VehicleId): VehicleTele
     forward: [0, 0, 1],
     id: config.vehicleId,
     mass: config.physics.mass,
-    position: [...GARAGE_POSITION],
+    position: [...VEHICLE_GARAGE_POSITION],
     resetCount: 0,
     speed: 0,
   };
@@ -140,9 +146,11 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
     paintColor = null,
     telemetryRef,
     vehicleId,
+    visualPositionRef,
   }, ref): ReactElement {
     const bodyRef = useRef<RapierRigidBody>(null);
     const actionActiveRef = useRef(false);
+    const visualRootRef = useRef<THREE.Group>(null);
     const config = resolveVehicleControllerConfig(vehicleId);
 
     /** 剛体とtelemetryを車庫の初期状態へ戻す。 */
@@ -152,16 +160,21 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
         forward: [0, 0, 1],
         id: config.vehicleId,
         mass: body?.mass() ?? telemetryRef.current.mass,
-        position: [...GARAGE_POSITION],
+        position: [...VEHICLE_GARAGE_POSITION],
         resetCount: telemetryRef.current.resetCount + 1,
         speed: 0,
       };
+      visualPositionRef.current = [...VEHICLE_GARAGE_POSITION];
       if (!body) return;
-      body.setTranslation({ x: GARAGE_POSITION[0], y: GARAGE_POSITION[1], z: GARAGE_POSITION[2] }, true);
+      body.setTranslation({
+        x: VEHICLE_GARAGE_POSITION[0],
+        y: VEHICLE_GARAGE_POSITION[1],
+        z: VEHICLE_GARAGE_POSITION[2],
+      }, true);
       body.setRotation({ w: 1, x: 0, y: 0, z: 0 }, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    }, [config.vehicleId, telemetryRef]);
+    }, [config.vehicleId, telemetryRef, visualPositionRef]);
 
     useImperativeHandle(ref, () => ({ resetVehicle }), [resetVehicle]);
 
@@ -169,6 +182,12 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       actionActiveRef.current = commandRef.current.primaryAction;
       const body = bodyRef.current;
       if (!body) return;
+
+      const visualRoot = visualRootRef.current;
+      if (visualRoot) {
+        visualRoot.getWorldPosition(visualWorldPosition);
+        visualPositionRef.current = [visualWorldPosition.x, visualWorldPosition.y, visualWorldPosition.z];
+      }
 
       const position = body.translation();
       if (isOutsideResetEnvelope(position)) {
@@ -199,7 +218,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       body.setLinvel({ x: nextVelocityX, y: velocity.y, z: nextVelocityZ }, true);
       body.setAngvel({ x: 0, y: targetYawVelocity, z: 0 }, true);
       updateTelemetry(telemetryRef, position, forward, body.mass(), Math.hypot(nextVelocityX, nextVelocityZ));
-    });
+    }, WORLD_FRAME_UPDATE_PRIORITIES.vehicleVisualSync);
 
     return (
       <RigidBody
@@ -207,7 +226,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
         colliders={false}
         enabledRotations={[false, true, false]}
         linearDamping={2.2}
-        position={GARAGE_POSITION}
+        position={VEHICLE_GARAGE_POSITION}
         ref={bodyRef}
       >
         <CuboidCollider
@@ -215,7 +234,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
           mass={config.physics.mass}
           position={config.collider.offset}
         />
-        <group rotation={[0, Math.PI, 0]}>
+        <group ref={visualRootRef} rotation={[0, Math.PI, 0]}>
           <SelectedVehicleModel
             actionActiveRef={actionActiveRef}
             paintColor={paintColor}

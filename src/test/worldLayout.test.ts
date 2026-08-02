@@ -13,6 +13,7 @@ import {
   PARK_CENTER,
   resolveVehicleDistrict,
   WORLD_BOUNDS,
+  VEHICLE_GARAGE_POSITION,
 } from '../voxel-game/scene/worldLayout';
 
 describe('voxel world layout', () => {
@@ -71,6 +72,7 @@ describe('voxel world layout', () => {
   it('96×96本番境界内へ既存遊びの座標を変えずに置く', () => {
     expect(WORLD_BOUNDS).toEqual({ maxX: 48, maxZ: 48, minX: -48, minZ: -48 });
     expect(GARAGE_POSITION).toEqual([0, 0.8, 6]);
+    expect(VEHICLE_GARAGE_POSITION).toEqual([0, 0, 6]);
     expect(PARK_CENTER).toEqual([0, 0, -24]);
     expect(BLOCK_PLAZA).toEqual({
       position: [-24, 0.18, 6],

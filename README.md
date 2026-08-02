@@ -72,6 +72,11 @@ docker compose up --build web
 18→12→6→0へ減り、車庫へ帰って仕事を再開すると18へ戻ります。炎の配置は本番の
 放水照準位置をanchorにしているため、照準点と見えている炎がずれません。
 
+追従カメラはRapierの描画補間後の車体位置を使い、平坦な箱庭では高さを固定します。
+車体を壁へ押し付けたときの小さな接触補正は0.18unitの余白内で吸収するため、車だけが
+物理反応し、街とHUDを含む画面全体はブルブル揺れません。車体の剛体原点も最初から
+接地位置へ生成するので、起動時と車庫リセット時の0.8unit落下は発生しません。
+
 最終E2E、3 viewportの代表画像、software renderer分類はDocker内で生成します。
 物理GPU性能は、同じ3 viewportをホストの物理GPU対応ブラウザで別途認証します。
 
@@ -84,6 +89,7 @@ docker compose --profile e2e run --rm --build voxel-game-audio-e2e
 docker compose --profile e2e run --rm --build voxel-game-map-e2e
 docker compose --profile e2e run --rm --build voxel-game-swipe-e2e
 docker compose --profile e2e run --rm --build voxel-game-break-coverage-e2e
+docker compose --profile e2e run --rm --build voxel-game-camera-stability-e2e
 ```
 
 canonical E2Eはscenarioの開始、30秒ごとのheartbeat、成功／失敗、経過秒を`[voxel-e2e]`行へ出力し、
@@ -105,7 +111,7 @@ VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-ga
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。積み木の衝突位置カバレッジ実装後のfresh unit testは48 files / 470 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。カメラ安定化後のfresh unit testは49 files / 473 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -121,6 +127,7 @@ docker compose --profile e2e run --rm --build voxel-game-audio-e2e
 docker compose --profile e2e run --rm --build voxel-game-map-e2e
 docker compose --profile e2e run --rm --build voxel-game-swipe-e2e
 docker compose --profile e2e run --rm --build voxel-game-break-coverage-e2e
+docker compose --profile e2e run --rm --build voxel-game-camera-stability-e2e
 ```
 
 production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
@@ -144,6 +151,10 @@ docker compose run --rm web node --test \
 共有走行、scenario進捗、HUD screenshot proof、job別火災経路を含むNode test 24件を実行します。
 canonical fullの最新manifestは全scenario成功、33 artifacts＝33 screenshot proofs、contract failure 0、
 browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目へ進みます。96×96マップ専用E2Eは、こうじヤード68unit、おもちゃのまち71unitの実走、別出口、代表solid衝突、7地区、40 solid、HUD 8px安全余白を3 viewportで確認します。
+
+カメラ安定性専用E2EはDesktop／Tablet／Mobile landscapeで車体を車庫壁へ押し付け、車体の
+XZ移動が127〜141回反転する条件でも、カメラXYZの反転0回、高さ変動0、browser error 0件を
+確認します。3枚の目視用画像は`output/voxel-game-camera-stability/`へ生成されます。
 
 7地区には、道路より低い19枚の固有色床・入口模様と21群（54 box）の街角セットがあります。床、模様、花、コーン、看板板などは通過でき、街灯柱、ベンチ本体、柵支柱、消火栓など硬い大物だけをsolidにしています。既存27件と合わせたstatic colliderは40件です。専用E2Eは7地区×Desktop／Tablet／Mobile landscapeの21画面で床色、装飾、HUD実寸、代表solid衝突、non-solid通過、scene 34 calls以下を検証します。
 

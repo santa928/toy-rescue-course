@@ -58,6 +58,7 @@ import {
 import { getActiveFireVoxelCount } from './scene/fireVfx';
 import { createWaterFlowFrame } from './scene/waterFlow';
 import type { WorldCameraTelemetry } from './scene/WorldFixedCamera';
+import { WORLD_CAMERA_ANCHOR_Y } from './scene/worldCameraConfig';
 import {
   BREAKABLE_FRAGMENT_POOL_SLOT_IDS,
   BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK,
@@ -204,8 +205,8 @@ export function VoxelGameApp(): ReactElement {
   });
   const controllerRef = useRef<VehicleControllerHandle>(null);
   const cameraTelemetryRef = useRef<WorldCameraTelemetry>({
-    lookTarget: [GARAGE_POSITION[0], GARAGE_POSITION[1] + 0.8, GARAGE_POSITION[2] - 1.5],
-    position: [GARAGE_POSITION[0] + 10, GARAGE_POSITION[1] + 12, GARAGE_POSITION[2] + 12],
+    lookTarget: [GARAGE_POSITION[0], WORLD_CAMERA_ANCHOR_Y + 0.8, GARAGE_POSITION[2] - 1.5],
+    position: [GARAGE_POSITION[0] + 10, WORLD_CAMERA_ANCHOR_Y + 12, GARAGE_POSITION[2] + 12],
     viewport: { height: 0, width: 0 },
     zoom: 56,
   });

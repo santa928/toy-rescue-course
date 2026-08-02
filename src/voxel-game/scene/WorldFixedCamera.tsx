@@ -3,13 +3,20 @@ import type { MutableRefObject, ReactElement } from 'react';
 import { OrthographicCamera } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { VehicleTelemetryRef } from './VehicleController';
+import type { VehicleTelemetryRef, VehicleVisualPositionRef } from './VehicleController';
 import { resolveWorldFixedCameraZoom } from './WorldFixedCameraLayout';
-import { WORLD_CAMERA_LOOK_OFFSET, WORLD_CAMERA_OFFSET } from './worldCameraConfig';
+import { resolveCameraFollowAxis } from './worldCameraFollow';
+import {
+  WORLD_CAMERA_ANCHOR_Y,
+  WORLD_CAMERA_LOOK_OFFSET,
+  WORLD_CAMERA_OFFSET,
+} from './worldCameraConfig';
+import { WORLD_FRAME_UPDATE_PRIORITIES } from './worldFrameUpdatePriorities';
 
 interface WorldFixedCameraProps {
   readonly cameraTelemetryRef?: WorldCameraTelemetryRef;
   readonly telemetryRef: VehicleTelemetryRef;
+  readonly visualPositionRef: VehicleVisualPositionRef;
 }
 
 export interface WorldCameraTelemetry {
@@ -28,19 +35,38 @@ const cameraTarget = new THREE.Vector3();
 const lookTarget = new THREE.Vector3();
 
 /** 車両位置だけを追い、車両yawでは回転しない世界方向固定cameraを構成する。 */
-export function WorldFixedCamera({ cameraTelemetryRef, telemetryRef }: WorldFixedCameraProps): ReactElement {
+export function WorldFixedCamera({
+  cameraTelemetryRef,
+  telemetryRef,
+  visualPositionRef,
+}: WorldFixedCameraProps): ReactElement {
   const cameraRef = useRef<THREE.OrthographicCamera>(null);
-  const followedPositionRef = useRef(new THREE.Vector3(...telemetryRef.current.position));
+  const followedPositionRef = useRef(new THREE.Vector3(
+    telemetryRef.current.position[0],
+    WORLD_CAMERA_ANCHOR_Y,
+    telemetryRef.current.position[2],
+  ));
+  const observedResetCountRef = useRef(telemetryRef.current.resetCount);
 
   useFrame(({ size }, delta) => {
     const camera = cameraRef.current;
     if (!camera) return;
 
-    smoothedPositionTarget.fromArray(telemetryRef.current.position);
+    const followedPosition = followedPositionRef.current;
+    const visualPosition = visualPositionRef.current;
+    if (observedResetCountRef.current !== telemetryRef.current.resetCount) {
+      observedResetCountRef.current = telemetryRef.current.resetCount;
+      followedPosition.set(visualPosition[0], WORLD_CAMERA_ANCHOR_Y, visualPosition[2]);
+    }
+    smoothedPositionTarget.set(
+      resolveCameraFollowAxis(followedPosition.x, visualPosition[0]),
+      followedPosition.y,
+      resolveCameraFollowAxis(followedPosition.z, visualPosition[2]),
+    );
     const damping = 1 - Math.exp(-6 * Math.max(0, delta));
-    followedPositionRef.current.lerp(smoothedPositionTarget, damping);
-    cameraTarget.copy(followedPositionRef.current).add(CAMERA_OFFSET);
-    lookTarget.copy(followedPositionRef.current).add(LOOK_OFFSET);
+    followedPosition.lerp(smoothedPositionTarget, damping);
+    cameraTarget.copy(followedPosition).add(CAMERA_OFFSET);
+    lookTarget.copy(followedPosition).add(LOOK_OFFSET);
     camera.position.copy(cameraTarget);
     camera.lookAt(lookTarget);
 
@@ -62,15 +88,15 @@ export function WorldFixedCamera({ cameraTelemetryRef, telemetryRef }: WorldFixe
       cameraTelemetry.viewport.width = size.width;
       cameraTelemetry.zoom = camera.zoom;
     }
-  });
+  }, WORLD_FRAME_UPDATE_PRIORITIES.camera);
 
-  const [vehicleX, vehicleY, vehicleZ] = telemetryRef.current.position;
+  const [vehicleX, , vehicleZ] = telemetryRef.current.position;
   return (
     <OrthographicCamera
       makeDefault
       position={[
         vehicleX + WORLD_CAMERA_OFFSET[0],
-        vehicleY + WORLD_CAMERA_OFFSET[1],
+        WORLD_CAMERA_ANCHOR_Y + WORLD_CAMERA_OFFSET[1],
         vehicleZ + WORLD_CAMERA_OFFSET[2],
       ]}
       ref={cameraRef}

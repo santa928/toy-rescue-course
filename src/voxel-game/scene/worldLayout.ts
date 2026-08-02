@@ -13,6 +13,13 @@ export const WORLD_DISTRICTS = PRODUCTION_WORLD_MAP.districts;
 /** 消防車庫前に置く消防車の初期位置。 */
 export const GARAGE_POSITION = PRODUCTION_WORLD_MAP.landmarks.garage;
 
+/** collider offsetで車体底面を接地させる、剛体原点用の車庫位置。 */
+export const VEHICLE_GARAGE_POSITION = [
+  GARAGE_POSITION[0],
+  0,
+  GARAGE_POSITION[2],
+] as const;
+
 /** 車庫へ戻ったとみなして次の仕事を再開するXZ半径。 */
 export const GARAGE_RESTART_RADIUS = 3;
 
