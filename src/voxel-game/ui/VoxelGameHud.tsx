@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import type { VehicleMissionSnapshot } from '../domain/VehicleMissionCoordinator';
+import type { VehicleMissionGuidance } from '../domain/missionGuidance';
 import type { VehicleColorEffectSnapshot } from '../domain/VehicleColorEffectRuntime';
 import type { ToyAudioUiState } from '../audio/useToyAudioFeedback';
 import {
@@ -9,6 +10,8 @@ import {
   type VehicleId,
 } from '../domain/vehicleDefinitions';
 import type { VoxelGameControls } from '../input/useVoxelGameControls';
+import type { VehicleTelemetryRef } from '../scene/VehicleController';
+import { MissionMiniMap } from './MissionMiniMap';
 import { TouchJoystick } from './TouchJoystick';
 
 interface VoxelGameHudProps {
@@ -18,11 +21,13 @@ interface VoxelGameHudProps {
   readonly controls: VoxelGameControls;
   readonly fullscreen: boolean;
   readonly fullscreenAvailable: boolean;
+  readonly guidance: VehicleMissionGuidance;
   readonly mission: VehicleMissionSnapshot;
   readonly onSelectVehicle: (vehicleId: VehicleId) => void;
   readonly onToggleAudio: () => void;
   readonly onToggleFullscreen: () => void;
   readonly selectedVehicleId: VehicleId;
+  readonly telemetryRef: VehicleTelemetryRef;
 }
 
 const COLOR_EFFECT_LABELS = {
@@ -39,11 +44,13 @@ export function VoxelGameHud({
   controls,
   fullscreen,
   fullscreenAvailable,
+  guidance,
   mission,
   onSelectVehicle,
   onToggleAudio,
   onToggleFullscreen,
   selectedVehicleId,
+  telemetryRef,
 }: VoxelGameHudProps): ReactElement {
   const vehicleDefinition = getVehicleDefinition(selectedVehicleId);
   const activeActionPointerRef = useRef<number | null>(null);
@@ -116,7 +123,7 @@ export function VoxelGameHud({
   const colorEffectLabel = visibleColorId === null
     ? null
     : `${COLOR_EFFECT_LABELS[visibleColorId]} ${colorEffect.remainingSeconds}びょう`;
-  const missionProgressLabel = `${mission.jobCycle}しゅうめ・${mission.progress.current}/${mission.progress.target}`;
+  const missionProgressLabel = `${mission.jobCycle}しゅうめ・${guidance.completionLabel}`;
   const audioLabel = !audio.available
     ? 'おとは使えません'
     : audio.pending
@@ -135,6 +142,7 @@ export function VoxelGameHud({
       aria-label="働く車の操作パネル"
       className="voxel-game-hud"
       data-color-effect-active={colorEffectLabel !== null}
+      data-vehicle-switch-available={canSwitchVehicle}
     >
       {canSwitchVehicle ? (
         <nav aria-label="のりものをえらぶ" className="vehicle-selector">
@@ -156,7 +164,7 @@ export function VoxelGameHud({
       ) : null}
       <div className="status-stack">
         <p
-          aria-label={`${mission.jobLabel}。${mission.objectiveLabel}。${missionProgressLabel}`}
+          aria-label={`${mission.jobLabel}。${guidance.instructionLabel}。${missionProgressLabel}`}
           aria-live="polite"
           className="mission-pill"
           data-phase={mission.phase}
@@ -170,7 +178,7 @@ export function VoxelGameHud({
           <span className="mission-pill__copy">
             <span className="mission-pill__job">{mission.jobLabel}</span>
             <span className="mission-pill__details">
-              <span className="mission-pill__objective">{mission.objectiveLabel}</span>
+              <span className="mission-pill__objective">{guidance.instructionLabel}</span>
               <span aria-hidden="true" className="mission-pill__progress">
                 {missionProgressLabel}
               </span>
@@ -217,6 +225,11 @@ export function VoxelGameHud({
         </span>
         <span>{visibleAudioLabel}</span>
       </button>
+      <MissionMiniMap
+        guidance={guidance}
+        telemetryRef={telemetryRef}
+        vehicleId={selectedVehicleId}
+      />
       <TouchJoystick controls={controls} />
       <button
         aria-label={vehicleDefinition.action.ariaLabel}

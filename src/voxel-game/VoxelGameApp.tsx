@@ -18,6 +18,7 @@ import {
   type VehicleColorEffectSnapshot,
 } from './domain/VehicleColorEffectRuntime';
 import { buildMissionJobTelemetry } from './domain/jobTelemetry';
+import { buildMissionGuidance } from './domain/missionGuidance';
 import { resolveSessionJobSeed } from './domain/sessionJobSeed';
 import { useVoxelGameControls } from './input/useVoxelGameControls';
 import {
@@ -330,6 +331,7 @@ export function VoxelGameApp(): ReactElement {
       const coordinatorState = coordinator.getSnapshot();
       const runtime = coordinatorState.fire;
       const currentMission = coordinatorState.mission;
+      const currentGuidance = buildMissionGuidance(coordinatorState);
       const currentJob = buildMissionJobTelemetry(coordinatorState);
       const fireJob = coordinatorState.currentJobs.fire;
       const fireSceneLayout = createFireJobSceneLayout(fireJob);
@@ -496,6 +498,7 @@ export function VoxelGameApp(): ReactElement {
           destinationDistrict: currentMission.destinationDistrict,
           direction: [...missionTelemetry.direction],
           id: currentMission.id,
+          guidance: currentGuidance,
           ...currentJob,
           nozzleOrigin: [...missionTelemetry.nozzleOrigin],
           objectiveLabel: currentMission.objectiveLabel,
@@ -616,6 +619,8 @@ export function VoxelGameApp(): ReactElement {
     };
   }, [colorEffectRuntime, controls.commandRef, coordinator, handleSelectVehicle]);
 
+  const missionGuidance = buildMissionGuidance(coordinatorSnapshot);
+
   return (
     <main className="voxel-game-shell">
       <section className="voxel-game-canvas" aria-label="純ボクセル働く車の箱庭">
@@ -659,11 +664,13 @@ export function VoxelGameApp(): ReactElement {
         controls={controls}
         fullscreen={fullscreen}
         fullscreenAvailable={fullscreenAvailable}
+        guidance={missionGuidance}
         mission={coordinatorSnapshot.mission}
         onSelectVehicle={handleSelectVehicle}
         onToggleAudio={toggleAudio}
         onToggleFullscreen={handleToggleFullscreen}
         selectedVehicleId={coordinatorSnapshot.selectedVehicleId}
+        telemetryRef={telemetryRef}
       />
       <PhysicalGpuProbe
         enabled={physicalGpuProbeEnabled}

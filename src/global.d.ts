@@ -106,6 +106,7 @@ declare global {
       import('./voxel-game/scene/WaterAndFire').MissionTelemetry,
       'waterPath'
     > & {
+      readonly guidance: import('./voxel-game/domain/missionGuidance').VehicleMissionGuidance;
       readonly waterPath: {
         readonly control: readonly [number, number, number];
         readonly end: readonly [number, number, number];

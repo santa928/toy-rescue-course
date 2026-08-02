@@ -40,11 +40,13 @@ docker compose up --build web
 - `F` / 右上ボタン: fullscreenの開始・終了
 - 右上の`おと オフ／オン`: 玩具BGM、走行音、車種別アクション音、成功音、対応端末の短い振動をまとめて切り替える
 
+画面上の仕事札には、仕事名に加えて「何へ・どの操作をするか」と`クリア 現在/目標`が表示されます。右上の小さな「おしごとマップ」では、選んだ車色の現在地、黄色い次ターゲット、目的地までの距離を確認できます。対象を完了すると次の未完了対象へピンが移り、仕事完了後は中央車庫を示します。車庫へ戻ると次の仕事が始まり、消防車の炎も再び表示されます。
+
 中央車庫の中で停止すると「しょうぼうしゃ」「ブルドーザー」「ショベルカー」「きゅうきゅうしゃ」「パトカー」を選べます。選択に失敗や解除条件はなく、車庫へ戻れば何度でも乗り換えられます。消防車の主操作は放水、ブルドーザーは前面ブレード、ショベルカーはバケット、救急車は手当て、パトカーはサイレンです。
 
 放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。ブルドーザーでは西地区の道しるべをたどり、走りながらブレードを動かして3個の工事がれきへ触れると、ボクセル破片へ崩して片付けられます。ショベルカーでは西地区の土山へ近づいて停止し、バケットを0.7秒動かすと茶色いボクセル粒へ崩して掘れます。救急車では公園の患者の横へ停止し、手当てを1.2秒続けると、横たわった患者が起き上がります。パトカーでは南地区の赤青の巡回門へ向かい、サイレンを鳴らして走り抜けると巡回できます。各車種には3件の仕事があり、仕事を終えて自由走行から車庫へ戻ると、同じ仕事が連続しない次の依頼へ進みます。未完了の帰庫や乗り換えでは依頼を変えません。
 
-通常プレイの仕事順はページを開くたびに変わり、検証や再現ではURLへ`?job-seed=1`のような10進整数を付けると同じ順序になります。現在のjob ID、仕事名、巡回番号、seed、実判定対象座標は`render_game_to_text()`の`mission`へ公開します。
+通常プレイの仕事順はページを開くたびに変わり、検証や再現ではURLへ`?job-seed=1`のような10進整数を付けると同じ順序になります。現在のjob ID、仕事名、巡回番号、seed、実判定対象座標、具体的な操作文、次ターゲット、達成数は`render_game_to_text()`の`mission`へ公開します。
 
 音は初期状態ではオフで、右上の`おと オフ`を押した後だけ始まります。外部音源を読み込まず、木琴風の五音BGM、小さな速度連動エンジン音、放水・ブレード・バケット・手当て・赤青サイレンをWeb Audioで生成します。乗り換え、対象完了、仕事完了には短い合図が入り、touch対応端末では対象／仕事完了だけ短く振動します。非表示中とオフ中はAudioContextを停止し、設定は保存しません。現在の有効状態、context、車種、action kind、gain、cue／振動回数は`render_game_to_text()`の`audio`へ公開します。
 
@@ -101,7 +103,7 @@ VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-ga
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。96×96マップ実装後のfresh unit testは46 files / 448 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。おしごと案内・ミニマップ実装後のfresh unit testは48 files / 463 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -119,8 +121,8 @@ docker compose --profile e2e run --rm --build voxel-game-map-e2e
 
 production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
 決定的なchunkへ分割します。`postbuild`が3つのHTML entryからのasset参照と、game entry 350kB、
-通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-02の地区床・街角装飾実装後の実測は
-game 158,103 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
+通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-02のおしごと案内・ミニマップ実装後の実測は
+game 161,648 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
 
 Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状態読取、keyboard／touch stick、
 制動、world軸走行、座標補正を`scripts/voxel-game-e2e/drive-harness.mjs`で共有します。canonicalの

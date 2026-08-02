@@ -5,6 +5,7 @@ const safeDesktop: HudLayoutRects = {
   colorEffect: { bottom: 108, left: 430, right: 594, top: 74 },
   fullscreen: { bottom: 60, left: 916, right: 1010, top: 12 },
   mission: { bottom: 64, left: 372, right: 652, top: 12 },
+  missionMap: { bottom: 264, left: 886, right: 1010, top: 124 },
   selector: { bottom: 60, left: 14, right: 246, top: 12 },
   viewport: { height: 768, width: 1024 },
 };
@@ -25,6 +26,13 @@ describe('hudLayout', () => {
     expect(isHudLayoutSafe({
       ...safeDesktop,
       fullscreen: { ...safeDesktop.fullscreen, right: 1030 },
+    }, 8)).toBe(false);
+  });
+
+  it('おしごとマップが全画面ボタンへ重なる配置を拒否する', () => {
+    expect(isHudLayoutSafe({
+      ...safeDesktop,
+      missionMap: { ...safeDesktop.missionMap, bottom: 195, top: 55 },
     }, 8)).toBe(false);
   });
 

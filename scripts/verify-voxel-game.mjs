@@ -2045,6 +2045,11 @@ async function verifyCompleteMission(
       assertInitialWorldPhysicsContract(initial);
       assert.equal(initial.mission.jobCycle, cycleIndex,
         `${name}: cycle ${cycleIndex} did not start with the expected job cycle.`);
+      assert.equal(initial.mission.guidance.instructionLabel,
+        '火のちかくで ほうすいをなが押し',
+        `${name}: cycle ${cycleIndex} fire instruction is unclear.`);
+      assert.equal(initial.mission.guidance.targetLabel, '火',
+        `${name}: cycle ${cycleIndex} fire map target is missing.`);
       const initialResetCount = initial.vehicle.resetCount;
       readPoolIdentity(initial, `${name} cycle ${cycleIndex} initial`);
       const fireJourneyStartedAtMs = Date.now();
@@ -2091,6 +2096,12 @@ async function verifyCompleteMission(
       const freeRoam = await readGameState(page);
       assert.equal(freeRoam.runtime.missionPhase, 'freeRoam',
         `${name}: cycle ${cycleIndex} freeRoam did not start.`);
+      assert.deepEqual(freeRoam.mission.guidance, {
+        completionLabel: 'クリア 1/1',
+        instructionLabel: 'しゃこへもどると つぎのおしごと',
+        targetLabel: 'ちゅうおうしゃこ',
+        targetPosition: [0, 0.8, 6],
+      }, `${name}: cycle ${cycleIndex} did not guide the player back to the garage.`);
       const restarted = await driveMissionBackToGarage(page, touch);
       assert.equal(restarted.runtime.missionPhase, 'assigned',
         `${name}: cycle ${cycleIndex} mission did not restart at garage.`);
@@ -2110,6 +2121,8 @@ async function verifyCompleteMission(
         `${name}: cycle ${cycleIndex} completed job repeated at garage.`);
       assert.equal(restarted.mission.jobCycle, cycleIndex + 1,
         `${name}: cycle ${cycleIndex} did not advance its job cycle.`);
+      assert.equal(restarted.mission.guidance.targetLabel, '火',
+        `${name}: cycle ${cycleIndex} next fire target did not return to the map.`);
       cycles.push({
         ...fireArrival,
         celebration: celebration.runtime,

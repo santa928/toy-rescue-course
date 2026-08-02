@@ -6,6 +6,7 @@ import type { VehicleColorEffectSnapshot } from '../voxel-game/domain/VehicleCol
 import type { DriveCommand } from '../voxel-game/input/controlState';
 import type { VoxelGameControls } from '../voxel-game/input/useVoxelGameControls';
 import { VoxelGameHud } from '../voxel-game/ui/VoxelGameHud';
+import type { VehicleTelemetryRef } from '../voxel-game/scene/VehicleController';
 
 /** DOM eventなしでHUDの文言とariaを描画する最小controlsを返す。 */
 function createControls(): VoxelGameControls {
@@ -93,6 +94,45 @@ const audioOff = {
   pending: false,
 };
 
+const policeGuidance = {
+  completionLabel: 'クリア 0/3',
+  instructionLabel: 'あおいゲートを サイレンでとおる',
+  targetLabel: 'つぎの ゲート',
+  targetPosition: [0, 0.7, 17] as const,
+};
+
+const bulldozerGuidance = {
+  completionLabel: 'クリア 0/3',
+  instructionLabel: 'がれきへ ブレードでぶつかる',
+  targetLabel: 'つぎの がれき',
+  targetPosition: [-29.5, 0.8, 12.5] as const,
+};
+
+const excavatorGuidance = {
+  completionLabel: 'クリア 0/3',
+  instructionLabel: 'つちのまえで とまり バケットをおす',
+  targetLabel: 'つぎの つち',
+  targetPosition: [-29.5, 0.65, 12.5] as const,
+};
+
+const ambulanceGuidance = {
+  completionLabel: 'クリア 0/1',
+  instructionLabel: 'ひとのそばで とまり てあてをおす',
+  targetLabel: 'けがをした ひと',
+  targetPosition: [-4, 0.7, -24] as const,
+};
+
+const vehicleTelemetryRef = {
+  current: {
+    forward: [0, 0, 1] as const,
+    id: 'police' as const,
+    mass: 1,
+    position: [0, 0.8, 6] as const,
+    resetCount: 0,
+    speed: 0,
+  },
+} satisfies VehicleTelemetryRef;
+
 describe('VoxelGameHud', () => {
   it('車庫では5台の選択状態とブルドーザー固有の主操作を公開する', () => {
     const html = renderToStaticMarkup(<VoxelGameHud
@@ -102,11 +142,13 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={bulldozerGuidance}
       mission={bulldozerMission}
       onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
+      telemetryRef={vehicleTelemetryRef}
     />);
 
     expect(html).toContain('aria-label="のりものをえらぶ"');
@@ -118,9 +160,9 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="ブレードを動かす"');
     expect(html).toContain('きたのがれきをかたづけよう');
-    expect(html).toContain('こうじげんばへ いこう');
-    expect(html).toContain('1しゅうめ・0/3');
-    expect(html).toContain('aria-label="きたのがれきをかたづけよう。こうじげんばへ いこう。1しゅうめ・0/3"');
+    expect(html).toContain('がれきへ ブレードでぶつかる');
+    expect(html).toContain('1しゅうめ・クリア 0/3');
+    expect(html).toContain('aria-label="きたのがれきをかたづけよう。がれきへ ブレードでぶつかる。1しゅうめ・クリア 0/3"');
   });
 
   it('パトカー固有の巡回仕事、3地点進捗、サイレン操作を公開する', () => {
@@ -131,18 +173,24 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={policeGuidance}
       mission={policeMission}
       onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="police"
+      telemetryRef={vehicleTelemetryRef}
     />);
 
     expect(html).toContain('aria-label="サイレンを鳴らす"');
     expect(html).toContain('まんなかを みまわろう');
-    expect(html).toContain('みまわり あと3かしょ');
-    expect(html).toContain('1しゅうめ・0/3');
+    expect(html).toContain('あおいゲートを サイレンでとおる');
+    expect(html).toContain('1しゅうめ・クリア 0/3');
     expect(html).toContain('data-vehicle="police"');
+    expect(html).toContain('あおいゲートを サイレンでとおる');
+    expect(html).toContain('クリア 0/3');
+    expect(html).toContain('aria-label="おしごとマップ。つぎの ゲート"');
+    expect(html).toContain('class="mission-map__target"');
   });
 
   it('救急車固有の仕事、1体進捗、手当て操作を公開する', () => {
@@ -153,17 +201,19 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={ambulanceGuidance}
       mission={ambulanceMission}
       onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="ambulance"
+      telemetryRef={vehicleTelemetryRef}
     />);
 
     expect(html).toContain('aria-label="手当てをする"');
     expect(html).toContain('いけのそばで てあてしよう');
-    expect(html).toContain('てあてをしよう');
-    expect(html).toContain('1しゅうめ・0/1');
+    expect(html).toContain('ひとのそばで とまり てあてをおす');
+    expect(html).toContain('1しゅうめ・クリア 0/1');
     expect(html).toContain('data-vehicle="ambulance"');
   });
 
@@ -175,17 +225,19 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={excavatorGuidance}
       mission={excavatorMission}
       onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="excavator"
+      telemetryRef={vehicleTelemetryRef}
     />);
 
     expect(html).toContain('aria-label="バケットを動かす"');
     expect(html).toContain('きたのつちをほろう');
-    expect(html).toContain('つち あと3こ');
-    expect(html).toContain('1しゅうめ・0/3');
+    expect(html).toContain('つちのまえで とまり バケットをおす');
+    expect(html).toContain('1しゅうめ・クリア 0/3');
     expect(html).toContain('data-vehicle="excavator"');
   });
 
@@ -197,11 +249,13 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={bulldozerGuidance}
       mission={bulldozerMission}
       onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
+      telemetryRef={vehicleTelemetryRef}
     />);
 
     expect(html).not.toContain('aria-label="のりものをえらぶ"');
@@ -227,11 +281,13 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={bulldozerGuidance}
       mission={bulldozerMission}
       onToggleAudio={vi.fn()}
       onSelectVehicle={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
+      telemetryRef={vehicleTelemetryRef}
     />);
 
     expect(html).toContain('class="status-stack"');
@@ -249,11 +305,13 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={bulldozerGuidance}
       mission={bulldozerMission}
       onSelectVehicle={vi.fn()}
       onToggleAudio={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
+      telemetryRef={vehicleTelemetryRef}
     />);
     const onHtml = renderToStaticMarkup(<VoxelGameHud
       audio={{ ...audioOff, contextState: 'running', enabled: true }}
@@ -262,11 +320,13 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={bulldozerGuidance}
       mission={bulldozerMission}
       onSelectVehicle={vi.fn()}
       onToggleAudio={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
+      telemetryRef={vehicleTelemetryRef}
     />);
     const unavailableHtml = renderToStaticMarkup(<VoxelGameHud
       audio={{ ...audioOff, available: false, contextState: 'unavailable' }}
@@ -275,11 +335,13 @@ describe('VoxelGameHud', () => {
       controls={createControls()}
       fullscreen={false}
       fullscreenAvailable
+      guidance={bulldozerGuidance}
       mission={bulldozerMission}
       onSelectVehicle={vi.fn()}
       onToggleAudio={vi.fn()}
       onToggleFullscreen={vi.fn()}
       selectedVehicleId="bulldozer"
+      telemetryRef={vehicleTelemetryRef}
     />);
 
     expect(offHtml).toContain('class="audio-toggle-button"');

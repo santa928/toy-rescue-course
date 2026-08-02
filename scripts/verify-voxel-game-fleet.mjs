@@ -74,6 +74,7 @@ async function measureFleetHud(page, viewport) {
     action: '.primary-action-button',
     fullscreen: '.fullscreen-button',
     joystick: '.touch-joystick',
+    map: '.mission-map',
     mission: '.mission-pill',
     selector: '.vehicle-selector',
   };
@@ -93,6 +94,10 @@ async function measureFleetHud(page, viewport) {
     ['joystick', 'action'],
     ['mission', 'joystick'],
     ['mission', 'action'],
+    ['map', 'fullscreen'],
+    ['map', 'mission'],
+    ['map', 'selector'],
+    ['map', 'action'],
   ]) {
     assert(rectDistance(boxes[leftName], boxes[rightName]) >= 8,
       `${viewport.name}: ${leftName}/${rightName} lack 8px safety gap: ${JSON.stringify(boxes)}.`);
@@ -113,7 +118,25 @@ async function measureFleetHud(page, viewport) {
       `${viewport.name}: vehicle button exceeds selector: ${JSON.stringify({ button, selector })}.`,
     );
   }
-  return { boxes, buttonBoxes };
+  const mapBoard = await page.locator('.mission-map__board').boundingBox();
+  const mapTarget = await page.locator('.mission-map__target').boundingBox();
+  const mapPlayer = await page.locator('.mission-map__player').boundingBox();
+  assert(mapBoard && mapTarget && mapPlayer,
+    `${viewport.name}: mission map child bounds are unavailable.`);
+  const board = toEdges(mapBoard);
+  for (const [name, marker] of [
+    ['target', toEdges(mapTarget)],
+    ['player', toEdges(mapPlayer)],
+  ]) {
+    const centerX = (marker.left + marker.right) / 2;
+    const centerY = (marker.top + marker.bottom) / 2;
+    assert(
+      centerX >= board.left && centerX <= board.right
+      && centerY >= board.top && centerY <= board.bottom,
+      `${viewport.name}: mission map ${name} center exceeds board: ${JSON.stringify({ board, marker })}.`,
+    );
+  }
+  return { boxes, buttonBoxes, mapBoard: board };
 }
 
 /** Spaceまたはtouch主操作buttonを同じcommandへ押下・解除する。 */
@@ -280,6 +303,12 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(selected.mission.jobSeed, 1);
     assert.equal(selected.mission.progress.current, 0);
     assert.equal(selected.mission.progress.target, 3);
+    assert.deepEqual(selected.mission.guidance, {
+      completionLabel: 'クリア 0/3',
+      instructionLabel: 'つちのまえで とまり バケットをおす',
+      targetLabel: 'つぎの つち',
+      targetPosition: [-29.5, 0.65, 12.5],
+    });
     assert.equal(selected.renderer.vehicleDrawCalls <= 7, true,
       `${viewport.name}: excavator exceeded seven body draw calls.`);
     assert.equal(selected.excavator.targetBodyVoxelCount, 18);
@@ -294,6 +323,10 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(await excavatorButton.getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('.primary-action-button').getAttribute('aria-label'),
       'バケットを動かす');
+    assert.equal((await page.locator('.mission-pill__objective').textContent())?.trim(),
+      selected.mission.guidance.instructionLabel);
+    assert.equal(await page.locator('.mission-map').getAttribute('aria-label'),
+      `おしごとマップ。${selected.mission.guidance.targetLabel}`);
     const layout = await measureFleetHud(page, viewport);
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-garage.png` });
 
@@ -357,7 +390,14 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
 
     await page.evaluate(() => window.advanceTime?.(1_800));
     await waitForFrames(page, 2);
-    assert.equal((await readGameState(page)).mission.phase, 'freeRoam');
+    const excavatorFreeRoam = await readGameState(page);
+    assert.equal(excavatorFreeRoam.mission.phase, 'freeRoam');
+    assert.deepEqual(excavatorFreeRoam.mission.guidance, {
+      completionLabel: 'クリア 3/3',
+      instructionLabel: 'しゃこへもどると つぎのおしごと',
+      targetLabel: 'ちゅうおうしゃこ',
+      targetPosition: [0, 0.8, 6],
+    });
     await driveToCoordinate(page, {
       coordinateIndex: 2,
       description: `${viewport.name}: return south block road`,
@@ -400,6 +440,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.notEqual(restarted.mission.jobId, selected.mission.jobId);
     assert.equal(restarted.excavator.completedCount, 0);
     assert.equal(restarted.vehicleSelection.canSwitch, true);
+    assert.notEqual(restarted.mission.guidance.targetLabel, 'ちゅうおうしゃこ');
 
     const ambulanceButton = page.getByRole('button', { name: 'きゅうきゅうしゃをえらぶ' });
     if (viewport.touch) await ambulanceButton.tap();
@@ -414,6 +455,12 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(ambulanceSelected.mission.jobCycle, 1);
     assert.equal(ambulanceSelected.mission.progress.current, 0);
     assert.equal(ambulanceSelected.mission.progress.target, 1);
+    assert.deepEqual(ambulanceSelected.mission.guidance, {
+      completionLabel: 'クリア 0/1',
+      instructionLabel: 'ひとのそばで とまり てあてをおす',
+      targetLabel: 'けがをした ひと',
+      targetPosition: [-4, 0.7, -24],
+    });
     assert.equal(ambulanceSelected.renderer.vehicleDrawCalls <= 7, true,
       `${viewport.name}: ambulance exceeded seven body draw calls.`);
     assert.equal(ambulanceSelected.ambulance.targetBodyVoxelCount, 6);
@@ -497,7 +544,9 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
 
     await page.evaluate(() => window.advanceTime?.(1_800));
     await waitForFrames(page, 2);
-    assert.equal((await readGameState(page)).mission.phase, 'freeRoam');
+    const ambulanceFreeRoam = await readGameState(page);
+    assert.equal(ambulanceFreeRoam.mission.phase, 'freeRoam');
+    assert.equal(ambulanceFreeRoam.mission.guidance.targetLabel, 'ちゅうおうしゃこ');
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: ambulance enter west return road`,
@@ -576,6 +625,12 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(policeSelected.mission.jobCycle, 1);
     assert.equal(policeSelected.mission.progress.current, 0);
     assert.equal(policeSelected.mission.progress.target, 3);
+    assert.deepEqual(policeSelected.mission.guidance, {
+      completionLabel: 'クリア 0/3',
+      instructionLabel: 'あおいゲートを サイレンでとおる',
+      targetLabel: 'つぎの ゲート',
+      targetPosition: [0, 0.7, 17],
+    });
     assert.equal(policeSelected.renderer.vehicleDrawCalls <= 7, true,
       `${viewport.name}: police exceeded seven body draw calls.`);
     assert.equal(policeSelected.police.targetBodyVoxelCount, 18);
@@ -692,7 +747,9 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
 
     await page.evaluate(() => window.advanceTime?.(1_800));
     await waitForFrames(page, 2);
-    assert.equal((await readGameState(page)).mission.phase, 'freeRoam');
+    const policeFreeRoam = await readGameState(page);
+    assert.equal(policeFreeRoam.mission.phase, 'freeRoam');
+    assert.equal(policeFreeRoam.mission.guidance.targetLabel, 'ちゅうおうしゃこ');
     await driveToCoordinate(page, {
       coordinateIndex: 2,
       description: `${viewport.name}: police clear south bench before return`,

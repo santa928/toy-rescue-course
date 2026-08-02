@@ -11,6 +11,7 @@ export interface HudLayoutRects {
   readonly colorEffect: ScreenRect | null;
   readonly fullscreen: ScreenRect;
   readonly mission: ScreenRect;
+  readonly missionMap: ScreenRect;
   readonly selector: ScreenRect | null;
   readonly viewport: { readonly height: number; readonly width: number };
 }
@@ -42,7 +43,13 @@ function getRectDistance(left: ScreenRect, right: ScreenRect): number {
 /** 主要HUDがviewport内に収まり、全組が指定安全余白以上離れているか判定する。 */
 export function isHudLayoutSafe(layout: HudLayoutRects, minimumGap = 8): boolean {
   if (!Number.isFinite(minimumGap) || minimumGap < 0) return false;
-  const rectangles = [layout.selector, layout.mission, layout.colorEffect, layout.fullscreen]
+  const rectangles = [
+    layout.selector,
+    layout.mission,
+    layout.colorEffect,
+    layout.fullscreen,
+    layout.missionMap,
+  ]
     .filter((rect): rect is ScreenRect => rect !== null);
   if (!rectangles.every((rect) => isRectInsideViewport(rect, layout.viewport))) return false;
   if (
