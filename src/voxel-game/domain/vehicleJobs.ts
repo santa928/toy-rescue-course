@@ -627,7 +627,8 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
       }
     }
   }
-  const allJobs = vehicleIds.flatMap((vehicleId) => registry[vehicleId]);
+  const allJobs: VehicleJobDefinition[] = [];
+  for (const vehicleId of vehicleIds) allJobs.push(...registry[vehicleId]);
   errors.push(...validateDecorationClearanceFromVehicleJobs(
     allJobs,
     flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),
