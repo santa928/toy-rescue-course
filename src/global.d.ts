@@ -122,6 +122,7 @@ declare global {
       readonly fireLayers: readonly unknown[];
       readonly routeMarkers: readonly import('./voxel-game/scene/WaterAndFire').VoxelBox[];
       readonly starGroups: readonly unknown[];
+      readonly targetBeacon: readonly import('./voxel-game/scene/WaterAndFire').VoxelBox[];
       readonly vehicleBounds: {
         readonly offset: readonly [number, number, number];
         readonly scale: readonly [number, number, number];
@@ -151,6 +152,7 @@ declare global {
       readonly intactBlockCount: number;
       readonly routeCubeCount: number;
       readonly starCubeCount: number;
+      readonly targetBeaconCubeCount: number;
       readonly waterCubeCount: number;
       readonly waterInstances: readonly {
         readonly active: boolean;

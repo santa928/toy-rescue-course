@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildWorldTelemetry,
+  resolveTargetBeaconCubeCount,
   selectVehicleWithColorEffect,
 } from '../voxel-game/VoxelGameApp';
 import {
@@ -109,6 +110,15 @@ describe('advanceRenderTelemetry', () => {
       rendererVendor: 'Apple',
       vehicleDrawCalls: 7,
     });
+  });
+});
+
+describe('mission target beacon telemetry', () => {
+  it('選択車種とroute表示から実target marker数だけを公開する', () => {
+    expect(resolveTargetBeaconCubeCount('fire-truck', true, 6, 0)).toBe(6);
+    expect(resolveTargetBeaconCubeCount('fire-truck', false, 6, 0)).toBe(0);
+    expect(resolveTargetBeaconCubeCount('bulldozer', true, 6, 4)).toBe(4);
+    expect(resolveTargetBeaconCubeCount('excavator', true, 6, 4)).toBe(0);
   });
 });
 

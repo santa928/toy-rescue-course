@@ -123,6 +123,8 @@ describe('WaterAndFire', () => {
         Number((job.sprayTarget[2] - FIRE_SPRAY_TARGET_POSITION[2]).toFixed(6)),
       ]);
       expect(layout.routeBoxes.map(({ position }) => position)).toEqual(job.routeMarkers);
+      expect(layout.targetBeaconBoxes).toHaveLength(6);
+      expect(layout.guideBoxes).toHaveLength(job.routeMarkers.length + 6);
       expect(layout.starGroups).toHaveLength(6);
       expect(layout.starGroups.map(([center]) => center?.position)).toEqual(
         job.celebrationStarCenters,
@@ -131,6 +133,22 @@ describe('WaterAndFire', () => {
       expect(layout.whiteStarBoxes).toHaveLength(15);
     },
   );
+
+  it('消防目印はspray targetへ固定し、建物の屋根より上に下向き矢印を作る', () => {
+    const job = VEHICLE_JOBS['fire-truck'][2];
+    const layout = createFireJobSceneLayout(job);
+    const fireBuilding = PRODUCTION_WORLD_MAP.visualBoxes
+      .find(({ id }) => id === 'fire-building-body');
+    expect(fireBuilding).toBeDefined();
+    expect(layout.targetBeaconBoxes).toHaveLength(6);
+    if (!fireBuilding) return;
+    const roofTop = fireBuilding.position[1] + fireBuilding.scale[1] / 2;
+
+    expect(Math.max(...layout.targetBeaconBoxes.map(({ position }) => position[1])))
+      .toBeGreaterThan(roofTop);
+    expect(layout.targetBeaconBoxes.at(-1)?.position[0]).toBe(job.sprayTarget[0]);
+    expect(layout.targetBeaconBoxes.at(-1)?.position[2]).toBe(job.sprayTarget[2]);
+  });
 
   it('中央車庫から東の火災地区へ12個の非solid道しるべを置く', () => {
     expect(ROUTE_BOXES.map(({ position }) => position)).toEqual([

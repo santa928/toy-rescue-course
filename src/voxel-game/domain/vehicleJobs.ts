@@ -128,7 +128,7 @@ export interface VehicleJobRegistry {
   readonly police: readonly PoliceVehicleJobDefinition[];
 }
 
-const FIRE_ROUTE_COMMON = PRODUCTION_WORLD_MAP.landmarks.fireRouteMarkers.slice(0, 9);
+const FIRE_WINDOW_ROUTE_COMMON = PRODUCTION_WORLD_MAP.landmarks.fireRouteMarkers.slice(0, 6);
 
 /** 火災照準点の周囲へ既存数と同じ6個の成功星中心を作る。 */
 function createFireCelebrationCenters([x, y, z]: WorldPoint): readonly WorldPoint[] {
@@ -144,6 +144,20 @@ function createFireCelebrationCenters([x, y, z]: WorldPoint): readonly WorldPoin
 
 const FIRE_WINDOW_LEFT_TARGET = [22.2, 1.45, -19.6] as const;
 const FIRE_WINDOW_RIGHT_TARGET = [24.8, 1.45, -19.6] as const;
+
+/** 東道路を北上して窓の正面へ南向きに入る、12点の消防車routeを作る。 */
+function createWindowFireRoute([x, , z]: WorldPoint): readonly WorldPoint[] {
+  return [
+    ...FIRE_WINDOW_ROUTE_COMMON,
+    [24, 0.26, 0],
+    [30, 0.26, -4],
+    [30, 0.26, -12],
+    [30, 0.26, -23.5],
+    [x, 0.26, -23.5],
+    [x, 0.26, Number((z - 3.4).toFixed(6))],
+  ];
+}
+
 const EXCAVATOR_INTERACTION = {
   contactRadius: 1.6,
   forwardOffset: 1.65,
@@ -244,12 +258,7 @@ export const VEHICLE_JOBS = {
       id: 'fire-window-left',
       kind: 'fire-rescue',
       label: 'ひだりのまどをけそう',
-      routeMarkers: [
-        ...FIRE_ROUTE_COMMON,
-        [30, 0.26, -5],
-        [28, 0.26, -10],
-        [23, 0.26, -15],
-      ],
+      routeMarkers: createWindowFireRoute(FIRE_WINDOW_LEFT_TARGET),
       sprayTarget: FIRE_WINDOW_LEFT_TARGET,
       vehicleId: 'fire-truck',
     },
@@ -259,12 +268,7 @@ export const VEHICLE_JOBS = {
       id: 'fire-window-right',
       kind: 'fire-rescue',
       label: 'みぎのまどをけそう',
-      routeMarkers: [
-        ...FIRE_ROUTE_COMMON,
-        [30, 0.26, -5],
-        [29, 0.26, -10],
-        [26, 0.26, -15],
-      ],
+      routeMarkers: createWindowFireRoute(FIRE_WINDOW_RIGHT_TARGET),
       sprayTarget: FIRE_WINDOW_RIGHT_TARGET,
       vehicleId: 'fire-truck',
     },

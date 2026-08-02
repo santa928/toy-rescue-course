@@ -32,6 +32,27 @@ describe('vehicle jobs', () => {
     ))).toBe(true);
   });
 
+  it('窓火災は建物の東を迂回して北面の火を向く道しるべを持つ', () => {
+    const fireBuilding = PRODUCTION_WORLD_MAP.visualBoxes
+      .find(({ id }) => id === 'fire-building-body');
+    expect(fireBuilding).toBeDefined();
+    if (!fireBuilding) return;
+    const eastEdge = fireBuilding.position[0] + fireBuilding.scale[0] / 2;
+    const northEdge = fireBuilding.position[2] - fireBuilding.scale[2] / 2;
+
+    for (const job of VEHICLE_JOBS['fire-truck'].slice(1)) {
+      expect(job.routeMarkers.some(([x]) => x >= eastEdge + 3)).toBe(true);
+      expect(job.routeMarkers.at(-2)?.[2]).toBeLessThan(northEdge - 3);
+      expect(job.routeMarkers.at(-1)).toEqual([
+        job.sprayTarget[0],
+        0.26,
+        job.sprayTarget[2] - 3.4,
+      ]);
+      expect((job.routeMarkers.at(-1)?.[2] ?? 0) - (job.routeMarkers.at(-2)?.[2] ?? 0))
+        .toBeGreaterThan(0);
+    }
+  });
+
   it('ブルドーザーへ木・石・箱を含む3つの実在工事仕事を定義する', () => {
     const jobs = getVehicleJobs('bulldozer');
 

@@ -111,6 +111,18 @@ export function buildWorldTelemetry(
   };
 }
 
+/** 選択車種と実scene表示状態から、描画中の目的地marker数だけを返す。 */
+export function resolveTargetBeaconCubeCount(
+  vehicleId: VehicleId,
+  fireRouteVisible: boolean,
+  fireTargetBeaconCount: number,
+  bulldozerTargetMarkerCount: number,
+): number {
+  if (vehicleId === 'fire-truck') return fireRouteVisible ? fireTargetBeaconCount : 0;
+  if (vehicleId === 'bulldozer') return bulldozerTargetMarkerCount;
+  return 0;
+}
+
 /** 車種選択成功時だけ一時色runtimeへ所有車両変更を通知する。 */
 export function selectVehicleWithColorEffect(
   coordinator: VehicleMissionCoordinator,
@@ -536,6 +548,7 @@ export function VoxelGameApp(): ReactElement {
           fireLayers: fireSceneLayout.layerBoxes,
           routeMarkers: fireSceneLayout.routeBoxes,
           starGroups: fireSceneLayout.starGroups,
+          targetBeacon: fireSceneLayout.targetBeaconBoxes,
           vehicleBounds: vehicleDefinition.visualBounds,
           worldSolids: WORLD_SOLID_BOXES.map(({ id, position, rotation, scale }) => ({
             id,
@@ -567,6 +580,12 @@ export function VoxelGameApp(): ReactElement {
             : coordinatorState.selectedVehicleId === 'bulldozer'
               ? bulldozerTelemetry.starVoxelCount
               : actionTargetTelemetry.starVoxelCount,
+          targetBeaconCubeCount: resolveTargetBeaconCubeCount(
+            coordinatorState.selectedVehicleId,
+            runtime.routeVisible,
+            fireSceneLayout.targetBeaconBoxes.length,
+            0,
+          ),
           waterCubeCount: waterFrame.instances.filter(({ active }) => active).length,
           waterInstances: waterFrame.instances.map(({ active, kind, position, scale, slot }) => ({
             active,

@@ -51,11 +51,13 @@ export interface FireAnchorLayout {
 export interface FireJobSceneLayout {
   readonly fireAnchorOffset: readonly [number, number, number];
   readonly firePosition: readonly [number, number, number];
+  readonly guideBoxes: readonly VoxelBox[];
   readonly hazardBox: VoxelBox;
   readonly layerBoxes: readonly VoxelBox[];
   readonly layerPositions: readonly (readonly [number, number, number])[];
   readonly routeBoxes: readonly VoxelBox[];
   readonly starGroups: readonly (readonly VoxelBox[])[];
+  readonly targetBeaconBoxes: readonly VoxelBox[];
   readonly whiteStarBoxes: readonly VoxelBox[];
   readonly yellowStarBoxes: readonly VoxelBox[];
 }
@@ -147,6 +149,14 @@ const FIRE_LAYER_POSITION_OFFSETS = [
   [0.05, 0.05, 0.08],
   [0, 0.7, 0],
 ] as const;
+const FIRE_TARGET_BEACON_OFFSETS = [
+  [-0.72, 3.6, 0],
+  [0, 3.6, 0],
+  [0.72, 3.6, 0],
+  [-0.36, 3.05, 0],
+  [0.36, 3.05, 0],
+  [0, 2.45, 0],
+] as const;
 
 /** map座標へ局所offsetを加え、authoring精度の小数へ正規化する。 */
 function addFirePositionOffset(
@@ -158,6 +168,16 @@ function addFirePositionOffset(
     Number((anchor[1] + offset[1]).toFixed(6)),
     Number((anchor[2] + offset[2]).toFixed(6)),
   ];
+}
+
+/** 火災建物越しにも見える、spray target基準の黄色い下向き矢印を作る。 */
+export function createFireTargetBeaconBoxes(
+  sprayTarget: readonly [number, number, number],
+): readonly VoxelBox[] {
+  return FIRE_TARGET_BEACON_OFFSETS.map((offset) => ({
+    position: addFirePositionOffset(sprayTarget, offset),
+    scale: [0.52, 0.52, 0.52],
+  }));
 }
 
 /** spray targetを唯一のanchorとしてhazardと炎3層のworld配置を導出する。 */
@@ -223,14 +243,18 @@ export function createFireJobSceneLayout(job: FireVehicleJobDefinition): FireJob
     { position: anchor.layerPositions[1], scale: FIRE_LAYER_BOXES[1].scale },
     { position: anchor.layerPositions[2], scale: FIRE_LAYER_BOXES[2].scale },
   ];
+  const routeBoxes = createRouteBoxes(job.routeMarkers);
+  const targetBeaconBoxes = createFireTargetBeaconBoxes(job.sprayTarget);
   return {
     fireAnchorOffset,
     firePosition: addFirePositionOffset(FIRE_POSITION, fireAnchorOffset),
+    guideBoxes: [...routeBoxes, ...targetBeaconBoxes],
     hazardBox: anchor.hazardBox,
     layerBoxes,
     layerPositions: anchor.layerPositions,
-    routeBoxes: createRouteBoxes(job.routeMarkers),
+    routeBoxes,
     starGroups,
+    targetBeaconBoxes,
     whiteStarBoxes: starGroups.filter((_, index) => index % 2 === 1).flat(),
     yellowStarBoxes: starGroups.filter((_, index) => index % 2 === 0).flat(),
   };
@@ -664,7 +688,7 @@ export function WaterAndFire({
         <boxGeometry args={[1, 1, 1]} />
         <meshLambertMaterial color="#f2fbff" />
       </instancedMesh>
-      {enabled && visualState.routeVisible ? <StaticVoxelBatch boxes={layout.routeBoxes} color="#ffd23f" emissive="#d49d16" /> : null}
+      {enabled && visualState.routeVisible ? <StaticVoxelBatch boxes={layout.guideBoxes} color="#ffd23f" emissive="#d49d16" /> : null}
       {enabled && visualState.celebrating ? (
         <group>
           <StaticVoxelBatch boxes={layout.yellowStarBoxes} color="#ffd23f" emissive="#d49d16" />
