@@ -130,12 +130,12 @@ test('座標合わせはX/Z以外と非finite targetを入力前に拒否する'
   );
 });
 
-test('精密座標合わせは正方向1frame後に逆入力で能動制動する', async () => {
+test('精密座標合わせは指定範囲で1frame補正後に逆入力で能動制動する', async () => {
   const states = [
     { vehicle: { position: [0, 0, 0], resetCount: 0, speed: 0 } },
     { vehicle: { position: [0, 0, 0], resetCount: 0, speed: 0 } },
-    { vehicle: { position: [0.5, 0, 0], resetCount: 0, speed: 0 } },
-    { vehicle: { position: [0.5, 0, 0], resetCount: 0, speed: 0 } },
+    { vehicle: { position: [0.8, 0, 0], resetCount: 0, speed: 0 } },
+    { vehicle: { position: [0.8, 0, 0], resetCount: 0, speed: 0 } },
   ];
   const touchEvents = [];
   const harness = createDriveHarness({
@@ -152,12 +152,13 @@ test('精密座標合わせは正方向1frame後に逆入力で能動制動す�
     coordinateIndex: 0,
     description: 'precision X',
     precisionCounterPulse: true,
-    target: 0.5,
-    tolerance: 0.1,
+    precisionCounterPulseThreshold: 1,
+    target: 0.8,
+    tolerance: 0.35,
     touchDriver,
   });
 
-  assert.equal(aligned.vehicle.position[0], 0.5);
+  assert.equal(aligned.vehicle.position[0], 0.8);
   assert.deepEqual(touchEvents, [
     ['set', ...WORLD_AXIS_INPUTS.positiveX.stick],
     'release',

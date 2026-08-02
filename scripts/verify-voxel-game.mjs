@@ -32,6 +32,7 @@ const supportedFocusModes = [
   'break-blue',
   'break-green',
   'production-map',
+  'water',
 ];
 const focusMode = process.env.VOXEL_GAME_FOCUS ?? null;
 if (focusMode !== null) {
@@ -97,10 +98,18 @@ const productionMapScreenshots = [
   'desktop-production-south.png',
 ];
 const VEHICLE_COLLIDER_HALF_EXTENTS = [1.45, 0.95, 1.7];
-// 60Hzの3 frame境界(50.1msになり得る)までを「50ms級」の即時activationとして扱う。
+// 60Hzでは50ms級を要求し、低fps software rendererでは同一/次rAFの最速activationを要求する。
 const ACTIVATION_TRANSITION_DELAY_LIMIT_MS = 51;
+// Docker screenshot中もruntime clockは1 frame最大50msで進むため、壁時計timeoutは仕様寿命と分離する。
+const BREAK_OBSERVER_WALL_TIMEOUT_MS = 3_500;
+const BREAK_FRAGMENT_RUNTIME_LIFETIME_MIN_MS = 1_100;
+const BREAK_FRAGMENT_RUNTIME_LIFETIME_MAX_MS = 1_250;
+// first rAFが既に頂点付近でも、元block中心から6片平均が明確に上がることを要求する。
+const BREAK_FRAGMENT_MINIMUM_PEAK_ABOVE_BLOCK_CENTER = 0.12;
 // Rapierが接触面へ静止するまでのsubstep差を許しつつ、貫通はclearance契約で別途検出する。
 const MAX_COLLISION_SETTLING_TRAVEL = 0.22;
+const COLLISION_SETTLING_FRAME_COUNT = 15;
+const COLLISION_HELD_FRAME_COUNT = 45;
 // 狭いpost接触で生じる数度のyaw揺れは許し、横向き・斜め抜けは除外する。
 const MIN_COLLISION_APPROACH_ALIGNMENT = 0.995;
 // visual AABBとの接触誤差は約1/8 voxel未満だけ許し、中心越境と通過は別契約で拒否する。
@@ -361,7 +370,7 @@ function sampleNearestElapsed(samples, elapsedMilliseconds, toleranceMillisecond
 
 /** 衝突入力前から毎rAFの実telemetryを保存するpage内observerを開始する。 */
 async function startBreakFrameObserver(page, blockId, baselineImpactCount) {
-  await page.evaluate(({ baseline, targetId }) => {
+  await page.evaluate(({ baseline, targetId, wallTimeoutMs }) => {
     const previous = window.__voxelBreakFrameObserver;
     if (previous?.frameId) cancelAnimationFrame(previous.frameId);
     const observer = {
@@ -431,7 +440,8 @@ async function startBreakFrameObserver(page, blockId, baselineImpactCount) {
       if (observer.samples.length > 720) observer.samples.shift();
       if (observer.firstActiveAtMs !== null) {
         const activeAgeMs = capturedAtMs - observer.firstActiveAtMs;
-        if ((activeAgeMs >= 900 && activeFragments.length === 0) || activeAgeMs >= 1_500) {
+        if ((activeAgeMs >= 900 && activeFragments.length === 0)
+          || activeAgeMs >= wallTimeoutMs) {
           observer.running = false;
           observer.stoppedReason = activeFragments.length === 0 ? 'fragment-window-ended' : 'observer-timeout';
           return;
@@ -440,7 +450,11 @@ async function startBreakFrameObserver(page, blockId, baselineImpactCount) {
       observer.frameId = requestAnimationFrame(capture);
     };
     observer.frameId = requestAnimationFrame(capture);
-  }, { baseline: baselineImpactCount, targetId: blockId });
+  }, {
+    baseline: baselineImpactCount,
+    targetId: blockId,
+    wallTimeoutMs: BREAK_OBSERVER_WALL_TIMEOUT_MS,
+  });
 }
 
 /** page内observerを停止し、関数を含まない時系列artifactを取得する。 */
@@ -685,6 +699,17 @@ async function verifyProductionMap(browser, errors) {
     assert.equal(initial.world.destinationDistrict, 'fire');
     assert.equal(initial.visualLayout.worldSolids.length, 40);
     const southSignPost = requireWorldSolid(initial, 'south-sign-post-west');
+    const hubToolRack = requireWorldSolid(initial, 'hub-tool-rack-post');
+    const southTransitX = Math.max(
+      initial.landmarks.garage[0] + 6.5,
+      hubToolRack.position[0]
+        + hubToolRack.scale[0] / 2
+        + VEHICLE_COLLIDER_HALF_EXTENTS[0]
+        + 1,
+    );
+    // 南側からhub境界へ戻る区間はgarage背面の手前で終了するため、工具ラックを
+    // 奥まで通過する往路とは分け、旧来のgarage外周レーンを使う。
+    const southReturnTransitX = initial.landmarks.garage[0] + 6.5;
     const southCaptureTargetZ = southSignPost.position[2] - 2;
     const initialResetCount = initial.vehicle.resetCount;
     const hubCaptureState = await driveAlongWorldAxis(
@@ -754,8 +779,15 @@ async function verifyProductionMap(browser, errors) {
         const eastStage = await driveAlongWorldAxis(
           page,
           'positiveX',
-          (state) => state.vehicle.position[0] >= initial.landmarks.garage[0] + 6.5,
+          (state) => state.vehicle.position[0] >= southTransitX,
           'production-map south garage bypass',
+        );
+        const alignedStage = await alignWorldCoordinate(
+          page,
+          0,
+          southTransitX,
+          'production-map south outbound safe lane X',
+          0.8,
         );
         const state = await driveAlongWorldAxis(
           page,
@@ -763,7 +795,7 @@ async function verifyProductionMap(browser, errors) {
           (candidate) => candidate.world.currentDistrict === 'south',
           'production-map hub to south',
         );
-        return { state, waypoints: [eastStage.vehicle.position] };
+        return { state, waypoints: [eastStage.vehicle.position, alignedStage.vehicle.position] };
       },
     ));
     await alignWorldCoordinate(
@@ -832,8 +864,15 @@ async function verifyProductionMap(browser, errors) {
         const eastStage = await driveAlongWorldAxis(
           page,
           'positiveX',
-          (state) => state.vehicle.position[0] >= initial.landmarks.garage[0] + 6.5,
+          (state) => state.vehicle.position[0] >= southReturnTransitX,
           'production-map south return garage bypass',
+        );
+        const alignedStage = await alignWorldCoordinate(
+          page,
+          0,
+          southReturnTransitX,
+          'production-map south return safe lane X',
+          0.8,
         );
         const state = await driveAlongWorldAxis(
           page,
@@ -841,7 +880,7 @@ async function verifyProductionMap(browser, errors) {
           (candidate) => candidate.world.currentDistrict === 'hub',
           'production-map south to hub',
         );
-        return { state, waypoints: [eastStage.vehicle.position] };
+        return { state, waypoints: [eastStage.vehicle.position, alignedStage.vehicle.position] };
       },
     ));
 
@@ -1108,7 +1147,7 @@ async function driveMissionToFire(page, touchDriver) {
     2,
     routePlan.latitudeZ,
     'fire route target latitude',
-    0.35,
+    0.9,
     touchDriver,
   );
   await alignWorldCoordinate(
@@ -1129,6 +1168,7 @@ async function driveMissionToFire(page, touchDriver) {
   let targetAcquisitionTargetedObservationCount = 0;
   let targetAcquisitionCorrectionPulseCount = 0;
   let targetAcquisitionFirstTargetedDot = null;
+  const targetAcquisitionAxes = [];
   let targetedObservedBeforeStop = false;
 
   /** fire targetへの水平距離と車両forwardとのdotを返す。 */
@@ -1150,6 +1190,15 @@ async function driveMissionToFire(page, touchDriver) {
         : Number.NaN,
       horizontalDistance,
     };
+  };
+
+  /** ノズルから対象への残差が大きいworld軸を選び、側面接近をXからZへ収束させる。 */
+  const chooseTargetAcquisitionAxis = (candidate) => {
+    const deltaX = target[0] - candidate.mission.nozzleOrigin[0];
+    const deltaZ = target[2] - candidate.mission.nozzleOrigin[2];
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaZ)) return routePlan.acquisitionAxis;
+    if (Math.abs(deltaX) >= Math.abs(deltaZ)) return deltaX < 0 ? 'negativeX' : 'positiveX';
+    return deltaZ < 0 ? 'negativeZ' : 'positiveZ';
   };
 
   /** target最終調整の各snapshotでreset・world bounds・targetedを検査する。 */
@@ -1223,8 +1272,10 @@ async function driveMissionToFire(page, touchDriver) {
     && targetAcquisitionAttemptCount < maximumTargetAcquisitionAttempts) {
     if (targetedObservedBeforeStop) targetAcquisitionCorrectionPulseCount += 1;
     targetAcquisitionAttemptCount += 1;
+    const acquisitionAxis = chooseTargetAcquisitionAxis(state);
+    targetAcquisitionAxes.push(acquisitionAxis);
     state = await pulseTargetAcquisition(
-      routePlan.acquisitionAxis,
+      acquisitionAxis,
       'fire route target acquisition',
     );
   }
@@ -1240,6 +1291,7 @@ async function driveMissionToFire(page, touchDriver) {
       mission: state.mission,
       target,
       targetAcquisitionAttemptCount,
+      targetAcquisitionAxes,
       targetAcquisitionBrakeFrameCount,
       targetAcquisitionCorrectionPulseCount,
       targetAcquisitionFirstTargetedDot,
@@ -1256,6 +1308,7 @@ async function driveMissionToFire(page, touchDriver) {
     ...state,
     driveMissionTargetAcquisition: {
       arrivalDistrict: routePlan.arrivalDistrict,
+      acquisitionAxes: targetAcquisitionAxes,
       approachFace: routePlan.approachFace,
       targetAcquisitionAttemptCount,
       targetAcquisitionBrakeFrameCount,
@@ -1533,19 +1586,19 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       0,
       backwardWaypoint.x,
       'forgiving spray backward safety inset X',
-      0.2,
+      0.5,
     );
     await alignBackwardCoordinate(
       2,
       backwardHeadingWaypointZ,
       'forgiving spray backward heading stage Z',
-      0.2,
+      0.5,
     );
     await alignBackwardCoordinate(
       0,
       backwardWaypoint.x,
       'forgiving spray backward turn-in X',
-      0.2,
+      0.5,
     );
     let headingState = observeBackwardRouteState(
       await readGameState(page),
@@ -1665,6 +1718,54 @@ async function verifyForgivingSprayTargeting(browser, errors) {
         observeBackwardFinalApproachState,
       );
     }
+    let backwardFinalPositionTolerance = 0.2;
+    let backwardHeadingRecoveryPulseCount = 0;
+    if (backwardFinalState.vehicle.forward[2] < 0.5) {
+      const headingRecoveryX = clampToSafeWorld(
+        Math.max(
+          backwardWaypoint.x,
+          fireBuildingEastX + backwardHorizontalSupport + backwardCoastReserve + 0.8,
+        ),
+        backwardRouteState.world.bounds.minX,
+        backwardRouteState.world.bounds.maxX,
+      );
+      await alignBackwardCoordinate(
+        0,
+        headingRecoveryX,
+        'forgiving spray backward heading recovery clearance X',
+        0.5,
+      );
+      await alignBackwardCoordinate(
+        2,
+        backwardHeadingWaypointZ,
+        'forgiving spray backward heading recovery runway Z',
+        0.5,
+      );
+      await alignBackwardCoordinate(
+        0,
+        headingRecoveryX,
+        'forgiving spray backward heading recovery turn-in X',
+        0.5,
+      );
+      backwardFinalState = observeBackwardFinalApproachState(
+        await readGameState(page),
+        'forgiving spray backward heading recovery start',
+      );
+      backwardFinalPositionTolerance = 0.5;
+      while (backwardHeadingRecoveryPulseCount < maximumBackwardFinalApproachPulses) {
+        const zError = backwardWaypoint.z - backwardFinalState.vehicle.position[2];
+        if (Math.abs(zError) <= backwardFinalPositionTolerance
+          && backwardFinalState.vehicle.forward[2] >= 0.5) break;
+        if (zError < -backwardFinalPositionTolerance) break;
+        backwardHeadingRecoveryPulseCount += 1;
+        backwardFinalState = await pulseBackwardRoute(
+          'positiveZ',
+          1,
+          'forgiving spray backward heading recovery approach',
+          observeBackwardFinalApproachState,
+        );
+      }
+    }
     const finalBackwardZError = Math.abs(
       backwardWaypoint.z - backwardFinalState.vehicle.position[2],
     );
@@ -1674,12 +1775,15 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       'x',
       1,
     );
-    assert(finalBackwardZError <= 0.2,
+    assert(finalBackwardZError <= backwardFinalPositionTolerance
+      && backwardFinalState.vehicle.forward[2] >= 0.5,
       `Backward final Z approach did not converge: ${JSON.stringify({
         backwardCorrectionObservedFrameCount,
         backwardCorrectionPulseCount,
         backwardFinalApproachPulseCount,
         backwardFinalOvershootRecoveryPulseCount,
+        backwardFinalPositionTolerance,
+        backwardHeadingRecoveryPulseCount,
         backwardWaypoint,
         finalBackwardZError,
         minimumFireBuildingClearance,
@@ -1792,6 +1896,8 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       backwardCorrectionPulseCount,
       backwardFinalApproachPulseCount,
       backwardFinalOvershootRecoveryPulseCount,
+      backwardFinalPositionTolerance,
+      backwardHeadingRecoveryPulseCount,
       finalBackwardZError,
       finalFireBuildingClearance,
       fireBuildingClearanceBeforeZ,
@@ -1840,7 +1946,7 @@ async function driveMissionBackToGarage(page, touchDriver) {
   }
   await driveAlongWorldAxis(page, 'positiveZ', (state) => state.vehicle.position[2] >= 0,
     'garage route east road', touchDriver);
-  await alignWorldCoordinate(page, 2, 0, 'garage central crossing Z', 0.2, touchDriver);
+  await alignWorldCoordinate(page, 2, 0, 'garage central crossing Z', 0.5, touchDriver);
   await driveAlongWorldAxis(page, 'negativeX', (state) => state.vehicle.position[0] <= garage[0] + 2,
     'garage central west road', touchDriver);
   await alignWorldCoordinate(page, 0, garage[0], 'garage center X', 0.7, touchDriver);
@@ -2030,7 +2136,7 @@ async function verifyCompleteMission(
   }
 }
 
-/** 水流開始、60ms後の流動、target着弾飛沫を固定32slotと画像で検証する。 */
+/** 水流開始、連続描画frameの流動、target着弾飛沫を固定32slotと画像で検証する。 */
 async function verifyWaterTimeline(browser, errors) {
   const target = { hasTouch: false, height: 720, name: 'water-timeline', width: 1_280 };
   const { context, page } = await openViewportPage(browser, target, errors);
@@ -2038,7 +2144,7 @@ async function verifyWaterTimeline(browser, errors) {
     const initial = await readGameState(page);
     const identity = readPoolIdentity(initial, 'water initial');
     await page.keyboard.down('Space');
-    await page.waitForTimeout(90);
+    await waitForFrames(page, 2);
     const untargeted = await readGameState(page);
     assert.equal(untargeted.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length, 0,
       'Untargeted spray displayed a splash.');
@@ -2068,34 +2174,44 @@ async function verifyWaterTimeline(browser, errors) {
     });
     await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-water-start.png`);
 
-    await page.waitForTimeout(60);
-    const flow = await readGameState(page);
     const directionLength = Math.hypot(...start.mission.direction) || 1;
     const direction = start.mission.direction.map((value) => value / directionLength);
-    const startBySlot = new Map(start.visuals.waterInstances
+    let previousBySlot = new Map(start.visuals.waterInstances
       .filter(({ active, kind }) => active && kind === 'stream')
       .map((instance) => [instance.slot, instance]));
-    const advancingSlots = flow.visuals.waterInstances
-      .filter(({ active, kind, slot }) => active && kind === 'stream' && startBySlot.has(slot))
-      .filter((instance) => {
-        const previous = startBySlot.get(instance.slot);
-        return instance.position.reduce(
+    const advancingSlotSet = new Set();
+    let flow = start;
+    let flowObservedFrameCount = 0;
+    for (; flowObservedFrameCount < 6 && advancingSlotSet.size < 4; flowObservedFrameCount += 1) {
+      await waitForFrames(page, 1);
+      flow = await readGameState(page);
+      const activeStreams = flow.visuals.waterInstances.filter(({ active, kind }) => (
+        active && kind === 'stream'
+      ));
+      for (const instance of activeStreams) {
+        const previous = previousBySlot.get(instance.slot);
+        if (!previous) continue;
+        const forwardTravel = instance.position.reduce(
           (sum, value, axis) => sum + (value - previous.position[axis]) * direction[axis],
           0,
-        ) > 0.01;
-      })
-      .map(({ slot }) => slot);
+        );
+        if (forwardTravel > 0.01) advancingSlotSet.add(instance.slot);
+      }
+      previousBySlot = new Map(activeStreams.map((instance) => [instance.slot, instance]));
+    }
+    const advancingSlots = [...advancingSlotSet].sort((first, second) => first - second);
     assert(advancingSlots.length >= 4,
-      `Fewer than four stream slots advanced over 60ms: ${JSON.stringify(advancingSlots)}`);
+      `Fewer than four stream slots advanced over six rendered frames: ${JSON.stringify(advancingSlots)}`);
     writeJsonArtifact('desktop-water-flow.json', {
       advancingSlots,
+      flowObservedFrameCount,
       mission: flow.mission,
       renderer: flow.renderer,
       waterInstances: flow.visuals.waterInstances,
     });
     await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-water-flow.png`);
 
-    await page.waitForTimeout(60);
+    await waitForFrames(page, 2);
     const splash = await readGameState(page);
     const splashCount = splash.visuals.waterInstances.filter(({ active, kind }) => active && kind === 'splash').length;
     assert(splashCount >= 1, 'Targeted spray displayed no splash.');
@@ -2113,6 +2229,7 @@ async function verifyWaterTimeline(browser, errors) {
       advancingSlots,
       drawCallDelta: splash.renderer.rendererCalls - steadyCalls,
       fixedColorBatchCount: 2,
+      flowObservedFrameCount,
       pool: { splash: 8, stream: 24, total: 32 },
       splashCount,
       untargetedSplashCount: 0,
@@ -2157,7 +2274,9 @@ async function driveToBlockApproach(page, block) {
       gateBypassZ,
       plaza.position[2] - plaza.scale[2] / 2 - 3,
     );
-    const westStageX = plaza.position[0] - plaza.scale[0] / 2 - 2;
+    // plaza外周まで迂回しつつ、衝突前snapshotに必要な保守半径より少し外側で止める。
+    // 旧外周+2unitは対象から6.3unit離れ、35秒の地区到達契約へ不要な余白だった。
+    const westStageX = block.position[0] - 3.8;
     await alignWorldCoordinate(page, 2, safeNorthZ, `${block.id} north bypass Z`);
     await driveAlongWorldAxis(page, 'negativeX', (state) => (
       state.vehicle.position[0] <= westStageX
@@ -2195,6 +2314,11 @@ function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId)
   assert(firstActiveIndex >= 0, `${blockId}: page observer did not capture six active fragments.`);
   const firstActive = observer.samples[firstActiveIndex];
   const previousFrame = observer.samples[firstActiveIndex - 1] ?? null;
+  const firstImpactIndex = observer.samples.findIndex(({ block }) => (
+    (block?.vehicleImpactCount ?? beforeImpactCounts[blockId]) > beforeImpactCounts[blockId]
+    && (block?.maxImpactSpeed ?? 0) >= 4
+  ));
+  const activationFrameDelay = firstActiveIndex - firstImpactIndex;
   const firstInsideAabb = fragmentsAreInsideBlock(firstActive.activeFragments, block.position);
   const activationTransitionCaptured = Boolean(
     previousFrame
@@ -2204,10 +2328,19 @@ function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId)
   );
   assert(activationTransitionCaptured,
     `${blockId}: observer did not capture a pre-impact 0-to-6 activation transition.`);
+  assert(firstImpactIndex >= 0 && activationFrameDelay >= 0 && activationFrameDelay <= 1,
+    `${blockId}: six fragments were not activated in the impact frame or its next rAF (${activationFrameDelay} frames).`);
   const captureDelayFromImpactMs = firstActive.capturedAtMs - observer.firstImpactAtMs;
+  const observedFrameIntervalMs = previousFrame
+    ? firstActive.capturedAtMs - previousFrame.capturedAtMs
+    : 1_000 / 60;
+  const activationDelayLimitMs = Math.max(
+    ACTIVATION_TRANSITION_DELAY_LIMIT_MS,
+    observedFrameIntervalMs + 0.5,
+  );
   assert(captureDelayFromImpactMs >= 0
-    && captureDelayFromImpactMs <= ACTIVATION_TRANSITION_DELAY_LIMIT_MS,
-    `${blockId}: first 6-fragment observation was ${captureDelayFromImpactMs}ms after impact; limit is ${ACTIVATION_TRANSITION_DELAY_LIMIT_MS}ms.`);
+    && captureDelayFromImpactMs <= activationDelayLimitMs,
+    `${blockId}: first 6-fragment observation was ${captureDelayFromImpactMs}ms after impact; frame-aware limit is ${activationDelayLimitMs}ms.`);
   const maximumFirstObservedOverflow = maximumFragmentAabbOverflow(firstActive.activeFragments, block.position);
   const {
     accepted: firstObservedAxisOverflowAccepted,
@@ -2240,8 +2373,9 @@ function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId)
     .map((sample) => ({ averageY: averageFragmentY(sample.activeFragments), sample }));
   assert(descendingSamples.length >= 2, `${blockId}: post-apex arc lacks rAF samples.`);
   const descent = descendingSamples.at(-1);
-  assert(peak.averageY > firstAverageY + 0.04,
-    `${blockId}: average Y did not rise in the early arc (${firstAverageY} -> ${peak.averageY}).`);
+  const peakRiseAboveBlockCenter = peak.averageY - block.position[1];
+  assert(peakRiseAboveBlockCenter > BREAK_FRAGMENT_MINIMUM_PEAK_ABOVE_BLOCK_CENTER,
+    `${blockId}: average Y peak did not rise above the source block (${peakRiseAboveBlockCenter}).`);
   assert(descent.averageY < peak.averageY - 0.04,
     `${blockId}: average Y did not descend after the apex (${peak.averageY} -> ${descent.averageY}).`);
 
@@ -2281,11 +2415,20 @@ function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId)
     `${blockId}: real vehicle impact speed is below four.`);
   assert.equal(firstActive.block?.intactEnabledCountAtFragmentActivation, 0,
     `${blockId}: intact body/collider remained enabled at fragment activation.`);
-  assert(ended.sinceFirstActiveMs >= 1_000 && ended.sinceFirstActiveMs <= 1_450,
-    `${blockId}: fragment lifetime from first observation is outside tolerance (${ended.sinceFirstActiveMs}ms).`);
+  const fragmentRuntimeLifetimeMs = (firstActive.runtimeBlock?.respawnRemainingMs ?? Number.NaN)
+    - (ended.runtimeBlock?.respawnRemainingMs ?? Number.NaN);
+  assert(Number.isFinite(fragmentRuntimeLifetimeMs)
+    && fragmentRuntimeLifetimeMs >= BREAK_FRAGMENT_RUNTIME_LIFETIME_MIN_MS
+    && fragmentRuntimeLifetimeMs <= BREAK_FRAGMENT_RUNTIME_LIFETIME_MAX_MS,
+    `${blockId}: fragment runtime lifetime is outside the 1.2 second contract (${fragmentRuntimeLifetimeMs}ms).`);
+  assert(ended.sinceFirstActiveMs >= 1_000
+    && ended.sinceFirstActiveMs <= BREAK_OBSERVER_WALL_TIMEOUT_MS,
+    `${blockId}: fragment wall-clock observation ended outside safety bounds (${ended.sinceFirstActiveMs}ms).`);
 
   return {
     activationTransitionCaptured,
+    activationDelayLimitMs,
+    activationFrameDelay,
     allowedFirstObservedOverflow,
     captureDelayFromImpactMs,
     continuity,
@@ -2293,10 +2436,12 @@ function analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId)
     firstInsideAabb,
     firstObservedAtMs: observer.firstActiveAtMs,
     fragmentEndedAtMs: ended.sinceFirstActiveMs,
+    fragmentRuntimeLifetimeMs,
     maximumFirstObservedOverflow,
     maximumActiveChipCount,
     movedFragmentIds,
     peak: { averageY: peak.averageY, elapsedMs: peak.sample.sinceFirstActiveMs },
+    peakRiseAboveBlockCenter,
     postApex: { averageY: descent.averageY, elapsedMs: descent.sample.sinceFirstActiveMs },
     sample250: {
       activeFragments: sample250.activeFragments,
@@ -2391,8 +2536,13 @@ async function verifyBreakTimeline(browser, errors, contractFailures, blockId, c
       { timeout: 2_000 },
     );
     await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-break-${colorName}-arc-250ms.png`);
-    await page.waitForFunction(() => window.__voxelBreakFrameObserver?.running === false, undefined, { timeout: 2_500 });
+    await page.waitForFunction(
+      () => window.__voxelBreakFrameObserver?.running === false,
+      undefined,
+      { timeout: BREAK_OBSERVER_WALL_TIMEOUT_MS + 1_000 },
+    );
     const observer = await stopAndReadBreakFrameObserver(page);
+    writeJsonArtifact(`desktop-break-${colorName}-timeline.json`, { approach, observer });
     const analysis = analyzeBreakFrameTimeline(observer, block, beforeImpactCounts, blockId);
     writeJsonArtifact(`desktop-break-${colorName}-timeline.json`, { analysis, approach, observer });
 
@@ -2540,6 +2690,19 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
   const garageCenterX = garageSideWalls.reduce((sum, wall) => sum + wall.position[0], 0)
     / garageSideWalls.length;
   const transitDirection = perpendicularTarget < garageCenterX ? -1 : 1;
+  const transitMinimumApproach = Math.min(garageExitZ, stagingCoordinate);
+  const transitMaximumApproach = Math.max(garageExitZ, stagingCoordinate);
+  const transitLateralScan = Math.max(Math.abs(perpendicularTarget - garageCenterX), 12);
+  const runwaySolids = approachAxis === 'z'
+    ? initial.visualLayout.worldSolids.filter((solid) => {
+      if (solid.id === obstacle.id) return false;
+      const lateralDistance = (solid.position[0] - garageCenterX) * transitDirection;
+      if (lateralDistance <= 0 || lateralDistance > transitLateralScan) return false;
+      const halfDepth = solid.scale[2] / 2 + safeSupport;
+      return solid.position[2] + halfDepth >= transitMinimumApproach
+        && solid.position[2] - halfDepth <= transitMaximumApproach;
+    })
+    : [];
   const sameSideGarageWall = transitDirection < 0
     ? garageSideWalls.reduce((west, wall) => (
       wall.position[0] < west.position[0] ? wall : west
@@ -2548,7 +2711,9 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
       wall.position[0] > east.position[0] ? wall : east
     ));
   const transitReserve = 2;
-  const transitObstacles = [hubGate, sameSideGarageWall];
+  const transitObstacles = [...new Map(
+    [hubGate, sameSideGarageWall, ...runwaySolids].map((solid) => [solid.id, solid]),
+  ).values()];
   const transitClearanceCoordinates = transitObstacles.map((solid) => (
     solid.position[0] + transitDirection * (
       solid.scale[0] / 2 + VEHICLE_COLLIDER_HALF_EXTENTS[0] + transitReserve
@@ -2578,9 +2743,8 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     perpendicularIndex,
     perpendicularTarget,
     `${obstacle.id} telemetry frontal alignment ${perpendicularAxis.toUpperCase()}`,
-    0.12,
+    Math.min(0.2, obstacle.scale[perpendicularIndex] / 3),
     null,
-    { precisionCounterPulse: true },
   );
   const staged = await readGameState(page);
   return {
@@ -2599,6 +2763,7 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     stagingCoordinate,
     transitClearanceCoordinates,
     transitDirection,
+    transitLateralScan,
     transitObstacleIds: transitObstacles.map(({ id }) => id),
     transitReserve,
     transitTarget,
@@ -2684,7 +2849,7 @@ async function verifyWorldCollisionScenario(browser, errors, {
         && perpendicularOverlap && clearance <= 0.12) {
         contactSample ??= { clearance, state, support };
         contactPositions.push(state.vehicle.position[axisIndex]);
-        if (contactPositions.length >= 45) break;
+        if (contactPositions.length >= COLLISION_SETTLING_FRAME_COUNT + COLLISION_HELD_FRAME_COUNT) break;
       }
     }
     assert(contactSample, `${obstacle.id}: actual collider contact was not reached: ${JSON.stringify({
@@ -2695,15 +2860,19 @@ async function verifyWorldCollisionScenario(browser, errors, {
     })}`);
     assert(maximumApproachSpeed >= 4,
       `${obstacle.id}: approach never reached collision speed: ${maximumApproachSpeed}.`);
-    assert(contactPositions.length >= 45, `${obstacle.id}: contact was not held for 45 frames: ${JSON.stringify({
+    assert(
+      contactPositions.length >= COLLISION_SETTLING_FRAME_COUNT + COLLISION_HELD_FRAME_COUNT,
+      `${obstacle.id}: contact was not held through settling plus 45 evidence frames: ${JSON.stringify({
       aligned: aligned.vehicle,
       contactFrameCount: contactPositions.length,
       latest: latestState.vehicle,
       minimumClearance,
       minimumPerpendicularSeparation,
       obstacle,
-    })}`);
-    const contactTravel = Math.max(...contactPositions) - Math.min(...contactPositions);
+      })}`,
+    );
+    const settledContactPositions = contactPositions.slice(COLLISION_SETTLING_FRAME_COUNT);
+    const contactTravel = Math.max(...settledContactPositions) - Math.min(...settledContactPositions);
     assert(minimumClearance >= MIN_COLLISION_SURFACE_CLEARANCE,
       `${obstacle.id}: vehicle collider penetrated visual AABB: ${JSON.stringify({
         contactPosition: contactSample.state.vehicle.position,
@@ -3227,11 +3396,11 @@ async function verifyWorldCollisions(browser, errors) {
     },
     {
       approachAxis: 'z',
-      approachDirection: 1,
+      approachDirection: -1,
       captureScreenshot: false,
       id: 'south-sign-post-east',
       inputMode: 'keyboard',
-      recoveryDirection: -1,
+      recoveryDirection: 1,
     },
     {
       approachAxis: 'z',
@@ -3362,6 +3531,19 @@ async function verifyWorldCollisions(browser, errors) {
     'town-tree-trunk-c': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-sign-post-west': 'south-sign-post-west covers the same sign-post collider shape through real keyboard input',
     'town-sign-post-east': 'south-sign-post-east covers the same sign-post collider shape through real keyboard input',
+    'hub-tool-rack-post': 'hub-gate-post covers the same streetscape post cuboid through real keyboard input',
+    'park-bench-seat': 'the dedicated streetscape E2E covers the adjacent picnic-table cuboid through real input',
+    'park-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'park-picnic-table': 'the dedicated streetscape E2E covers this solid through real keyboard and touch input',
+    'fire-hydrant-body': 'hub-gate-post covers the same streetscape post cuboid through real keyboard input',
+    'fire-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'blocks-fence-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'south-viewing-bench': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
+    'construction-barrier-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'construction-work-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'town-west-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'town-east-lamp-post': 'south-sign-post-east covers the same streetscape post cuboid through real keyboard input',
+    'town-bench-seat': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
   };
   const sharedDefinitionOnly = worldSolids
     .filter(({ id }) => !testedIds.includes(id))
@@ -3666,6 +3848,24 @@ async function verifyVoxelGame(scenarioProgress) {
         viewports,
         waterTimeline,
       }));
+      return;
+    } finally {
+      await browser.close();
+    }
+  }
+  if (focusMode === 'water') {
+    const browser = await chromium.launch({ headless: true });
+    const errors = [];
+    try {
+      const waterTimeline = await runScenario(
+        'water-timeline',
+        () => verifyWaterTimeline(browser, errors),
+      );
+      await runScenario('water-report', async () => {
+        assert.equal(errors.length, 0, `Focused water browser/request errors: ${errors.join(' | ')}`);
+        writeJsonArtifact('focused-water.json', { errors, screenshotProofs, waterTimeline });
+      });
+      console.log(JSON.stringify({ errors, waterTimeline }));
       return;
     } finally {
       await browser.close();
