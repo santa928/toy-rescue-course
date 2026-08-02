@@ -437,7 +437,7 @@ git log --oneline origin/main..HEAD
 
 Expected: secret 0、意図外ファイル0、whitespace error 0、日本語の論理commitのみ。
 
-- [ ] **Step 7: mainをpushする**
+- [x] **Step 7: mainをpushする**
 
 ```sh
 git push origin main
@@ -445,7 +445,7 @@ git push origin main
 
 Expected: remote更新成功。PRは作成しない。
 
-- [ ] **Step 8: remote SHA・Actions／Pages・公開URLを確認する**
+- [x] **Step 8: remote SHA・Actions／Pages・公開URLを確認する**
 
 ```sh
 git ls-remote --heads origin main
@@ -461,7 +461,7 @@ Pages workflowの成功を待ち、公開URLをcache-busting付きで検証す�
 
 公開gameで3入口、7地区count、代表地区装飾、console/page/request error 0を確認する。remote SHAがlocal HEADと一致し、ahead/behindが`0 0`になるまで完了扱いにしない。
 
-- [ ] **Step 9: goalをcompleteにする**
+- [x] **Step 9: goalをcompleteにする**
 
 全受け入れ条件と公開確認が完了した後だけ`update_goal(status="complete")`を呼び、最終報告へcommit、remote SHA、Pages run、公開URL、unit／E2E／GPU実測値を記載する。
 
@@ -472,3 +472,4 @@ Pages workflowの成功を待ち、公開URLをcache-busting付きで検証す�
 - canonical full: 全scenario成功、33 screenshot proofs、contract failure 0、browser error 0/0/0。
 - fresh unit／build: Vitest 47 files／453 tests、drive harness 8/8、657 modules。game 158,103 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytes。
 - Apple M4: 全5車種median 59.88fps、p10 55.87〜57.47fps、scene 29〜32 calls、vehicle 7 calls、console error 0。
+- 初回公開: commit `ad5619b`、Pages run `30738942984` success、remote ahead／behind `0/0`。公開3入口と7地区×3 viewportの21組を再検証しerror 0。

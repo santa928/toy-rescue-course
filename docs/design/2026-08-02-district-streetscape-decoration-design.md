@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-02
 
-**状態:** 実装・ローカル検証済み（GitHub Pages公開待ち）
+**状態:** 実装・検証・GitHub Pages公開済み
 
 **対象:** 7地区の床色・模様、入口サイン、街角装飾、物理、telemetry、3 viewport、性能再認証
 
@@ -204,3 +204,5 @@ Apple M4／ANGLE Metal、1280×720、2秒warm-up＋12秒probeの実測は次の�
 | パトカー | 59.88 | 56.82 | 59.98 | 32 |
 
 median 55fps、p10 45fps、scene 34 calls、static collider 40件の全上限を満たしたため、性能未達時の削減策とchunk streaming／LODは発動しない。
+
+初回公開commit `ad5619b` はremote `main`と一致し、ahead／behind `0/0`を確認した。GitHub Pages run `30738942984`はunit、base付きbuild、artifact、deployがすべて成功した。公開URLへのproduction smokeはroot、`/voxel-game.html`、`/vehicle-lab.html`の3入口を通過し、公開配信物への街角E2Eも7地区×3 viewportの21組、browser error 0で完走した。
