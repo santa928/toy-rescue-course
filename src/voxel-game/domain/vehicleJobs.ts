@@ -1,5 +1,6 @@
 import type {
   BulldozerDebrisLandmarkDefinition,
+  WorldBoxDefinition,
   WorldDistrictId,
   WorldPoint,
 } from '../scene/productionWorldMap';
@@ -7,6 +8,7 @@ import {
   PRODUCTION_WORLD_MAP,
   resolveWorldDistrict,
 } from '../scene/productionWorldMap';
+import { flattenDecorationBoxes } from '../scene/worldStreetscape';
 import type {
   VehicleId,
   VehicleMissionId,
@@ -472,6 +474,48 @@ function hasValidActionTargetInteraction(interaction: ActionTargetInteraction): 
     && interaction.maximumSpeed >= interaction.minimumSpeed;
 }
 
+/** 全仕事unionから街角solidとの距離を測る円形targetを一意なID付きで列挙する。 */
+function getVehicleJobClearanceTargets(job: VehicleJobDefinition): readonly {
+  readonly id: string;
+  readonly position: WorldPoint;
+  readonly radius: number;
+}[] {
+  if (job.kind === 'fire-rescue') {
+    return [{ id: 'sprayTarget', position: job.sprayTarget, radius: 0 }];
+  }
+  if (job.kind === 'debris-clearance') return job.debris;
+  return job.targets;
+}
+
+/** 15仕事の実target円と新しいsolid装飾boxのXZ安全余白を検証する。 */
+export function validateDecorationClearanceFromVehicleJobs(
+  jobs: readonly VehicleJobDefinition[],
+  decorationBoxes: readonly WorldBoxDefinition[],
+  clearance = 1.5,
+): readonly string[] {
+  const errors: string[] = [];
+  const safeClearance = Number.isFinite(clearance) && clearance >= 0 ? clearance : 1.5;
+
+  for (const box of decorationBoxes) {
+    if (!box.solid) continue;
+    const halfX = box.scale[0] / 2;
+    const halfZ = box.scale[2] / 2;
+    for (const job of jobs) {
+      for (const target of getVehicleJobClearanceTargets(job)) {
+        const separationX = Math.max(Math.abs(target.position[0] - box.position[0]) - halfX, 0);
+        const separationZ = Math.max(Math.abs(target.position[2] - box.position[2]) - halfZ, 0);
+        if (Math.hypot(separationX, separationZ) < target.radius + safeClearance) {
+          errors.push(
+            `Decoration solid ${box.id} overlaps vehicle job ${job.id} target ${target.id}`,
+          );
+        }
+      }
+    }
+  }
+
+  return errors;
+}
+
 /** registryの件数、ID、文言、車種、対象数、座標契約を決定的に列挙する。 */
 export function validateVehicleJobs(registry: VehicleJobRegistry): readonly string[] {
   const errors: string[] = [];
@@ -583,6 +627,11 @@ export function validateVehicleJobs(registry: VehicleJobRegistry): readonly stri
       }
     }
   }
+  const allJobs = vehicleIds.flatMap((vehicleId) => registry[vehicleId]);
+  errors.push(...validateDecorationClearanceFromVehicleJobs(
+    allJobs,
+    flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),
+  ));
   return errors;
 }
 

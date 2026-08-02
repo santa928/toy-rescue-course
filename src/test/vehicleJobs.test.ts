@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   VEHICLE_JOBS,
   getVehicleJobs,
+  validateDecorationClearanceFromVehicleJobs,
   validateVehicleJobs,
   type VehicleJobRegistry,
 } from '../voxel-game/domain/vehicleJobs';
-import { resolveWorldDistrict } from '../voxel-game/scene/productionWorldMap';
+import {
+  PRODUCTION_WORLD_MAP,
+  resolveWorldDistrict,
+  type WorldBoxDefinition,
+} from '../voxel-game/scene/productionWorldMap';
+import { flattenDecorationBoxes } from '../voxel-game/scene/worldStreetscape';
 
 describe('vehicle jobs', () => {
   it('消防車へ3つの実在火災仕事を定義する', () => {
@@ -126,6 +132,32 @@ describe('vehicle jobs', () => {
     expect(new Set(jobs.map(({ id }) => id)).size).toBe(jobs.length);
     expect(jobs.every(({ label }) => label.length > 0 && label.length <= 18)).toBe(true);
     expect(validateVehicleJobs(VEHICLE_JOBS)).toEqual([]);
+  });
+
+  it('15仕事の実targetから新solidを1.5unit離し、非solidは通過可能にする', () => {
+    const jobs = [
+      ...VEHICLE_JOBS['fire-truck'],
+      ...VEHICLE_JOBS.bulldozer,
+      ...VEHICLE_JOBS.excavator,
+      ...VEHICLE_JOBS.ambulance,
+      ...VEHICLE_JOBS.police,
+    ];
+    const decorationBoxes = flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters);
+    const patient = VEHICLE_JOBS.ambulance[0].targets[0];
+    const blocker = {
+      color: '#86552f',
+      id: 'test-job-blocker',
+      position: patient.position,
+      scale: [0.6, 1.8, 0.6],
+      solid: true,
+    } as const satisfies WorldBoxDefinition;
+    const passThrough = { ...blocker, id: 'test-job-pass-through', solid: false } as const;
+
+    expect(validateDecorationClearanceFromVehicleJobs(jobs, decorationBoxes)).toEqual([]);
+    expect(validateDecorationClearanceFromVehicleJobs(jobs, [blocker])).toEqual([
+      'Decoration solid test-job-blocker overlaps vehicle job patient-pond target patient-pond-a',
+    ]);
+    expect(validateDecorationClearanceFromVehicleJobs(jobs, [passThrough])).toEqual([]);
   });
 
   it('未知の車種IDを初期消防車の仕事へ安全に戻す', () => {

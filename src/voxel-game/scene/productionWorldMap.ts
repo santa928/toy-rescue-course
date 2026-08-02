@@ -173,9 +173,9 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     },
     {
       boxes: [
-        { color: '#86552f', id: 'park-lamp-post', position: [5.2, 1.25, -28], scale: [0.5, 2.3, 0.5], solid: true },
-        { color: '#f2c94c', id: 'park-lamp-light', position: [5.2, 2.55, -28], scale: [0.9, 0.45, 0.9], solid: false },
-        { color: '#3f7f3a', id: 'park-hedge', position: [5.2, 0.45, -29.2], scale: [1.4, 0.8, 0.55], solid: false },
+        { color: '#86552f', id: 'park-lamp-post', position: [-5.2, 1.25, -28], scale: [0.5, 2.3, 0.5], solid: true },
+        { color: '#f2c94c', id: 'park-lamp-light', position: [-5.2, 2.55, -28], scale: [0.9, 0.45, 0.9], solid: false },
+        { color: '#3f7f3a', id: 'park-hedge', position: [-5.2, 0.45, -29.2], scale: [1.4, 0.8, 0.55], solid: false },
       ],
       districtId: 'park',
       id: 'park-lamp-and-hedge',
@@ -221,10 +221,10 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     },
     {
       boxes: [
-        { color: '#86552f', id: 'blocks-fence-post', position: [-16, 1, -7], scale: [0.6, 1.8, 0.6], solid: true },
-        { color: '#e24b3f', id: 'blocks-entry-cone-red', position: [-18, 0.4, -7], scale: [0.7, 0.75, 0.7], solid: false },
-        { color: '#f2c94c', id: 'blocks-entry-cone-yellow', position: [-19.2, 0.4, -7], scale: [0.7, 0.75, 0.7], solid: false },
-        { color: '#f1efe6', id: 'blocks-fence-board', position: [-16, 1.25, -7], scale: [0.4, 0.35, 2.6], solid: false },
+        { color: '#86552f', id: 'blocks-fence-post', position: [-16, 1, -9], scale: [0.6, 1.8, 0.6], solid: true },
+        { color: '#e24b3f', id: 'blocks-entry-cone-red', position: [-18, 0.4, -9], scale: [0.7, 0.75, 0.7], solid: false },
+        { color: '#f2c94c', id: 'blocks-entry-cone-yellow', position: [-19.2, 0.4, -9], scale: [0.7, 0.75, 0.7], solid: false },
+        { color: '#f1efe6', id: 'blocks-fence-board', position: [-16, 1.25, -8.7], scale: [0.4, 0.35, 2.6], solid: false },
       ],
       districtId: 'blocks',
       id: 'blocks-entry-fence',
