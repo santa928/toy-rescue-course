@@ -422,7 +422,7 @@ git add README.md docs/design/2026-08-02-district-streetscape-decoration-design.
 git commit -m "地区床と街角装飾の検証結果を記録する"
 ```
 
-- [ ] **Step 6: push前security gateを実行する**
+- [x] **Step 6: push前security gateを実行する**
 
 `pre-push-security-check`に従い、少なくとも次を確認する。
 
