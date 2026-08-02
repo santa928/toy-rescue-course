@@ -1,68 +1,102 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import type { VoxelGameControls } from '../input/useVoxelGameControls';
-import { resolveJoystickPointer } from './touchPointerMath';
+import { resolveSwipePointer } from './touchPointerMath';
+import type { SwipeOrigin } from './touchPointerMath';
 
-interface TouchJoystickProps {
+interface FullscreenDrivePadProps {
   readonly controls: VoxelGameControls;
 }
 
-/** 単一pointerを車両stickへ変換し、thumbだけをDOM refで高頻度更新する。 */
-export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
+/** 既存の玩具レバーを待機中の左下位置へ戻す。 */
+function resetPadPosition(pad: HTMLDivElement): void {
+  pad.style.removeProperty('bottom');
+  pad.style.removeProperty('left');
+  pad.style.removeProperty('top');
+  pad.style.removeProperty('transform');
+}
+
+/** 画面の任意位置から始めた単一pointerを浮動スティック入力へ変換する。 */
+export function FullscreenDrivePad({ controls }: FullscreenDrivePadProps): ReactElement {
   const activePointerRef = useRef<number | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const originRef = useRef<SwipeOrigin | null>(null);
+  const padRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLSpanElement>(null);
   const { setTouchStick } = controls;
 
   /** thumbを正規化済みstick位置へ移し、React renderを発生させない。 */
   const moveThumb = useCallback((x: number, y: number): void => {
-    const root = rootRef.current;
+    const pad = padRef.current;
     const thumb = thumbRef.current;
-    if (!root || !thumb) return;
-    const travel = Math.max(0, (Math.min(root.clientWidth, root.clientHeight) - thumb.offsetWidth) / 2 - 8);
+    if (!pad || !thumb) return;
+    const travel = Math.max(0, (Math.min(pad.clientWidth, pad.clientHeight) - thumb.offsetWidth) / 2 - 8);
     thumb.style.transform = `translate(-50%, -50%) translate(${x * travel}px, ${y * travel}px)`;
   }, []);
 
-  /** pointer座標をstick commandとthumbへ同時反映する。 */
+  /** pointer座標を開始点からのstick commandとthumbへ同時反映する。 */
   const applyPointer = useCallback((clientX: number, clientY: number): void => {
-    const root = rootRef.current;
-    if (!root) return;
-    const point = resolveJoystickPointer(root.getBoundingClientRect(), clientX, clientY);
+    const origin = originRef.current;
+    const pad = padRef.current;
+    if (!origin || !pad) return;
+    const maximumDistance = Math.min(pad.clientWidth, pad.clientHeight) / 2;
+    const point = resolveSwipePointer(origin, clientX, clientY, maximumDistance);
     setTouchStick(point.x, point.y);
     moveThumb(point.x, point.y);
   }, [moveThumb, setTouchStick]);
 
-  /** active pointerを解除し、全終了経路でstickとthumbを中央へ戻す。 */
+  /** active pointerを解除し、command、thumb、浮動位置を全終了経路で初期化する。 */
   const releaseActivePointer = useCallback((releaseCapture = true): void => {
     const pointerId = activePointerRef.current;
     activePointerRef.current = null;
-    const root = rootRef.current;
-    if (root) root.dataset.active = 'false';
+    originRef.current = null;
+    const pad = padRef.current;
+    const surface = surfaceRef.current;
+    if (pad) {
+      pad.dataset.active = 'false';
+      resetPadPosition(pad);
+    }
+    if (surface) surface.dataset.active = 'false';
     setTouchStick(0, 0);
     moveThumb(0, 0);
-    if (!releaseCapture || pointerId === null || !root?.hasPointerCapture(pointerId)) return;
+    if (!releaseCapture || pointerId === null || !surface?.hasPointerCapture(pointerId)) return;
     try {
-      root.releasePointerCapture(pointerId);
+      surface.releasePointerCapture(pointerId);
     } catch {
-      // captureはbrowser側で既に失われる場合があるため、中央復帰だけを保証する。
+      // captureはbrowser側で既に失われる場合があるため、停止状態だけを保証する。
     }
   }, [moveThumb, setTouchStick]);
 
-  /** 最初のpointerだけをcaptureしてstick操作を開始する。 */
+  /** 最初のpointerをcaptureし、触れた画面位置へ玩具レバーを移す。 */
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (activePointerRef.current !== null || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (
+      activePointerRef.current !== null
+      || (event.pointerType === 'mouse' && event.button !== 0)
+      || !Number.isFinite(event.clientX)
+      || !Number.isFinite(event.clientY)
+    ) return;
     event.preventDefault();
+    const origin = { x: event.clientX, y: event.clientY };
     activePointerRef.current = event.pointerId;
+    originRef.current = origin;
+    const pad = padRef.current;
+    if (pad) {
+      pad.dataset.active = 'true';
+      pad.style.bottom = 'auto';
+      pad.style.left = `${origin.x}px`;
+      pad.style.top = `${origin.y}px`;
+      pad.style.transform = 'translate(-50%, -50%)';
+    }
     event.currentTarget.dataset.active = 'true';
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
       // capture非対応でもup/cancel/blur cleanupで解除する。
     }
-    applyPointer(event.clientX, event.clientY);
+    applyPointer(origin.x, origin.y);
   }, [applyPointer]);
 
-  /** active pointerだけを追従させる。 */
+  /** active pointerだけを開始点から追従させる。 */
   const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
     if (activePointerRef.current !== event.pointerId) return;
     event.preventDefault();
@@ -76,7 +110,7 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
     releaseActivePointer(true);
   }, [releaseActivePointer]);
 
-  /** browserがcaptureを失った場合もstickを中央へ戻す。 */
+  /** browserがcaptureを失った場合もstickを停止する。 */
   const handleLostPointerCapture = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
     if (activePointerRef.current !== event.pointerId) return;
     releaseActivePointer(false);
@@ -99,19 +133,25 @@ export function TouchJoystick({ controls }: TouchJoystickProps): ReactElement {
 
   return (
     <div
-      aria-label="運転スティック"
-      className="touch-joystick"
+      className="touch-drive-surface"
       data-active="false"
       onLostPointerCapture={handleLostPointerCapture}
       onPointerCancel={handlePointerEnd}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
-      ref={rootRef}
+      ref={surfaceRef}
     >
-      <span aria-hidden="true" className="touch-joystick__track" />
-      <span aria-hidden="true" className="touch-joystick__thumb" ref={thumbRef} />
-      <span aria-hidden="true" className="touch-joystick__label">うんてん</span>
+      <div
+        aria-label="画面をスライドして運転"
+        className="touch-joystick"
+        data-active="false"
+        ref={padRef}
+      >
+        <span aria-hidden="true" className="touch-joystick__track" />
+        <span aria-hidden="true" className="touch-joystick__thumb" ref={thumbRef} />
+        <span aria-hidden="true" className="touch-joystick__label">どこでも</span>
+      </div>
     </div>
   );
 }

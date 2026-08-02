@@ -11,8 +11,8 @@ import {
 } from '../domain/vehicleDefinitions';
 import type { VoxelGameControls } from '../input/useVoxelGameControls';
 import type { VehicleTelemetryRef } from '../scene/VehicleController';
+import { FullscreenDrivePad } from './FullscreenDrivePad';
 import { MissionMiniMap } from './MissionMiniMap';
-import { TouchJoystick } from './TouchJoystick';
 
 interface VoxelGameHudProps {
   readonly audio: ToyAudioUiState;
@@ -144,6 +144,7 @@ export function VoxelGameHud({
       data-color-effect-active={colorEffectLabel !== null}
       data-vehicle-switch-available={canSwitchVehicle}
     >
+      <FullscreenDrivePad controls={controls} />
       {canSwitchVehicle ? (
         <nav aria-label="のりものをえらぶ" className="vehicle-selector">
           {VEHICLE_DEFINITIONS.map((definition) => (
@@ -230,7 +231,6 @@ export function VoxelGameHud({
         telemetryRef={telemetryRef}
         vehicleId={selectedVehicleId}
       />
-      <TouchJoystick controls={controls} />
       <button
         aria-label={vehicleDefinition.action.ariaLabel}
         aria-pressed={primaryActionPressed}

@@ -219,6 +219,32 @@ services:
           exit 1
         }
 
+  voxel-game-swipe-e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    working_dir: /app
+    environment:
+      VOXEL_GAME_BASE_URL: http://127.0.0.1:4173
+      VOXEL_GAME_SWIPE_OUTPUT: output/voxel-game-swipe
+      VOXEL_GAME_SWIPE_VIEWPORT: ${VOXEL_GAME_SWIPE_VIEWPORT:-}
+    volumes:
+      - ./output:/app/output
+    command:
+      - sh
+      - -lc
+      - |
+        set -e
+        npm run build
+        npm run preview -- --host 127.0.0.1 > /tmp/voxel-game-swipe-preview.log 2>&1 &
+        server_pid=$$!
+        trap 'kill "$$server_pid" 2>/dev/null || true' EXIT
+        node scripts/verify-fullscreen-swipe-drive.mjs || {
+          sed -n '1,220p' /tmp/voxel-game-swipe-preview.log >&2
+          exit 1
+        }
+
   production-smoke-e2e:
     profiles: ["e2e"]
     build:

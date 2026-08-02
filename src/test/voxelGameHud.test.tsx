@@ -163,6 +163,9 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('がれきへ ブレードでぶつかる');
     expect(html).toContain('1しゅうめ・クリア 0/3');
     expect(html).toContain('aria-label="きたのがれきをかたづけよう。がれきへ ブレードでぶつかる。1しゅうめ・クリア 0/3"');
+    expect(html).toContain('class="touch-drive-surface"');
+    expect(html).toContain('aria-label="画面をスライドして運転"');
+    expect(html).toContain('class="touch-joystick__label">どこでも');
   });
 
   it('パトカー固有の巡回仕事、3地点進捗、サイレン操作を公開する', () => {

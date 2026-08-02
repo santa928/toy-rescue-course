@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-02
 
-**状態:** 承認済み・実装前（GitHub Issue #2）
+**状態:** 実装・ローカル検証完了（GitHub Issue #2）
 
 ## 1. 目的
 
@@ -112,3 +112,12 @@ pointer captureはブラウザ都合で失敗・消失することがある。ca
 - [x] 性能目標がある。
 - [x] 要件差分に維持・追加・保留・削除がある。
 - [x] pointer競合と全停止経路が具体化されている。
+
+## 14. 実測結果
+
+- fresh unit: 48 files / 469 tests成功。
+- production build: game 162,182 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで全budget内。
+- focused実touch E2E: Desktop touch 1280×720、Tablet 1024×768、Mobile landscape 844×390の12方向drag、HUD単独tap、運転＋主操作同時保持、release／cancel停止、browser error 0件。
+- canonical nonbreak E2E: 直接移動、寛容な消火照準、keyboard／touch各2仕事、water timeline、3 viewport layoutの全scenario成功。
+- 12枚を原寸目視し、待機レバーの左下safe area、active原点、thumb収まり、主要HUDのhit target、文言位置に崩れ・はみ出し・操作阻害がないことを確認した。
+- 方向検証は、追従カメラによる画面差分相殺を除くため、開始時カメラを固定して移動前後の車両座標を投影する。

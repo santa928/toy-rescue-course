@@ -645,6 +645,14 @@ button {
   }
 }
 
+.touch-drive-surface {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
 .touch-joystick {
   position: absolute;
   bottom: calc(env(safe-area-inset-bottom) + 18px);
