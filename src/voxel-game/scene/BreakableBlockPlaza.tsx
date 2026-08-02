@@ -5,6 +5,8 @@ import {
   CuboidCollider,
   RigidBody,
   type CollisionEnterPayload,
+  type CollisionExitPayload,
+  type ContactForcePayload,
   type RapierCollider,
   type RapierRigidBody,
 } from '@react-three/rapier';
@@ -194,6 +196,14 @@ export interface BlockImpactSpeedInput {
   readonly vehiclePreviousStepSpeed: number;
 }
 
+export type BlockContactKind = 'enter' | 'sustain';
+
+export interface BlockContactEvaluationInput {
+  readonly collisionBodyIsVehicle: boolean;
+  readonly contactKind: BlockContactKind;
+  readonly vehicleCollisionObserved: boolean;
+}
+
 export const BREAKABLE_FRAGMENT_SLOTS_PER_BLOCK = 6;
 export const BREAKABLE_FRAGMENT_LIFETIME_MS = 1_200;
 const BLOCK_RESPAWN_DURATION_MS = 5_000;
@@ -366,6 +376,15 @@ export function resolveBlockImpactSpeed({
   return collisionBodyIsVehicle ? vehiclePreviousStepSpeed : 0;
 }
 
+/** 継続接触は実車両enterの観測後だけ許可し、別bodyやevent順序の誤判定を防ぐ。 */
+export function shouldEvaluateBlockContact({
+  collisionBodyIsVehicle,
+  contactKind,
+  vehicleCollisionObserved,
+}: BlockContactEvaluationInput): boolean {
+  return collisionBodyIsVehicle && (contactKind === 'enter' || vehicleCollisionObserved);
+}
+
 /** block中心と車両のXZ距離が復元半径3を厳密に超えるか判定する。 */
 export function isBlockRespawnAreaClear(
   blockPosition: readonly [number, number, number],
@@ -386,8 +405,10 @@ export function isFragmentWindowActive(
     && respawnRemainingMs > FRAGMENT_WINDOW_END_REMAINING_MS + FRAGMENT_WINDOW_EPSILON_MS;
 }
 
-/** collision payloadの実RigidBody APIから相対線速度を取得する。 */
-function getCollisionRelativeLinearSpeed(payload: CollisionEnterPayload): number {
+/** contact payloadの実RigidBody APIから相対線速度を取得する。 */
+function getCollisionRelativeLinearSpeed(
+  payload: CollisionEnterPayload | ContactForcePayload,
+): number {
   const targetVelocity = payload.target.rigidBody?.linvel() ?? ZERO_VELOCITY;
   const otherVelocity = payload.other.rigidBody?.linvel() ?? ZERO_VELOCITY;
   return calculateRelativeLinearSpeed(targetVelocity, otherVelocity);
@@ -526,6 +547,7 @@ export function BreakableBlockPlaza({
       maxVehiclePreviousStepSpeed: 0,
       vehicleCount: 0,
   })));
+  const vehicleContactActiveRef = useRef(BREAKABLE_BLOCKS.map(() => false));
   const breakMutationTimersRef = useRef(new Set<number>());
   const chipMeshRef = useRef<THREE.InstancedMesh>(null);
   const chipBurstsRef = useRef<(ChipBurstRuntime | null)[]>(BREAKABLE_BLOCKS.map(() => null));
@@ -755,77 +777,118 @@ export function BreakableBlockPlaza({
     syncAfterRuntimeAdvance: () => syncRuntimeBodies(runtime.getSnapshot()),
   }), [breakableTelemetryRef, refreshTelemetry, runtime, syncRuntimeBodies]);
 
+  /** 接触開始と継続接触を同じ破壊遷移へ集約し、破片有効化を一度だけ行う。 */
+  const handleBlockContact = useCallback((
+    block: BreakableBlockDefinition,
+    index: number,
+    payload: CollisionEnterPayload | ContactForcePayload,
+    contactKind: BlockContactKind,
+  ): void => {
+    if (runtime.getSnapshot().blocks[index]?.phase !== 'intact') return;
+    const eventRelativeSpeed = getCollisionRelativeLinearSpeed(payload);
+    const collisionBodyIsVehicle = isCollisionBodyVehicle(
+      payload.other.rigidBody,
+      telemetryRef.current,
+    );
+    const impact = impactTelemetryRef.current[index];
+    const vehicleCollisionObserved = vehicleContactActiveRef.current[index] ?? false;
+    const shouldEvaluate = shouldEvaluateBlockContact({
+      collisionBodyIsVehicle,
+      contactKind,
+      vehicleCollisionObserved,
+    });
+    const speed = resolveBlockImpactSpeed({
+      collisionBodyIsVehicle,
+      eventRelativeSpeed,
+      vehiclePreviousStepSpeed: telemetryRef.current.speed,
+    });
+
+    if (impact && contactKind === 'enter') {
+      impact.count += 1;
+      impact.maxEventRelativeSpeed = Math.max(impact.maxEventRelativeSpeed, eventRelativeSpeed);
+      impact.maxSpeed = Math.max(impact.maxSpeed, speed);
+      if (collisionBodyIsVehicle) {
+        vehicleContactActiveRef.current[index] = true;
+        impact.vehicleCount += 1;
+        impact.maxVehiclePreviousStepSpeed = Math.max(
+          impact.maxVehiclePreviousStepSpeed,
+          telemetryRef.current.speed,
+        );
+      }
+    } else if (impact && shouldEvaluate) {
+      impact.maxEventRelativeSpeed = Math.max(impact.maxEventRelativeSpeed, eventRelativeSpeed);
+      impact.maxSpeed = Math.max(impact.maxSpeed, speed);
+      impact.maxVehiclePreviousStepSpeed = Math.max(
+        impact.maxVehiclePreviousStepSpeed,
+        telemetryRef.current.speed,
+      );
+    }
+
+    if (!shouldEvaluate) {
+      if (contactKind === 'enter') refreshTelemetry();
+      return;
+    }
+    const newlyBroken = runtime.registerBlockImpact(block.id, speed);
+    if (!newlyBroken) {
+      if (contactKind === 'enter') refreshTelemetry();
+      return;
+    }
+
+    vehicleContactActiveRef.current[index] = false;
+    impactForwardRef.current[index] = [
+      telemetryRef.current.forward[0],
+      0,
+      telemetryRef.current.forward[2],
+    ];
+    triggerChipBurst(index, block.position, block.color);
+
+    const breakMutationTimer = window.setTimeout(() => {
+      breakMutationTimersRef.current.delete(breakMutationTimer);
+      const intactSlot = intactSlotsRef.current[index];
+      intactSlot?.collider?.setEnabled(false);
+      intactSlot?.body?.setEnabled(false);
+      if (intactSlot?.mesh) intactSlot.mesh.visible = false;
+      if (impact) {
+        impact.intactEnabledCountAtFragmentActivation = Number(
+          intactSlot?.body?.isEnabled() ?? false,
+        ) + Number(intactSlot?.collider?.isEnabled() ?? false);
+      }
+      for (const slotIndex of BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[index] ?? []) {
+        const slot = BREAKABLE_FRAGMENT_POOL[slotIndex];
+        const runtimeSlot = runtimeSlotsRef.current[slotIndex];
+        if (slot && runtimeSlot) {
+          activateFragment(
+            slot,
+            runtimeSlot,
+            block.position,
+            impactForwardRef.current[index] ?? [0, 0, 1],
+          );
+        }
+      }
+      refreshTelemetry();
+    }, 0);
+    breakMutationTimersRef.current.add(breakMutationTimer);
+  }, [refreshTelemetry, runtime, telemetryRef, triggerChipBurst]);
+
+  /** 現在の車両接触だけを解除し、復元後へ前ライフの継続許可を持ち越さない。 */
+  const handleBlockContactExit = useCallback((
+    index: number,
+    payload: CollisionExitPayload,
+  ): void => {
+    if (isCollisionBodyVehicle(payload.other.rigidBody, telemetryRef.current)) {
+      vehicleContactActiveRef.current[index] = false;
+    }
+  }, [telemetryRef]);
+
   return (
     <group>
       {BREAKABLE_BLOCKS.map((block, index) => (
         <RigidBody
           colliders={false}
           key={block.id}
-          onCollisionEnter={(payload) => {
-            if (runtime.getSnapshot().blocks[index]?.phase !== 'intact') return;
-            const eventRelativeSpeed = getCollisionRelativeLinearSpeed(payload);
-            const collisionBodyIsVehicle = isCollisionBodyVehicle(
-              payload.other.rigidBody,
-              telemetryRef.current,
-            );
-            const speed = resolveBlockImpactSpeed({
-              collisionBodyIsVehicle,
-              eventRelativeSpeed,
-              vehiclePreviousStepSpeed: telemetryRef.current.speed,
-            });
-            const impact = impactTelemetryRef.current[index];
-            if (impact) {
-              impact.count += 1;
-              impact.maxEventRelativeSpeed = Math.max(impact.maxEventRelativeSpeed, eventRelativeSpeed);
-              impact.maxSpeed = Math.max(impact.maxSpeed, speed);
-              if (collisionBodyIsVehicle) {
-                impact.vehicleCount += 1;
-                impact.maxVehiclePreviousStepSpeed = Math.max(
-                  impact.maxVehiclePreviousStepSpeed,
-                  telemetryRef.current.speed,
-                );
-              }
-            }
-            const newlyBroken = runtime.registerBlockImpact(block.id, speed);
-            if (!newlyBroken) {
-              refreshTelemetry();
-              return;
-            }
-
-            impactForwardRef.current[index] = [
-              telemetryRef.current.forward[0],
-              0,
-              telemetryRef.current.forward[2],
-            ];
-            triggerChipBurst(index, block.position, block.color);
-
-            const breakMutationTimer = window.setTimeout(() => {
-              breakMutationTimersRef.current.delete(breakMutationTimer);
-              const intactSlot = intactSlotsRef.current[index];
-              intactSlot?.collider?.setEnabled(false);
-              intactSlot?.body?.setEnabled(false);
-              if (intactSlot?.mesh) intactSlot.mesh.visible = false;
-              if (impact) {
-                impact.intactEnabledCountAtFragmentActivation = Number(
-                  intactSlot?.body?.isEnabled() ?? false,
-                ) + Number(intactSlot?.collider?.isEnabled() ?? false);
-              }
-              for (const slotIndex of BREAKABLE_FRAGMENT_SLOT_INDICES_BY_BLOCK[index] ?? []) {
-                const slot = BREAKABLE_FRAGMENT_POOL[slotIndex];
-                const runtimeSlot = runtimeSlotsRef.current[slotIndex];
-                if (slot && runtimeSlot) {
-                  activateFragment(
-                    slot,
-                    runtimeSlot,
-                    block.position,
-                    impactForwardRef.current[index] ?? [0, 0, 1],
-                  );
-                }
-              }
-              refreshTelemetry();
-            }, 0);
-            breakMutationTimersRef.current.add(breakMutationTimer);
-          }}
+          onCollisionEnter={(payload) => handleBlockContact(block, index, payload, 'enter')}
+          onCollisionExit={(payload) => handleBlockContactExit(index, payload)}
+          onContactForce={(payload) => handleBlockContact(block, index, payload, 'sustain')}
           position={block.position}
           ref={intactBodyRefCallbacks[index]}
           rotation={[0, index * 0.22, 0]}

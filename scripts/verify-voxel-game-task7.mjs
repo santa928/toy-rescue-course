@@ -227,7 +227,16 @@ async function verifyDesktop(browser, errors, results) {
       `Keyboard command is wrong: ${JSON.stringify(pressed.controls)}`);
     assert(await page.locator('.primary-action-button').getAttribute('aria-pressed') === 'true',
       'Keyboard spray command did not update aria-pressed true.');
-    await page.getByText('おみずをかけよう', { exact: true }).waitFor({ state: 'visible' });
+    assert(pressed.mission.phase === 'active'
+      && pressed.mission.objectiveLabel === 'おみずをかけよう',
+    `Keyboard spray did not activate the fire mission: ${JSON.stringify(pressed.mission)}`);
+    assert((await missionJob.textContent())?.trim() === pressed.mission.jobLabel,
+      `Active mission HUD/job telemetry mismatch: ${JSON.stringify(pressed.mission)}`);
+    const missionInstruction = page.locator('.mission-pill__objective');
+    await missionInstruction.waitFor({ state: 'visible' });
+    assert((await missionInstruction.textContent())?.trim()
+      === pressed.mission.guidance.instructionLabel,
+    `Active mission guidance is stale: ${JSON.stringify(pressed.mission)}`);
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
     await waitForFrames(page, 1);
     const blurred = await readGameState(page);
@@ -289,7 +298,7 @@ async function verifyTouch(browser, errors, results) {
       assert(await page.locator('.touch-joystick').getAttribute(attribute) === null,
         `Joystick has misleading keyboard-slider ${attribute} semantics.`);
     }
-    assert(await page.locator('.touch-joystick').getAttribute('aria-label') === '運転スティック',
+    assert(await page.locator('.touch-joystick').getAttribute('aria-label') === '画面をスライドして運転',
       'Joystick lost its required accessible label.');
     const center = { x: joystick.x + joystick.width / 2, y: joystick.y + joystick.height / 2 };
     const joystickEdges = toEdges(joystick);
@@ -474,6 +483,14 @@ async function verifyTouch(browser, errors, results) {
       pointerType: 'touch',
     });
     await page.locator('.touch-joystick').dispatchEvent('pointerdown', {
+      bubbles: true,
+      button: 0,
+      clientX: center.x,
+      clientY: center.y,
+      pointerId: 54,
+      pointerType: 'touch',
+    });
+    await page.locator('.touch-drive-surface').dispatchEvent('pointermove', {
       bubbles: true,
       button: 0,
       clientX: heldStick.x,

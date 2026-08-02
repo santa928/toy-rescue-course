@@ -13,6 +13,7 @@ import {
   resetChipInstances,
   resolveBlockImpactSpeed,
   resolveChipBurstAge,
+  shouldEvaluateBlockContact,
 } from '../voxel-game/scene/BreakableBlockPlaza';
 import {
   CHIP_BURST_SIZE,
@@ -187,6 +188,29 @@ describe('BreakableBlockPlaza', () => {
       eventRelativeSpeed: 8.4,
       vehiclePreviousStepSpeed: 0,
     })).toBe(0);
+  });
+
+  it('車両の継続接触は先行enterがある場合だけ破壊速度を再評価する', () => {
+    expect(shouldEvaluateBlockContact({
+      collisionBodyIsVehicle: true,
+      contactKind: 'enter',
+      vehicleCollisionObserved: false,
+    })).toBe(true);
+    expect(shouldEvaluateBlockContact({
+      collisionBodyIsVehicle: true,
+      contactKind: 'sustain',
+      vehicleCollisionObserved: true,
+    })).toBe(true);
+    expect(shouldEvaluateBlockContact({
+      collisionBodyIsVehicle: true,
+      contactKind: 'sustain',
+      vehicleCollisionObserved: false,
+    })).toBe(false);
+    expect(shouldEvaluateBlockContact({
+      collisionBodyIsVehicle: false,
+      contactKind: 'sustain',
+      vehicleCollisionObserved: true,
+    })).toBe(false);
   });
 
   it('車両とのXZ距離が3を超える場合だけ復元領域をclearにする', () => {

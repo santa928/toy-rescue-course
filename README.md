@@ -83,6 +83,7 @@ docker compose --profile e2e run --rm --build voxel-game-fleet-e2e
 docker compose --profile e2e run --rm --build voxel-game-audio-e2e
 docker compose --profile e2e run --rm --build voxel-game-map-e2e
 docker compose --profile e2e run --rm --build voxel-game-swipe-e2e
+docker compose --profile e2e run --rm --build voxel-game-break-coverage-e2e
 ```
 
 canonical E2Eはscenarioの開始、30秒ごとのheartbeat、成功／失敗、経過秒を`[voxel-e2e]`行へ出力し、
@@ -104,7 +105,7 @@ VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-ga
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。画面全体スワイプ運転実装後のfresh unit testは48 files / 469 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。積み木の衝突位置カバレッジ実装後のfresh unit testは48 files / 470 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -119,6 +120,7 @@ docker compose --profile e2e run --rm --build voxel-game-fleet-e2e
 docker compose --profile e2e run --rm --build voxel-game-audio-e2e
 docker compose --profile e2e run --rm --build voxel-game-map-e2e
 docker compose --profile e2e run --rm --build voxel-game-swipe-e2e
+docker compose --profile e2e run --rm --build voxel-game-break-coverage-e2e
 ```
 
 production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
@@ -156,6 +158,6 @@ console／page／request errorがないことを実ブラウザで確認しま�
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。ショベルカーの3土山、救急車の患者手当て、パトカーの3地点巡回について、成功、帰庫、次仕事までを3 viewportで実走した24枚は `output/voxel-game-fleet/` へ生成されます。実AudioContextのon/off、5車種action、速度連動engine、HUD実寸とオン／オフ6枚は`output/voxel-game-audio/`へ生成されます。追加2地区の経路、物理、HUD実寸と6枚は`output/voxel-game-map/`へ生成されます。全画面スワイプ運転の任意原点、上下左右、HUD競合、同時主操作、3 viewportの12枚は`output/voxel-game-swipe/`へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。ショベルカーの3土山、救急車の患者手当て、パトカーの3地点巡回について、成功、帰庫、次仕事までを3 viewportで実走した24枚は `output/voxel-game-fleet/` へ生成されます。実AudioContextのon/off、5車種action、速度連動engine、HUD実寸とオン／オフ6枚は`output/voxel-game-audio/`へ生成されます。追加2地区の経路、物理、HUD実寸と6枚は`output/voxel-game-map/`へ生成されます。全画面スワイプ運転の任意原点、上下左右、HUD競合、同時主操作、3 viewportの12枚は`output/voxel-game-swipe/`へ生成されます。積み木の同一面5位置について、衝突前後10枚と速度・接触回数は`output/voxel-game-break-coverage/`へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
 
 2026-08-02の地区床・街角装飾版を1280×720の `ANGLE Metal Renderer: Apple M4` で各車2秒warm-up＋12秒計測しました。5台すべてmedian 59.88fps、p10は55.87〜57.47fps、平均は59.90〜59.98fpsで、認証目標のmedian 55fps以上／p10 45fps以上を満たしています。sceneは消防車30、ブルドーザー29、ショベルカー・救急車・パトカー32 calls、各車体は7 callsでした。96×96ちょうど、40 static collider、床1 `InstancedMesh`と既存palette batchのまま性能目標を満たしたため、chunk streaming／LODは導入しません。一辺96unit超への拡張または将来の物理GPU性能未達時だけ再評価します。再測定時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。
