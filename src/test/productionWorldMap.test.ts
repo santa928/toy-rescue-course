@@ -195,10 +195,17 @@ describe('PRODUCTION_WORLD_MAP', () => {
   });
 
   it('visualとsolidを同じbox定義で共有する', () => {
-    expect(PRODUCTION_WORLD_MAP.visualBoxes).toHaveLength(55);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes).toHaveLength(50);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)).toHaveLength(27);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid).length).toBeLessThanOrEqual(28);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.every(({ id }) => id.length > 0)).toBe(true);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.some(({ id }) => [
+      'park-ground',
+      'block-plaza-ground',
+      'construction-ground',
+      'town-green-west',
+      'town-green-east',
+    ].includes(id))).toBe(false);
   });
 
   it('追加地区の代表中心とランドマークを対応地区へ置く', () => {
@@ -469,7 +476,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
           index === 0 ? { ...box, rotation: [0, 0, Number.POSITIVE_INFINITY] as const } : box
         )),
       },
-      'non-finite rotation: park-ground',
+      'non-finite rotation: park-pond',
     ],
   ])('%sの非有限rotationを拒否する', (_description, map, expectedError) => {
     expect(validateProductionWorldMap(map)).toContain(expectedError);

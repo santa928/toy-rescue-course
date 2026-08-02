@@ -1,3 +1,5 @@
+import { validateWorldStreetscape } from './worldStreetscape';
+
 /** 96×96の本番箱庭を描画・物理・ゲームプレイで共有する純粋な座標定義。 */
 
 /** 本番箱庭にある目的地地区の識別子。 */
@@ -57,6 +59,23 @@ export interface WorldBoxDefinition {
   readonly solid: boolean;
 }
 
+/** 道路下へ置く、地区識別専用の非solid床タイル。 */
+export interface WorldSurfaceTileDefinition {
+  readonly color: string;
+  readonly districtId: WorldDistrictId;
+  readonly id: string;
+  readonly position: WorldPoint;
+  readonly scale: WorldPoint;
+}
+
+/** 1つの街角テーマとして同時に配置する装飾box群。 */
+export interface WorldDecorationClusterDefinition {
+  readonly boxes: readonly WorldBoxDefinition[];
+  readonly districtId: WorldDistrictId;
+  readonly id: string;
+  readonly purpose: 'entry' | 'landmark' | 'rest' | 'service';
+}
+
 /** 積み木広場へ置く壊せる積み木の座標定義。 */
 export interface BreakableBlockLandmarkDefinition {
   readonly color: string;
@@ -110,15 +129,220 @@ export interface WorldRoadDefinition {
 /** 本番箱庭を構成する地区、道路、共有boxの不変定義。 */
 export interface ProductionWorldMapDefinition {
   readonly bounds: WorldBounds2D;
+  readonly decorationClusters: readonly WorldDecorationClusterDefinition[];
   readonly districts: readonly WorldDistrictDefinition[];
   readonly landmarks: WorldLandmarksDefinition;
   readonly roads: readonly WorldRoadDefinition[];
+  readonly surfaceTiles: readonly WorldSurfaceTileDefinition[];
   readonly visualBoxes: readonly WorldBoxDefinition[];
 }
 
 /** 描画・物理・ゲームプレイ間で共有する96×96本番箱庭の唯一の座標定義。 */
 const PRODUCTION_WORLD_MAP_DEFINITION = {
   bounds: { maxX: 48, maxZ: 48, minX: -48, minZ: -48 },
+  decorationClusters: [
+    {
+      boxes: [
+        { color: '#86552f', id: 'hub-tool-rack-post', position: [8.2, 1, 7.2], scale: [0.6, 1.8, 0.6], solid: true },
+        { color: '#f2c94c', id: 'hub-tool-rack-shelf', position: [8.2, 1.55, 7.2], scale: [2.2, 0.25, 0.65], solid: false },
+        { color: '#a86f3f', id: 'hub-parcel-a', position: [6.1, 0.45, 8.7], scale: [1.2, 0.9, 1.2], solid: false },
+        { color: '#a86f3f', id: 'hub-parcel-b', position: [8.1, 0.35, 8.6], scale: [1, 0.7, 1], solid: false },
+      ],
+      districtId: 'hub',
+      id: 'hub-tools-and-parcels',
+      purpose: 'service',
+    },
+    {
+      boxes: [
+        { color: '#e24b3f', id: 'hub-entry-guide-red', position: [-6.4, 0.3, -5.6], scale: [2.2, 0.5, 0.5], solid: false },
+        { color: '#f1efe6', id: 'hub-entry-guide-white', position: [-6.4, 0.3, -6.35], scale: [2.2, 0.5, 0.5], solid: false },
+      ],
+      districtId: 'hub',
+      id: 'hub-entry-guides',
+      purpose: 'entry',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'park-bench-seat', position: [5.2, 0.55, -22], scale: [1.6, 0.7, 2.4], solid: true },
+        { color: '#e24b3f', id: 'park-entry-flower-red', position: [5.2, 0.32, -24.2], scale: [0.6, 0.55, 0.6], solid: false },
+        { color: '#f2c94c', id: 'park-entry-flower-yellow', position: [5.2, 0.32, -25], scale: [0.6, 0.55, 0.6], solid: false },
+      ],
+      districtId: 'park',
+      id: 'park-entry-flowerbed',
+      purpose: 'entry',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'park-lamp-post', position: [5.2, 1.25, -28], scale: [0.5, 2.3, 0.5], solid: true },
+        { color: '#f2c94c', id: 'park-lamp-light', position: [5.2, 2.55, -28], scale: [0.9, 0.45, 0.9], solid: false },
+        { color: '#3f7f3a', id: 'park-hedge', position: [5.2, 0.45, -29.2], scale: [1.4, 0.8, 0.55], solid: false },
+      ],
+      districtId: 'park',
+      id: 'park-lamp-and-hedge',
+      purpose: 'landmark',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'park-picnic-table', position: [-5.2, 0.6, -17], scale: [1.6, 0.8, 2], solid: true },
+        { color: '#e24b3f', id: 'park-picnic-cloth', position: [-5.2, 1.05, -17], scale: [1.7, 0.12, 2.1], solid: false },
+      ],
+      districtId: 'park',
+      id: 'park-picnic-corner',
+      purpose: 'rest',
+    },
+    {
+      boxes: [
+        { color: '#e24b3f', id: 'fire-hydrant-body', position: [16, 0.65, -12], scale: [0.8, 1.2, 0.8], solid: true },
+        { color: '#f2c94c', id: 'fire-hydrant-cap', position: [16, 1.35, -12], scale: [1.05, 0.25, 1.05], solid: false },
+        { color: '#f1efe6', id: 'fire-entry-curb', position: [15, 0.25, -8.5], scale: [0.5, 0.4, 3], solid: false },
+      ],
+      districtId: 'fire',
+      id: 'fire-entry-hydrant',
+      purpose: 'entry',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'fire-lamp-post', position: [18, 1.25, -7], scale: [0.5, 2.3, 0.5], solid: true },
+        { color: '#f2c94c', id: 'fire-lamp-light', position: [18, 2.55, -7], scale: [0.9, 0.45, 0.9], solid: false },
+      ],
+      districtId: 'fire',
+      id: 'fire-sidewalk-lamp',
+      purpose: 'landmark',
+    },
+    {
+      boxes: [
+        { color: '#c83e34', id: 'fire-mailbox', position: [27, 0.85, -8], scale: [0.8, 1.4, 0.8], solid: false },
+        { color: '#3f7f3a', id: 'fire-planter-green', position: [25.5, 0.4, -8], scale: [1, 0.7, 1], solid: false },
+        { color: '#f2c94c', id: 'fire-planter-flower', position: [25.5, 0.85, -8], scale: [0.6, 0.35, 0.6], solid: false },
+      ],
+      districtId: 'fire',
+      id: 'fire-mailbox-planters',
+      purpose: 'service',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'blocks-fence-post', position: [-16, 1, -7], scale: [0.6, 1.8, 0.6], solid: true },
+        { color: '#e24b3f', id: 'blocks-entry-cone-red', position: [-18, 0.4, -7], scale: [0.7, 0.75, 0.7], solid: false },
+        { color: '#f2c94c', id: 'blocks-entry-cone-yellow', position: [-19.2, 0.4, -7], scale: [0.7, 0.75, 0.7], solid: false },
+        { color: '#f1efe6', id: 'blocks-fence-board', position: [-16, 1.25, -7], scale: [0.4, 0.35, 2.6], solid: false },
+      ],
+      districtId: 'blocks',
+      id: 'blocks-entry-fence',
+      purpose: 'entry',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'blocks-pallet-base', position: [-20, 0.3, 8], scale: [3, 0.4, 2], solid: false },
+        { color: '#a86f3f', id: 'blocks-pallet-crate', position: [-20, 0.85, 8], scale: [1.4, 0.8, 1.4], solid: false },
+      ],
+      districtId: 'blocks',
+      id: 'blocks-pallet-corner',
+      purpose: 'service',
+    },
+    {
+      boxes: [
+        { color: '#3b82f6', id: 'blocks-toolbox', position: [-16.5, 0.45, 10.5], scale: [1.8, 0.8, 1.1], solid: false },
+        { color: '#f2c94c', id: 'blocks-guide-board', position: [-16.5, 1.4, 11.2], scale: [2.4, 1.1, 0.35], solid: false },
+      ],
+      districtId: 'blocks',
+      id: 'blocks-tools-and-guide',
+      purpose: 'landmark',
+    },
+    {
+      boxes: [
+        { color: '#e24b3f', id: 'south-entry-flag-red', position: [-1.5, 1.2, 15], scale: [1.4, 1.1, 0.2], solid: false },
+        { color: '#f2c94c', id: 'south-entry-flag-yellow', position: [0, 1.2, 15], scale: [1.4, 1.1, 0.2], solid: false },
+        { color: '#3b82f6', id: 'south-entry-flag-blue', position: [1.5, 1.2, 15], scale: [1.4, 1.1, 0.2], solid: false },
+      ],
+      districtId: 'south',
+      id: 'south-entry-flags',
+      purpose: 'entry',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'south-viewing-bench', position: [5, 0.55, 26], scale: [0.8, 0.7, 2.6], solid: true },
+        { color: '#f1efe6', id: 'south-bench-back', position: [5.25, 1.05, 26], scale: [0.25, 0.8, 2.6], solid: false },
+      ],
+      districtId: 'south',
+      id: 'south-viewing-corner',
+      purpose: 'rest',
+    },
+    {
+      boxes: [
+        { color: '#3f7f3a', id: 'south-flowerbed-green', position: [0, 0.3, 30], scale: [3.2, 0.5, 1], solid: false },
+        { color: '#e24b3f', id: 'south-flowerbed-red', position: [-0.8, 0.65, 30], scale: [0.45, 0.35, 0.45], solid: false },
+        { color: '#f2c94c', id: 'south-flowerbed-yellow', position: [0.8, 0.65, 30], scale: [0.45, 0.35, 0.45], solid: false },
+      ],
+      districtId: 'south',
+      id: 'south-color-flowerbed',
+      purpose: 'landmark',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'construction-barrier-post', position: [-40, 1, -31], scale: [0.6, 1.8, 0.6], solid: true },
+        { color: '#e24b3f', id: 'construction-barrier-board-red', position: [-40, 1.35, -31], scale: [0.4, 0.45, 3], solid: false },
+        { color: '#f1efe6', id: 'construction-barrier-board-white', position: [-40, 0.75, -31], scale: [0.4, 0.45, 3], solid: false },
+      ],
+      districtId: 'construction',
+      id: 'construction-entry-barrier',
+      purpose: 'entry',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'construction-material-stack', position: [-31, 0.45, -22.5], scale: [3, 0.8, 1.6], solid: false },
+        { color: '#3b82f6', id: 'construction-toolbox', position: [-28.5, 0.45, -22.5], scale: [1.6, 0.8, 1.1], solid: false },
+      ],
+      districtId: 'construction',
+      id: 'construction-materials',
+      purpose: 'service',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'construction-work-lamp-post', position: [-22.1, 1.3, -35], scale: [0.6, 2.4, 0.6], solid: true },
+        { color: '#facc15', id: 'construction-work-lamp', position: [-22.1, 2.7, -35], scale: [1, 0.5, 1], solid: false },
+      ],
+      districtId: 'construction',
+      id: 'construction-work-light',
+      purpose: 'landmark',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'town-west-lamp-post', position: [22.1, 1.3, 29.5], scale: [0.6, 2.4, 0.6], solid: true },
+        { color: '#f2c94c', id: 'town-west-lamp-light', position: [22.1, 2.7, 29.5], scale: [1, 0.5, 1], solid: false },
+      ],
+      districtId: 'town',
+      id: 'town-west-lamp',
+      purpose: 'entry',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'town-east-lamp-post', position: [39.9, 1.3, 31], scale: [0.6, 2.4, 0.6], solid: true },
+        { color: '#f2c94c', id: 'town-east-lamp-light', position: [39.9, 2.7, 31], scale: [1, 0.5, 1], solid: false },
+      ],
+      districtId: 'town',
+      id: 'town-east-lamp',
+      purpose: 'landmark',
+    },
+    {
+      boxes: [
+        { color: '#86552f', id: 'town-bench-seat', position: [31, 0.55, 31], scale: [3, 0.7, 0.8], solid: true },
+        { color: '#3f7f3a', id: 'town-bench-hedge', position: [31, 0.55, 32.2], scale: [3.4, 1, 0.7], solid: false },
+      ],
+      districtId: 'town',
+      id: 'town-bench-and-hedge',
+      purpose: 'rest',
+    },
+    {
+      boxes: [
+        { color: '#c83e34', id: 'town-mailbox', position: [31, 0.85, 22.3], scale: [0.8, 1.4, 0.8], solid: false },
+        { color: '#f1efe6', id: 'town-doorstep-west', position: [25, 0.22, 22], scale: [2.4, 0.3, 0.8], solid: false },
+        { color: '#f2c94c', id: 'town-doorstep-east', position: [37, 0.22, 22], scale: [2.4, 0.3, 0.8], solid: false },
+      ],
+      districtId: 'town',
+      id: 'town-mailbox-doorsteps',
+      purpose: 'service',
+    },
+  ],
   districts: [
     { bounds: { maxX: 10, maxZ: 10, minX: -10, minZ: -10 }, id: 'hub', label: 'ちゅうおうしゃこ' },
     { bounds: { maxX: 12, maxZ: -14, minX: -12, minZ: -34 }, id: 'park', label: 'こうえん' },
@@ -286,8 +510,28 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
       scale: [8, 0.18, 4],
     },
   ],
+  surfaceTiles: [
+    { color: '#dfcda8', districtId: 'hub', id: 'hub-ground', position: [0, 0.025, 0], scale: [20, 0.05, 20] },
+    { color: '#f6e8c9', districtId: 'hub', id: 'hub-entry-pattern', position: [-6.4, 0.06, -7.2], scale: [5, 0.04, 0.55] },
+    { color: '#91bd70', districtId: 'park', id: 'park-district-base', position: [0, 0.025, -24], scale: [24, 0.05, 20] },
+    { color: '#91bd70', districtId: 'park', id: 'park-ground', position: [0, 0.055, -24], scale: [20, 0.02, 16] },
+    { color: '#b9d798', districtId: 'park', id: 'park-entry-pattern', position: [0, 0.06, -15], scale: [8, 0.04, 0.65] },
+    { color: '#d99275', districtId: 'fire', id: 'fire-ground', position: [24, 0.025, -7], scale: [20, 0.05, 26] },
+    { color: '#efb7a3', districtId: 'fire', id: 'fire-entry-pattern', position: [15, 0.06, -7], scale: [0.65, 0.04, 8] },
+    { color: '#d8ba76', districtId: 'blocks', id: 'blocks-district-base', position: [-24, 0.025, 3], scale: [20, 0.05, 26] },
+    { color: '#d8ba76', districtId: 'blocks', id: 'block-plaza-ground', position: [-24, 0.055, 6], scale: [14, 0.02, 16] },
+    { color: '#f2d995', districtId: 'blocks', id: 'blocks-entry-pattern', position: [-15, 0.06, -7], scale: [0.65, 0.04, 5] },
+    { color: '#82b8d7', districtId: 'south', id: 'south-ground', position: [0, 0.025, 24], scale: [24, 0.05, 20] },
+    { color: '#aed5e9', districtId: 'south', id: 'south-entry-pattern', position: [0, 0.06, 15], scale: [8, 0.04, 0.65] },
+    { color: '#d5b468', districtId: 'construction', id: 'construction-ground', position: [-31, 0.025, -31], scale: [30, 0.05, 30] },
+    { color: '#a9adb3', districtId: 'construction', id: 'construction-entry-pattern', position: [-31, 0.06, -17], scale: [8, 0.04, 0.65] },
+    { color: '#a9adb3', districtId: 'construction', id: 'construction-gravel-patch', position: [-31, 0.055, -33], scale: [7, 0.02, 5] },
+    { color: '#d7d0b9', districtId: 'town', id: 'town-ground', position: [31, 0.025, 31], scale: [30, 0.05, 30] },
+    { color: '#eee7d2', districtId: 'town', id: 'town-green-west', position: [22, 0.055, 34], scale: [4, 0.02, 12] },
+    { color: '#eee7d2', districtId: 'town', id: 'town-green-east', position: [40, 0.055, 35], scale: [4, 0.02, 14] },
+    { color: '#eee7d2', districtId: 'town', id: 'town-entry-pattern', position: [31, 0.06, 17], scale: [8, 0.04, 0.65] },
+  ],
   visualBoxes: [
-    { color: '#78a94f', id: 'park-ground', position: [0, 0.18, -24], scale: [20, 0.34, 16], solid: false },
     { color: '#67c7df', id: 'park-pond', position: [2, 0.4, -24], scale: [6, 0.18, 4], solid: false },
     { color: '#86552f', id: 'tree-trunk-1', position: [-7, 1.25, -28], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#86552f', id: 'tree-trunk-2', position: [-7, 1.25, -20], scale: [0.7, 2.2, 0.7], solid: true },
@@ -308,13 +552,11 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#6f4327', id: 'fire-building-roof', position: [23.5, 3.75, -16.5], scale: [6.8, 0.5, 5.8], solid: false },
     { color: '#7ed1e6', id: 'fire-window-1', position: [22.2, 1.9, -19.05], scale: [1.5, 1.5, 0.18], solid: false },
     { color: '#7ed1e6', id: 'fire-window-2', position: [24.8, 1.9, -19.05], scale: [1.5, 1.5, 0.18], solid: false },
-    { color: '#e1c78c', id: 'block-plaza-ground', position: [-24, 0.18, 6], scale: [14, 0.34, 16], solid: false },
     { color: '#c83e34', id: 'hub-gate-post', position: [-6, 1.1, 0], scale: [0.7, 2, 0.7], solid: true },
     { color: '#86552f', id: 'south-sign-post-west', position: [-3.5, 1.1, 18.5], scale: [0.7, 2, 0.7], solid: true },
     { color: '#86552f', id: 'south-sign-post-east', position: [3.5, 1.1, 29.5], scale: [0.7, 2, 0.7], solid: true },
     { color: '#f2c94c', id: 'south-sign-board-west', position: [-3.5, 2.15, 18.5], scale: [3, 1, 0.4], solid: false },
     { color: '#e24b3f', id: 'south-sign-board-east', position: [3.5, 2.15, 29.5], scale: [3, 1, 0.4], solid: false },
-    { color: '#e1c78c', id: 'construction-ground', position: [-31, 0.18, -31], scale: [30, 0.34, 30], solid: false },
     { color: '#3b82f6', id: 'construction-office-body', position: [-38, 1.5, -37], scale: [6, 2.8, 5], solid: true },
     { color: '#facc15', id: 'construction-office-roof', position: [-38, 3.1, -37], scale: [6.8, 0.4, 5.8], solid: false },
     { color: '#f2c94c', id: 'construction-crane-post-west', position: [-27, 2, -38], scale: [0.8, 3.8, 0.8], solid: true },
@@ -325,8 +567,6 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#86552f', id: 'construction-timber-stack-c', position: [-25, 0.8, -26], scale: [3, 1.4, 2], solid: true },
     { color: '#86552f', id: 'construction-sign-post', position: [-40, 1.1, -22], scale: [0.7, 2, 0.7], solid: true },
     { color: '#e24b3f', id: 'construction-sign-board', position: [-40, 2.15, -22], scale: [3.4, 1, 0.4], solid: false },
-    { color: '#78a94f', id: 'town-green-west', position: [22, 0.18, 34], scale: [4, 0.34, 12], solid: false },
-    { color: '#78a94f', id: 'town-green-east', position: [40, 0.18, 35], scale: [4, 0.34, 14], solid: false },
     { color: '#e24b3f', id: 'town-house-red-body', position: [25, 1.5, 25], scale: [6, 2.8, 5], solid: true },
     { color: '#c83e34', id: 'town-house-red-roof', position: [25, 3.1, 25], scale: [6.8, 0.4, 5.8], solid: false },
     { color: '#f2c94c', id: 'town-house-yellow-body', position: [37, 1.5, 25], scale: [6, 2.8, 5], solid: true },
@@ -451,6 +691,9 @@ export function validateProductionWorldMap(
   const ids = [
     ...map.districts.map(({ id }) => id),
     ...map.roads.map(({ id }) => id),
+    ...map.surfaceTiles.map(({ id }) => id),
+    ...map.decorationClusters.map(({ id }) => id),
+    ...map.decorationClusters.flatMap(({ boxes }) => boxes.map(({ id }) => id)),
     ...map.visualBoxes.map(({ id }) => id),
     ...map.landmarks.breakableBlocks.map(({ id }) => id),
     ...map.landmarks.bulldozerDebris.map(({ id }) => id),
@@ -643,6 +886,8 @@ export function validateProductionWorldMap(
       errors.push(`landmark ${landmark.name} expected ${landmark.expected}, received ${received}`);
     }
   }
+
+  errors.push(...validateWorldStreetscape(map));
 
   return errors;
 }
