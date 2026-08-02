@@ -17,6 +17,9 @@ import {
 import { COLOR_PLAY_SOURCES } from '../voxel-game/scene/worldLayout';
 import { buildMissionJobTelemetry } from '../voxel-game/domain/jobTelemetry';
 import { VEHICLE_JOBS } from '../voxel-game/domain/vehicleJobs';
+import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
+import { flattenDecorationBoxes } from '../voxel-game/scene/worldStreetscape';
+import { WORLD_SOLID_BOXES } from '../voxel-game/scene/worldCollisionLayout';
 
 describe('vehicle controller config', () => {
   it('消防車の既存controller値をregistryから解決する', () => {
@@ -114,6 +117,8 @@ describe('buildWorldTelemetry', () => {
       bounds: { maxX: 48, maxZ: 48, minX: -48, minZ: -48 },
       currentDistrict: 'hub',
       destinationDistrict: 'fire',
+      decorationBoxCount: 54,
+      decorationClusterCount: 21,
       districts: [
         { id: 'hub', label: 'ちゅうおうしゃこ' },
         { id: 'park', label: 'こうえん' },
@@ -123,6 +128,14 @@ describe('buildWorldTelemetry', () => {
         { id: 'construction', label: 'こうじヤード' },
         { id: 'town', label: 'おもちゃのまち' },
       ],
+      staticColliderCount: 40,
+      surfaceTileCount: 19,
+    });
+    expect(buildWorldTelemetry([0, 0.8, 6])).toMatchObject({
+      decorationBoxCount: flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters).length,
+      decorationClusterCount: PRODUCTION_WORLD_MAP.decorationClusters.length,
+      staticColliderCount: WORLD_SOLID_BOXES.length,
+      surfaceTileCount: PRODUCTION_WORLD_MAP.surfaceTiles.length,
     });
   });
 

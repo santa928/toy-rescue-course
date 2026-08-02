@@ -65,6 +65,7 @@ import {
 } from './scene/BreakableBlockPlaza';
 import { CHIP_POOL_SIZE } from './scene/breakableVfx';
 import { PRODUCTION_WORLD_MAP } from './scene/productionWorldMap';
+import { flattenDecorationBoxes } from './scene/worldStreetscape';
 import {
   COLOR_PLAY_POOL_SLOT_COUNT,
   COLOR_PLAY_SHOWER_SLOT_COUNT,
@@ -87,6 +88,9 @@ import { PhysicalGpuProbe } from './performance/PhysicalGpuCertificationProbe';
 import { isPhysicalGpuProbeEnabled } from './performance/physicalGpuProbe';
 
 const INITIAL_VEHICLE_ID: VehicleId = 'fire-truck';
+const WORLD_DECORATION_BOX_COUNT = flattenDecorationBoxes(
+  PRODUCTION_WORLD_MAP.decorationClusters,
+).length;
 
 /** 車両位置と静的map定義からE2E向けの簡潔なworld状態を返す。 */
 export function buildWorldTelemetry(
@@ -96,8 +100,12 @@ export function buildWorldTelemetry(
   return {
     bounds: PRODUCTION_WORLD_MAP.bounds,
     currentDistrict: resolveVehicleDistrict(vehiclePosition),
+    decorationBoxCount: WORLD_DECORATION_BOX_COUNT,
+    decorationClusterCount: PRODUCTION_WORLD_MAP.decorationClusters.length,
     destinationDistrict,
     districts: PRODUCTION_WORLD_MAP.districts.map(({ id, label }) => ({ id, label })),
+    staticColliderCount: WORLD_SOLID_BOXES.length,
+    surfaceTileCount: PRODUCTION_WORLD_MAP.surfaceTiles.length,
   };
 }
 

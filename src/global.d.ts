@@ -174,11 +174,15 @@ declare global {
       readonly bounds: import('./voxel-game/scene/productionWorldMap').WorldBounds2D;
       readonly currentDistrict:
         import('./voxel-game/scene/productionWorldMap').ResolvedWorldDistrictId;
+      readonly decorationBoxCount: number;
+      readonly decorationClusterCount: number;
       readonly destinationDistrict: 'fire' | 'blocks' | 'park' | 'south';
       readonly districts: readonly {
         readonly id: import('./voxel-game/scene/productionWorldMap').WorldDistrictId;
         readonly label: string;
       }[];
+      readonly staticColliderCount: number;
+      readonly surfaceTileCount: number;
     };
   }
 
