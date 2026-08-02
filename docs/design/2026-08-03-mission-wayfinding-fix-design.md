@@ -67,7 +67,7 @@ Issue #1で追加した仕事札とミニマップだけでは残った、次の
 
 ### ブルドーザー対象囲い
 
-`bulldozerVfx.ts`の黄色いroute poolへ4固定slotを追加する。7 route slotは既存経路を維持し、4 target slotは未完了対象の周囲へ四角形を作る。`sourceIndex=-2`をtarget slotの内部識別に使い、telemetryではroute 7とtarget 4を別々に数える。
+`bulldozerVfx.ts`の黄色いroute poolへ4固定slotを追加する。7 route slotは既存経路を維持し、4 target slotは未完了対象の周囲へ四角形を作る。`sourceIndex=-2`をtarget slotの内部識別に使い、telemetryではroute 7とtarget 4を別々に数え、実際に描画した囲いの中心も公開する。
 
 成功条件は既存どおり、ブレード操作中、速度0.6以上、前面接触とする。判定値は緩和しない。
 
