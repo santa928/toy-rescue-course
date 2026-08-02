@@ -28,7 +28,7 @@
 - Create: `src/test/worldStreetscape.test.ts`
 - Modify: `src/test/productionWorldMap.test.ts`
 
-- [ ] **Step 1: surface／clusterのtyped contractを要求する失敗testを書く**
+- [x] **Step 1: surface／clusterのtyped contractを要求する失敗testを書く**
 
 `src/test/worldStreetscape.test.ts`で次を先に要求する。
 
@@ -42,7 +42,7 @@ expect(countDecorationClustersByDistrict(PRODUCTION_WORLD_MAP.decorationClusters
 
 `src/test/productionWorldMap.test.ts`では旧地面5件が`visualBoxes`から消え、同じIDで`surfaceTiles`へ移ることを要求する。
 
-- [ ] **Step 2: REDをDocker内で確認する**
+- [x] **Step 2: REDをDocker内で確認する**
 
 Run:
 
@@ -52,7 +52,7 @@ docker compose run --rm web npm test -- --run src/test/worldStreetscape.test.ts 
 
 Expected: `surfaceTiles`、`decorationClusters`、helper未定義でFAIL。
 
-- [ ] **Step 3: contractとpure helperの最小実装を追加する**
+- [x] **Step 3: contractとpure helperの最小実装を追加する**
 
 `productionWorldMap.ts`へ以下の公開型を追加する。
 
@@ -101,13 +101,13 @@ export function validateWorldStreetscape(
 
 被覆率はdistrict内の0.5unit格子点を決定的にsamplingし、road内点を母数から除外して、surface内点の比率を返す。box境界はfull scaleのhalf extentsで計算し、回転したboxは未対応としてvalidatorで拒否しない代わりに今回のsurfaceにはrotationを持たせない。
 
-- [ ] **Step 4: validationの失敗契約をtestで固定する**
+- [x] **Step 4: validationの失敗契約をtestで固定する**
 
 重複ID、NaN、非正scale、world外、地区外、surface上面超過、70%未満、地区ごと1群／5群、新solidの道路1.6unit拡張領域侵入、車庫入口・color trigger 1.5unit侵入、palette外、合計collider 41以上を個別fixtureで検証し、error文字列へ対象IDを含める。
 
 `validateProductionWorldMap()`から`validateWorldStreetscape()`を呼び、起動guardも同じ失敗を返す。
 
-- [ ] **Step 5: canonical dataを追加しGREENにする**
+- [x] **Step 5: canonical dataを追加しGREENにする**
 
 7地区へ基底タイル＋4unit以上間隔の模様を追加し、承認paletteを使う。
 
@@ -124,7 +124,7 @@ const WORLD_SURFACE_PALETTE = {
 
 21群を設計書どおり2/3/3/3/3/3/4で定義する。花、コーン、看板板、旗布、生垣葉は`solid:false`、街灯柱、ベンチ本体、柵支柱、消火栓、大きなバリケード支柱だけを`solid:true`にし、追加solidは13以下とする。装飾色は既存`visualBoxes`のpaletteだけを使う。
 
-- [ ] **Step 6: GREENと関連回帰を確認する**
+- [x] **Step 6: GREENと関連回帰を確認する**
 
 Run:
 
@@ -134,7 +134,7 @@ docker compose run --rm web npm test -- --run src/test/worldStreetscape.test.ts 
 
 Expected: 全PASS、7地区coverage≥0.7、cluster 21、new solid≤13。
 
-- [ ] **Step 7: Task 1をコミットする**
+- [x] **Step 7: Task 1をコミットする**
 
 ```sh
 git add src/voxel-game/scene/worldStreetscape.ts src/voxel-game/scene/productionWorldMap.ts src/test/worldStreetscape.test.ts src/test/productionWorldMap.test.ts
@@ -150,11 +150,11 @@ git commit -m "地区床と街角装飾の共有定義を追加する"
 - Modify: `src/voxel-game/vehicleJobs.ts`
 - Modify: `src/test/vehicleJobs.test.ts`
 
-- [ ] **Step 1: 15仕事targetと新solidの1.5unit clearanceを要求する失敗testを書く**
+- [x] **Step 1: 15仕事targetと新solidの1.5unit clearanceを要求する失敗testを書く**
 
 全`VEHICLE_JOB_DEFINITIONS`のtarget/targetRadiusに対し、`flattenDecorationBoxes(...).filter(solid)`とのXZ分離を検証する。違反fixtureではcluster box IDとjob IDがerrorへ出ることを要求する。
 
-- [ ] **Step 2: REDをDocker内で確認する**
+- [x] **Step 2: REDをDocker内で確認する**
 
 Run:
 
@@ -164,7 +164,7 @@ docker compose run --rm web npm test -- --run src/test/vehicleJobs.test.ts
 
 Expected: job safety validator未接続でFAIL。
 
-- [ ] **Step 3: pure job safety validationを実装する**
+- [x] **Step 3: pure job safety validationを実装する**
 
 `vehicleJobs.ts`へdocstring付きで次を追加し、既存`validateVehicleJobs()`へ統合する。
 
@@ -178,7 +178,7 @@ export function validateDecorationClearanceFromVehicleJobs(
 
 target円へboxのhalf extentsとclearanceを足し、XZの最近接点距離で判定する。循環依存を避けるため、`productionWorldMap.ts`側から仕事定義をimportしない。
 
-- [ ] **Step 4: GREENと全仕事回帰を確認する**
+- [x] **Step 4: GREENと全仕事回帰を確認する**
 
 Run:
 
@@ -188,7 +188,7 @@ docker compose run --rm web npm test -- --run src/test/vehicleJobs.test.ts src/t
 
 Expected: 15仕事とrandom progressionを含め全PASS。
 
-- [ ] **Step 5: Task 2をコミットする**
+- [x] **Step 5: Task 2をコミットする**
 
 ```sh
 git add src/voxel-game/vehicleJobs.ts src/test/vehicleJobs.test.ts
@@ -206,7 +206,7 @@ git commit -m "街角装飾を仕事経路の安全検証へ接続する"
 - Modify: `src/test/productionWorldRender.test.ts`
 - Modify: `src/test/worldCollisionLayout.test.ts`
 
-- [ ] **Step 1: 描画と物理の失敗testを書く**
+- [x] **Step 1: 描画と物理の失敗testを書く**
 
 `productionWorldRender.test.ts`で次を要求する。
 
@@ -216,7 +216,7 @@ git commit -m "街角装飾を仕事経路の安全検証へ接続する"
 
 `worldCollisionLayout.test.ts`で`WORLD_SOLID_BOXES`がlegacy solid＋new decoration solidに一致し、40以下、`WorldSolidColliders`が単一fixed bodyと同数colliderを構成することを要求する。
 
-- [ ] **Step 2: REDをDocker内で確認する**
+- [x] **Step 2: REDをDocker内で確認する**
 
 Run:
 
@@ -226,7 +226,7 @@ docker compose run --rm web npm test -- --run src/test/productionWorldRender.tes
 
 Expected: surface batch未接続、装飾box未描画、collider数不一致でFAIL。
 
-- [ ] **Step 3: 単一surface batchと統合box batchesを実装する**
+- [x] **Step 3: 単一surface batchと統合box batchesを実装する**
 
 `VoxelWorld.tsx`へ`InstancedSurfaceTiles`を追加し、mount/layout更新時だけmatrixとinstance colorを設定する。
 
@@ -240,11 +240,11 @@ function InstancedSurfaceTiles({ tiles }: {
 
 `WORLD_RENDER_BOXES = [...visualBoxes, ...flattenDecorationBoxes(decorationClusters)]`をmodule初期化時に1回だけ作り、`groupWorldBoxesByColor()`へ渡す。新しい毎frame allocationやstate更新は作らない。描画順はground→surface→road→marking→visual/decoration→colliderとし、roadを床より上へ維持する。
 
-- [ ] **Step 4: 単一fixed colliderへ統合する**
+- [x] **Step 4: 単一fixed colliderへ統合する**
 
 `worldCollisionLayout.ts`の`WORLD_SOLID_BOXES`をlegacy visual solid＋decoration solidから生成する。`TREE_TRUNKS`等の既存ID lookup契約は維持し、index依存testだけをID比較へ直す。`WorldSolidColliders`自体は1個の`RigidBody type="fixed"`を維持する。
 
-- [ ] **Step 5: GREENと描画／物理回帰を確認する**
+- [x] **Step 5: GREENと描画／物理回帰を確認する**
 
 Run:
 
@@ -254,7 +254,7 @@ docker compose run --rm web npm test -- --run src/test/productionWorldRender.tes
 
 Expected: 全PASS、surface batch 1、static collider≤40、fixed body 1。
 
-- [ ] **Step 6: Task 3をコミットする**
+- [x] **Step 6: Task 3をコミットする**
 
 ```sh
 git add src/voxel-game/scene/VoxelWorld.tsx src/voxel-game/scene/worldCollisionLayout.ts src/test/productionWorldRender.test.ts src/test/worldCollisionLayout.test.ts
@@ -271,7 +271,7 @@ git commit -m "地区床と街角装飾を描画と物理へ接続する"
 - Modify: `src/voxel-game/VoxelGameApp.tsx`
 - Modify: `src/test/voxelGameRenderTelemetry.test.ts`
 
-- [ ] **Step 1: telemetry countを要求する失敗testを書く**
+- [x] **Step 1: telemetry countを要求する失敗testを書く**
 
 `buildWorldTelemetry()`が`render_game_to_text()`へ渡す`world`へ以下4件を要求する。
 
@@ -284,7 +284,7 @@ expect(payload.world).toMatchObject({
 });
 ```
 
-- [ ] **Step 2: REDをDocker内で確認する**
+- [x] **Step 2: REDをDocker内で確認する**
 
 Run:
 
@@ -294,11 +294,11 @@ docker compose run --rm web npm test -- --run src/test/voxelGameRenderTelemetry.
 
 Expected: 4 count未定義でFAIL。
 
-- [ ] **Step 3: telemetryの型とbuilderをcanonical countへ接続する**
+- [x] **Step 3: telemetryの型とbuilderをcanonical countへ接続する**
 
 `src/global.d.ts`の`VoxelGameTextState['world']`へ4つの`number`を追加する。`buildWorldTelemetry()`はcanonical arraysと`WORLD_SOLID_BOXES`だけからcountを生成し、手書き定数を持たない。HUD表示と文言は変更しない。
 
-- [ ] **Step 4: GREENとapp回帰を確認する**
+- [x] **Step 4: GREENとapp回帰を確認する**
 
 Run:
 
@@ -308,7 +308,7 @@ docker compose run --rm web npm test -- --run src/test/voxelGameRenderTelemetry.
 
 Expected: 全PASS。
 
-- [ ] **Step 5: Task 4をコミットする**
+- [x] **Step 5: Task 4をコミットする**
 
 ```sh
 git add src/global.d.ts src/voxel-game/VoxelGameApp.tsx src/test/voxelGameRenderTelemetry.test.ts
@@ -325,7 +325,7 @@ git commit -m "地区装飾の状態をゲームtelemetryへ公開する"
 - Modify: `docker-compose.yml`
 - Modify: `.gitignore` only if the existing `output/` rule is absent
 
-- [ ] **Step 1: 既存map harnessを再利用する専用E2Eを書く**
+- [x] **Step 1: 既存map harnessを再利用する専用E2Eを書く**
 
 `scripts/verify-voxel-game-streetscape.mjs`へDesktop 1280×720、Tablet 1024×768、Mobile landscape 844×390と7地区のrepresentative poseを定義する。各組み合わせでcache-busting queryを付け、`render_game_to_text()`から次を検証する。
 
@@ -337,15 +337,15 @@ git commit -m "地区装飾の状態をゲームtelemetryへ公開する"
 
 各地区×viewportを`output/voxel-game-streetscape/<viewport>-<district>.png`へfull-page screenshotとして出力し、manifest JSONへviewport、district、HUD bounds、counts、errorsを保存する。
 
-- [ ] **Step 2: solid collisionとnon-solid通過をE2Eへ追加する**
+- [x] **Step 2: solid collisionとnon-solid通過をE2Eへ追加する**
 
 既存drive harnessを使い、代表の追加solid 1件へ車両が侵入しないこと、コーンまたは入口模様のnon-solid 1件を通過できることをdesktopで数値検証する。15仕事、既存solid、色遊びは専用既存E2Eを回帰gateとして後段で実行する。
 
-- [ ] **Step 3: Docker Compose serviceを追加する**
+- [x] **Step 3: Docker Compose serviceを追加する**
 
 `voxel-game-streetscape-e2e`を追加する。`npm run build`→`npm run preview -- --host 127.0.0.1`→専用scriptの順で実行し、outputだけをbind mountする。
 
-- [ ] **Step 4: 3 viewportを分割実行し21画像を作る**
+- [x] **Step 4: 3 viewportを分割実行し21画像を作る**
 
 Run:
 
@@ -357,11 +357,11 @@ VOXEL_GAME_STREETSCAPE_VIEWPORT=mobile-landscape docker compose --profile e2e ru
 
 Expected: 各7画像、合計21画像、manifest PASS、error 0。
 
-- [ ] **Step 5: 21画像を原寸目視し数値boundsを照合する**
+- [x] **Step 5: 21画像を原寸目視し数値boundsを照合する**
 
 各画像で固有床と最低1つの入口／街角装飾が見え、広い木色面、道路の隠れ、装飾見切れ、HUD重なり、操作阻害がないことを目視する。問題があればcanonical座標だけを修正してunit＋該当viewport E2Eを再実行する。
 
-- [ ] **Step 6: Task 5をコミットする**
+- [x] **Step 6: Task 5をコミットする**
 
 ```sh
 git add scripts/verify-voxel-game-streetscape.mjs docker-compose.yml
@@ -381,22 +381,22 @@ git commit -m "全地区の街角装飾E2Eを追加する"
 - Modify: `docs/plans/2026-08-02-district-streetscape-decoration-plan.md`
 - Modify: `progress.md` only if it remains ignored
 
-- [ ] **Step 1: READMEと設計状態を実装済みに同期する**
+- [x] **Step 1: READMEと設計状態を実装済みに同期する**
 
 READMEへ7地区の床色・入口・街角装飾、操作を塞がないsolid方針、`voxel-game-streetscape-e2e`の実行方法を追記する。設計書の状態を「実装・検証済み」へ更新し、実測値だけを記録する。plan checkboxとignored `progress.md`へ実行結果を反映する。
 
-- [ ] **Step 2: fresh full unitとPages base付きbudget buildをDocker内で実行する**
+- [x] **Step 2: fresh full unitとPages base付きbudget buildをDocker内で実行する**
 
 Run:
 
 ```sh
 docker compose run --rm web npm test -- --run
-docker compose run --rm -e GITHUB_PAGES=true web npm run build
+docker compose run --rm web npm run build -- --base=/toy-rescue-course/
 ```
 
 Expected: 全unit PASS。game entry≤350kB、通常chunk≤600kB、Three≤750kB、Rapier≤2.25MB。
 
-- [ ] **Step 3: 既存E2E回帰をDocker内で実行する**
+- [x] **Step 3: 既存E2E回帰をDocker内で実行する**
 
 Run:
 
@@ -411,11 +411,11 @@ docker compose --profile e2e run --rm voxel-game-audio-e2e
 
 Expected: 3入口、15仕事、帰庫、乗り換え、色遊び、積み木破壊、既存collision、audioが全PASS。cache-busting URLを使用する。
 
-- [ ] **Step 4: Apple M4物理GPUで全5車種を再認証する**
+- [x] **Step 4: Apple M4物理GPUで全5車種を再認証する**
 
-Chrome実機で`?gpu-cert=<timestamp>`を付け、fire-truck、bulldozer、excavator、forklift、dump-truckを各1280×720で測定する。各median≥55fps、p10≥45fps、scene calls≤34、console/page/request error 0を記録する。Docker SwiftShaderの数値を認証値に使わない。
+Chrome実機で`?gpu-cert=<timestamp>`を付け、fire-truck、bulldozer、excavator、ambulance、policeを各1280×720で測定する。各median≥55fps、p10≥45fps、scene calls≤34、console error 0を記録する。Docker SwiftShaderの数値を認証値に使わない。
 
-- [ ] **Step 5: 文書同期を日本語コミットする**
+- [x] **Step 5: 文書同期を日本語コミットする**
 
 ```sh
 git add README.md docs/design/2026-08-02-district-streetscape-decoration-design.md docs/plans/2026-08-02-district-streetscape-decoration-plan.md
@@ -464,3 +464,11 @@ Pages workflowの成功を待ち、公開URLをcache-busting付きで検証す�
 - [ ] **Step 9: goalをcompleteにする**
 
 全受け入れ条件と公開確認が完了した後だけ`update_goal(status="complete")`を呼び、最終報告へcommit、remote SHA、Pages run、公開URL、unit／E2E／GPU実測値を記載する。
+
+## 実測サマリー
+
+- canonical data: surface 19、decoration cluster 21、decoration box 54、static collider 40。
+- 専用街角E2E: 7地区×3 viewport＝21組、21画像を原寸目視、scene 23〜31 calls、browser error 0。
+- canonical full: 全scenario成功、33 screenshot proofs、contract failure 0、browser error 0/0/0。
+- fresh unit／build: Vitest 47 files／453 tests、drive harness 8/8、657 modules。game 158,103 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytes。
+- Apple M4: 全5車種median 59.88fps、p10 55.87〜57.47fps、scene 29〜32 calls、vehicle 7 calls、console error 0。

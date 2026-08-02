@@ -2,7 +2,7 @@
 
 **日付:** 2026-08-02
 
-**状態:** 設計承認済み・実装未着手
+**状態:** 実装・ローカル検証済み（GitHub Pages公開待ち）
 
 **対象:** 7地区の床色・模様、入口サイン、街角装飾、物理、telemetry、3 viewport、性能再認証
 
@@ -184,3 +184,23 @@ pure validatorは次をID付きのエラーとして拒否する。
 - [x] 性能目標がある。
 - [x] 要件差分に維持・追加・保留・削除がある。
 - [x] 保留・削除を暗黙化していない。
+
+## 14. 実装・検証結果
+
+canonical dataはsurface 19枚、decoration 21群／54 box、static collider 40件で確定した。床は1 `InstancedMesh`、装飾は既存palette batch、全solidは単一fixed bodyから生成し、追加asset fetchと毎frame React state更新は増やしていない。telemetryも同じ配列から件数を公開する。
+
+専用街角E2Eは7地区×3 viewportの21組を完走し、各画像を原寸目視した。固有床または模様、最低1群の入口／街角装飾、HUDの安全余白を全組で確認し、広い木色面、道路の隠れ、重なり、はみ出し、操作阻害はなかった。sceneは23〜31 calls、代表solid衝突とnon-solid通過、console／page／request error 0を確認した。
+
+既存map、車両、色遊び、5台fleet、audio、production smokeとcanonical fullを再実行した。canonical fullは全scenario成功、33 screenshot proofs、contract failure 0、browser error 0/0/0で、40 collider、3 viewport完全ミッション、流動する水、4色の約1.2秒破壊時系列を含む。fresh unitは47 files／453 tests、drive harnessは8/8、production buildは657 modulesで成功した。bundleはgame 158,103 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで全予算内だった。
+
+Apple M4／ANGLE Metal、1280×720、2秒warm-up＋12秒probeの実測は次のとおり。全車console error 0、車体7 callsだった。
+
+| 車両 | median fps | p10 fps | 平均 fps | scene calls |
+| --- | ---: | ---: | ---: | ---: |
+| 消防車 | 59.88 | 57.47 | 59.98 | 30 |
+| ブルドーザー | 59.88 | 55.87 | 59.90 | 29 |
+| ショベルカー | 59.88 | 55.87 | 59.98 | 32 |
+| 救急車 | 59.88 | 56.50 | 59.98 | 32 |
+| パトカー | 59.88 | 56.82 | 59.98 | 32 |
+
+median 55fps、p10 45fps、scene 34 calls、static collider 40件の全上限を満たしたため、性能未達時の削減策とchunk streaming／LODは発動しない。
