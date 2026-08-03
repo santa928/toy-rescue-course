@@ -7,6 +7,7 @@ import {
 import {
   BULLDOZER_CHIP_POOL_SIZE,
   BULLDOZER_DEBRIS_VOXEL_POOL_SIZE,
+  BULLDOZER_DYNAMIC_FRUSTUM_CULLED,
   BULLDOZER_STAR_POOL_SIZE,
   createBulldozerVfxFrame,
   hideBulldozerMissionFrame,
@@ -152,13 +153,14 @@ describe('bulldozer VFX frame', () => {
   it('3塊×4 voxel、18 chip、7 route、4 target、固定成功星slotを一度だけ確保する', () => {
     const frame = createBulldozerVfxFrame();
 
+    expect(BULLDOZER_DYNAMIC_FRUSTUM_CULLED).toBe(false);
     expect(frame.debris).toHaveLength(BULLDOZER_DEBRIS_VOXEL_POOL_SIZE);
     expect(frame.chips).toHaveLength(BULLDOZER_CHIP_POOL_SIZE);
     expect(frame.routeMarkers).toHaveLength(BULLDOZER_ROUTE_MARKER_POSITIONS.length + 4);
     expect(frame.stars).toHaveLength(BULLDOZER_STAR_POOL_SIZE);
   });
 
-  it('assigned中は3塊、7 route、次対象の4辺囲いを表示し、chipと星を隠す', () => {
+  it('assigned中は3塊、7 route、次対象を囲む浮いた4本ポールを表示し、chipと星を隠す', () => {
     const frame = createBulldozerVfxFrame();
     const debrisReference = frame.debris;
     const clearTimes = new Float64Array([-1, -1, -1]);
@@ -170,6 +172,14 @@ describe('bulldozer VFX frame', () => {
     expect(frame.debris.filter(({ active }) => active)).toHaveLength(12);
     expect(frame.routeMarkers.filter(({ active, sourceIndex }) => active && sourceIndex === -1))
       .toHaveLength(7);
+    const targetMarkers = frame.routeMarkers
+      .filter(({ active, sourceIndex }) => active && sourceIndex === -2);
+    expect(targetMarkers).toHaveLength(4);
+    expect(targetMarkers.every(({ position }) => position[1] > 1)).toBe(true);
+    expect(targetMarkers.every(({ scale }) => scale[1] > scale[0] && scale[1] > scale[2]))
+      .toBe(true);
+    expect(new Set(targetMarkers.map(({ position }) => position[0]))).toHaveLength(2);
+    expect(new Set(targetMarkers.map(({ position }) => position[2]))).toHaveLength(2);
     expect(readTargetMarkerCenter(frame)).toEqual([-29.5, 12.5]);
     expect(frame.chips.filter(({ active }) => active)).toHaveLength(0);
     expect(frame.stars.filter(({ active }) => active)).toHaveLength(0);

@@ -13,6 +13,7 @@ export const BULLDOZER_DEBRIS_VOXEL_POOL_SIZE =
 export const BULLDOZER_CHIP_POOL_SIZE = BULLDOZER_DEBRIS.length * BULLDOZER_CHIPS_PER_SOURCE;
 export const BULLDOZER_STAR_POOL_SIZE = 12;
 export const BULLDOZER_TARGET_MARKER_SLOT_COUNT = 4;
+export const BULLDOZER_DYNAMIC_FRUSTUM_CULLED = false;
 export const BULLDOZER_GUIDE_POOL_SIZE = BULLDOZER_ROUTE_MARKER_POSITIONS.length
   + BULLDOZER_TARGET_MARKER_SLOT_COUNT;
 
@@ -60,10 +61,10 @@ const STAR_OFFSETS = [
   [0.5, 1.55, 0.45], [1.5, 1.35, -0.55], [0, 2.1, 0.2],
 ] as const;
 const TARGET_MARKER_PARTS = [
-  { offset: [0, 0, -1.45], scale: [2.5, 0.12, 0.24] },
-  { offset: [0, 0, 1.45], scale: [2.5, 0.12, 0.24] },
-  { offset: [-1.45, 0, 0], scale: [0.24, 0.12, 2.5] },
-  { offset: [1.45, 0, 0], scale: [0.24, 0.12, 2.5] },
+  { offset: [-1.35, 0, -1.35], scale: [0.32, 0.9, 0.32] },
+  { offset: [1.35, 0, -1.35], scale: [0.32, 0.9, 0.32] },
+  { offset: [-1.35, 0, 1.35], scale: [0.32, 0.9, 0.32] },
+  { offset: [1.35, 0, 1.35], scale: [0.32, 0.9, 0.32] },
 ] as const;
 
 /** 指定paletteとsourceへ紐づく非active固定slotを作る。 */
@@ -210,7 +211,7 @@ export function updateBulldozerVfxFrame(
       const pulse = 1 + Math.sin(safeElapsed * 5) * 0.06;
       transform.active = true;
       transform.position[0] = target.position[0] + part.offset[0];
-      transform.position[1] = 0.3 + Math.sin(safeElapsed * 4) * 0.05;
+      transform.position[1] = 1.35 + Math.sin(safeElapsed * 4) * 0.08;
       transform.position[2] = target.position[2] + part.offset[2];
       transform.scale[0] = part.scale[0] * pulse;
       transform.scale[1] = part.scale[1];

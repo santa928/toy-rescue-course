@@ -10,6 +10,7 @@ import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetryRef } from './VehicleController';
 import type { WorldPoint } from './productionWorldMap';
 import {
+  BULLDOZER_DYNAMIC_FRUSTUM_CULLED,
   BULLDOZER_GUIDE_POOL_SIZE,
   createBulldozerVfxFrame,
   hideBulldozerMissionFrame,
@@ -68,7 +69,7 @@ const MINIMUM_CLEAR_SPEED = 0.6;
 const UNIT_GEOMETRY = new THREE.BoxGeometry(1, 1, 1);
 const PALETTE_COLORS: Readonly<Record<BulldozerVfxPaletteId, string>> = {
   crate: '#d89a32',
-  route: '#f59e0b',
+  route: '#facc15',
   star: '#fff1a6',
   stone: '#858b94',
   timber: '#9a5d2f',
@@ -151,11 +152,16 @@ function VoxelPool({
   readonly palette: BulldozerVfxPaletteId;
 }): ReactElement {
   return (
-    <instancedMesh args={[UNIT_GEOMETRY, undefined, count]} dispose={null} ref={meshRef}>
+    <instancedMesh
+      args={[UNIT_GEOMETRY, undefined, count]}
+      dispose={null}
+      frustumCulled={BULLDOZER_DYNAMIC_FRUSTUM_CULLED}
+      ref={meshRef}
+    >
       <meshLambertMaterial
         color={PALETTE_COLORS[palette]}
-        emissive={palette === 'star' ? '#d97706' : undefined}
-        emissiveIntensity={palette === 'star' ? 0.24 : 0}
+        emissive={palette === 'star' ? '#d97706' : palette === 'route' ? '#a16207' : undefined}
+        emissiveIntensity={palette === 'star' ? 0.24 : palette === 'route' ? 0.08 : 0}
       />
     </instancedMesh>
   );
