@@ -63,12 +63,15 @@ const targets = [
 const expectedScreenshots = [
   'desktop-driving.png',
   'desktop-second-fire-wayfinding.png',
+  'desktop-third-fire-wayfinding.png',
   'desktop-water-fire.png',
   'desktop-block-broken.png',
   'desktop-complete.png',
   'tablet-landscape-driving.png',
   'tablet-landscape-water-fire.png',
   'mobile-landscape-driving.png',
+  'mobile-second-fire-wayfinding.png',
+  'mobile-third-fire-wayfinding.png',
   'mobile-landscape-water-fire.png',
 ];
 const timelineScreenshots = [
@@ -2051,7 +2054,7 @@ async function verifyCompleteMission(
   const touch = hasTouch ? await createTouchDriver(page) : null;
   try {
     const cycles = [];
-    for (let cycleIndex = 1; cycleIndex <= 2; cycleIndex += 1) {
+    for (let cycleIndex = 1; cycleIndex <= 3; cycleIndex += 1) {
       const initial = await readGameState(page);
       assertInitialWorldPhysicsContract(initial);
       assert.equal(initial.mission.jobCycle, cycleIndex,
@@ -2089,6 +2092,20 @@ async function verifyCompleteMission(
           page,
           `${outputDirectory}/desktop-second-fire-wayfinding.png`,
           `${name}: second fire wayfinding capture`,
+        );
+      }
+      if (!hasTouch && cycleIndex === 3) {
+        await captureStableMissionScreenshot(
+          page,
+          `${outputDirectory}/desktop-third-fire-wayfinding.png`,
+          `${name}: third fire wayfinding capture`,
+        );
+      }
+      if (hasTouch && target.width === 844 && cycleIndex >= 2) {
+        await captureStableMissionScreenshot(
+          page,
+          `${outputDirectory}/mobile-${cycleIndex === 2 ? 'second' : 'third'}-fire-wayfinding.png`,
+          `${name}: cycle ${cycleIndex} mobile fire wayfinding capture`,
         );
       }
       if (touch) await touch.pressSpray();
@@ -2154,8 +2171,8 @@ async function verifyCompleteMission(
         targetedDistance: targeted.mission.distance,
       });
     }
-    assert.equal(new Set(cycles.map(({ completedJobId }) => completedJobId)).size, 2,
-      `${name}: two completed cycles did not use distinct jobs.`);
+    assert.equal(new Set(cycles.map(({ completedJobId }) => completedJobId)).size, 3,
+      `${name}: three completed cycles did not use every fire job once.`);
     return {
       ...cycles[0],
       cycles,

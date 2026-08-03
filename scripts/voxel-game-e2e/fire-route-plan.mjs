@@ -25,39 +25,40 @@ export function createFireRoutePlan(jobId, target, routeMarkers) {
     'fire route target must be a finite 3D point.',
   );
   assert(
-    jobId === 'fire-side' || jobId === 'fire-window-left' || jobId === 'fire-window-right',
+    jobId === 'fire-side' || jobId === 'fire-hydrant' || jobId === 'fire-planter',
     `unsupported fire job: ${jobId}`,
   );
   assertRouteMarkers(routeMarkers);
 
-  const approachesNorthFace = jobId !== 'fire-side';
+  const approachesOpenTarget = jobId !== 'fire-side';
   const approachStart = routeMarkers.at(-2);
   const approachEnd = routeMarkers.at(-1);
-  if (approachesNorthFace) {
+  if (approachesOpenTarget) {
     assert(
-      approachStart[2] < target[2] && approachEnd[2] < target[2],
-      'window fire route must stay north of target.',
+      Math.abs(approachStart[2] - target[2]) <= 0.01
+        && Math.abs(approachEnd[2] - target[2]) <= 0.01,
+      'outdoor fire route must share the target latitude.',
     );
     assert(
-      Math.abs(approachEnd[0] - target[0]) <= 0.01,
-      'window fire route must align with target X.',
+      approachEnd[0] > target[0],
+      'outdoor fire route must stay east of target.',
     );
     assert(
-      approachEnd[2] > approachStart[2],
-      'window fire route must finish facing south toward the target.',
+      approachEnd[0] < approachStart[0],
+      'outdoor fire route must finish facing west toward the target.',
     );
   }
-  const latitudeZ = approachesNorthFace
-    ? approachEnd[2]
+  const latitudeZ = approachesOpenTarget
+    ? target[2]
     : target[2] + EAST_FACE_LATITUDE_OFFSET;
   return Object.freeze({
-    acquisitionAxis: approachesNorthFace ? 'positiveZ' : 'negativeX',
-    arrivalDistrict: approachesNorthFace ? 'road' : 'fire',
-    approachFace: approachesNorthFace ? 'north' : 'east',
-    approachStartZ: approachesNorthFace ? approachStart[2] : latitudeZ,
+    acquisitionAxis: 'negativeX',
+    arrivalDistrict: 'fire',
+    approachFace: approachesOpenTarget ? 'open-east' : 'east',
+    approachStartZ: approachesOpenTarget ? approachStart[2] : latitudeZ,
     latitudeZ,
-    requiresEastLaneBeforeReturn: approachesNorthFace,
-    stagingX: approachesNorthFace ? approachEnd[0] : target[0] + TARGET_STAGING_OFFSET,
+    requiresEastLaneBeforeReturn: false,
+    stagingX: approachesOpenTarget ? approachEnd[0] : target[0] + TARGET_STAGING_OFFSET,
     trunkX: EAST_TRUNK_X,
   });
 }

@@ -170,7 +170,7 @@ function addFirePositionOffset(
   ];
 }
 
-/** 火災建物越しにも見える、spray target基準の黄色い下向き矢印を作る。 */
+/** 進入路から見える火災targetを補助する、黄色い下向き矢印を作る。 */
 export function createFireTargetBeaconBoxes(
   sprayTarget: readonly [number, number, number],
 ): readonly VoxelBox[] {

@@ -61,7 +61,7 @@ describe('deriveToyAudioEvents', () => {
   it('job cycle変更に伴う進捗resetを完了扱いにしない', () => {
     expect(deriveToyAudioEvents(
       snapshot({ current: 3, phase: 'freeRoam' }),
-      snapshot({ current: 0, jobCycle: 2, jobId: 'fire-window-left', phase: 'assigned' }),
+      snapshot({ current: 0, jobCycle: 2, jobId: 'fire-hydrant', phase: 'assigned' }),
     )).toEqual([]);
   });
 });

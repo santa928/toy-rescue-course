@@ -24,33 +24,58 @@ describe('fire route plan', () => {
     assert(Math.abs(plan.stagingX - 32.7) < 1e-9);
   });
 
-  test('窓火災は北道路から南向きに照準し、帰りは東道路へ迂回する', () => {
+  test('消火栓そばの屋外火災は東側から西向きに照準する', () => {
     const plan = createFireRoutePlan(
-      'fire-window-left',
-      [22.2, 1.45, -19.6],
-      [[30, 0.26, -23.5], [22.2, 0.26, -23]],
+      'fire-hydrant',
+      [18.5, 1.45, -10.5],
+      [[32, 0.26, -10.5], [24.3, 0.26, -10.5]],
     );
-    assert.deepEqual({ ...plan, latitudeZ: 0 }, {
-      acquisitionAxis: 'positiveZ',
-      arrivalDistrict: 'road',
-      approachFace: 'north',
-      approachStartZ: -23.5,
-      latitudeZ: 0,
-      requiresEastLaneBeforeReturn: true,
-      stagingX: 22.2,
+    assert.deepEqual(plan, {
+      acquisitionAxis: 'negativeX',
+      arrivalDistrict: 'fire',
+      approachFace: 'open-east',
+      approachStartZ: -10.5,
+      latitudeZ: -10.5,
+      requiresEastLaneBeforeReturn: false,
+      stagingX: 24.3,
       trunkX: 30,
     });
-    assert(Math.abs(plan.latitudeZ - -23) < 1e-9);
   });
 
-  test('窓火災の描画ルートが火災より南で止まる退行を拒否する', () => {
+  test('花壇そばの屋外火災も東側から西向きに照準する', () => {
+    const plan = createFireRoutePlan(
+      'fire-planter',
+      [25.5, 1.45, -8],
+      [[32, 0.26, -8], [31.3, 0.26, -8]],
+    );
+    assert.deepEqual(plan, {
+      acquisitionAxis: 'negativeX',
+      arrivalDistrict: 'fire',
+      approachFace: 'open-east',
+      approachStartZ: -8,
+      latitudeZ: -8,
+      requiresEastLaneBeforeReturn: false,
+      stagingX: 31.3,
+      trunkX: 30,
+    });
+  });
+
+  test('屋外火災を背にするか対象を通り越す描画ルートを拒否する', () => {
     assert.throws(
       () => createFireRoutePlan(
-        'fire-window-right',
-        [15.2, 1.45, -19.6],
-        [[30, 0.26, -10], [15.2, 0.26, -13.8]],
+        'fire-hydrant',
+        [18.5, 1.45, -10.5],
+        [[24.3, 0.26, -10.5], [30, 0.26, -10.5]],
       ),
-      /north of target/,
+      /finish facing west/,
+    );
+    assert.throws(
+      () => createFireRoutePlan(
+        'fire-planter',
+        [25.5, 1.45, -8],
+        [[32, 0.26, -8], [25, 0.26, -8]],
+      ),
+      /east of target/,
     );
   });
 

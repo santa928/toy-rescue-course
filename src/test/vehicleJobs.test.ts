@@ -11,16 +11,30 @@ import {
   resolveWorldDistrict,
   type WorldBoxDefinition,
 } from '../voxel-game/scene/productionWorldMap';
+import { getVehicleDefinition } from '../voxel-game/domain/vehicleDefinitions';
 import { flattenDecorationBoxes } from '../voxel-game/scene/worldStreetscape';
 
 describe('vehicle jobs', () => {
-  it('消防車へ3つの実在火災仕事を定義する', () => {
-    const jobs = getVehicleJobs('fire-truck');
+  it('消防車へ道路から見える3つの実在火災仕事を定義する', () => {
+    const jobs = VEHICLE_JOBS['fire-truck'];
 
-    expect(jobs.map(({ id }) => id)).toEqual([
-      'fire-side',
-      'fire-window-left',
-      'fire-window-right',
+    expect(getVehicleJobs('fire-truck')).toBe(jobs);
+    expect(jobs.map(({ id, label, sprayTarget }) => ({ id, label, sprayTarget }))).toEqual([
+      {
+        id: 'fire-side',
+        label: 'よこの火をけそう',
+        sprayTarget: [26.9, 1.45, -16.1],
+      },
+      {
+        id: 'fire-hydrant',
+        label: 'しょうかせんのそばをけそう',
+        sprayTarget: [18.5, 1.45, -10.5],
+      },
+      {
+        id: 'fire-planter',
+        label: 'おはなのそばをけそう',
+        sprayTarget: [25.5, 1.45, -8],
+      },
     ]);
     expect(jobs.every((job) => (
       job.kind === 'fire-rescue'
@@ -32,24 +46,28 @@ describe('vehicle jobs', () => {
     ))).toBe(true);
   });
 
-  it('窓火災は建物の東を迂回して北面の火を向く道しるべを持つ', () => {
+  it('屋外火災は建物の南側で見え、最後の道しるべが東から火を向く', () => {
     const fireBuilding = PRODUCTION_WORLD_MAP.visualBoxes
       .find(({ id }) => id === 'fire-building-body');
     expect(fireBuilding).toBeDefined();
     if (!fireBuilding) return;
-    const eastEdge = fireBuilding.position[0] + fireBuilding.scale[0] / 2;
-    const northEdge = fireBuilding.position[2] - fireBuilding.scale[2] / 2;
+    const southEdge = fireBuilding.position[2] + fireBuilding.scale[2] / 2;
+    const [colliderHalfX, , colliderHalfZ] = getVehicleDefinition('fire-truck')
+      .collider.halfExtents;
+    const turningCorridorSupport = Math.hypot(colliderHalfX, colliderHalfZ);
+    const corridorReserve = 0.5;
 
     for (const job of VEHICLE_JOBS['fire-truck'].slice(1)) {
-      expect(job.routeMarkers.some(([x]) => x >= eastEdge + 3)).toBe(true);
-      expect(job.routeMarkers.at(-2)?.[2]).toBeLessThan(northEdge - 3);
-      expect(job.routeMarkers.at(-1)).toEqual([
-        job.sprayTarget[0],
-        0.26,
-        job.sprayTarget[2] - 3.4,
-      ]);
-      expect((job.routeMarkers.at(-1)?.[2] ?? 0) - (job.routeMarkers.at(-2)?.[2] ?? 0))
-        .toBeGreaterThan(0);
+      const approachStart = job.routeMarkers.at(-2);
+      const approachEnd = job.routeMarkers.at(-1);
+
+      expect(job.sprayTarget[2]).toBeGreaterThan(southEdge);
+      expect(job.sprayTarget[2] - turningCorridorSupport)
+        .toBeGreaterThan(southEdge + corridorReserve);
+      expect(approachStart?.[2]).toBe(job.sprayTarget[2]);
+      expect(approachEnd?.[2]).toBe(job.sprayTarget[2]);
+      expect(approachStart?.[0]).toBeGreaterThan(approachEnd?.[0] ?? Number.POSITIVE_INFINITY);
+      expect(approachEnd?.[0]).toBeGreaterThan(job.sprayTarget[0]);
     }
   });
 

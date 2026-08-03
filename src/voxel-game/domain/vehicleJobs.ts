@@ -18,8 +18,8 @@ import type { ActionTargetInteraction } from './actionTargetContact';
 /** 1 session内で抽選する全仕事の識別子。 */
 export type VehicleJobId =
   | 'fire-side'
-  | 'fire-window-left'
-  | 'fire-window-right'
+  | 'fire-hydrant'
+  | 'fire-planter'
   | 'debris-north'
   | 'debris-south'
   | 'debris-west'
@@ -128,7 +128,7 @@ export interface VehicleJobRegistry {
   readonly police: readonly PoliceVehicleJobDefinition[];
 }
 
-const FIRE_WINDOW_ROUTE_COMMON = PRODUCTION_WORLD_MAP.landmarks.fireRouteMarkers.slice(0, 6);
+const FIRE_OUTDOOR_ROUTE_COMMON = PRODUCTION_WORLD_MAP.landmarks.fireRouteMarkers.slice(0, 6);
 
 /** 火災照準点の周囲へ既存数と同じ6個の成功星中心を作る。 */
 function createFireCelebrationCenters([x, y, z]: WorldPoint): readonly WorldPoint[] {
@@ -142,19 +142,19 @@ function createFireCelebrationCenters([x, y, z]: WorldPoint): readonly WorldPoin
   ];
 }
 
-const FIRE_WINDOW_LEFT_TARGET = [22.2, 1.45, -19.6] as const;
-const FIRE_WINDOW_RIGHT_TARGET = [24.8, 1.45, -19.6] as const;
+const FIRE_HYDRANT_TARGET = [18.5, 1.45, -10.5] as const;
+const FIRE_PLANTER_TARGET = [25.5, 1.45, -8] as const;
 
-/** 東道路を北上して窓の正面へ南向きに入る、12点の消防車routeを作る。 */
-function createWindowFireRoute([x, , z]: WorldPoint): readonly WorldPoint[] {
+/** 東道路から見通しのよい屋外targetへ西向きに入る、12点の消防車routeを作る。 */
+function createOutdoorFireRoute([x, , z]: WorldPoint): readonly WorldPoint[] {
   return [
-    ...FIRE_WINDOW_ROUTE_COMMON,
+    ...FIRE_OUTDOOR_ROUTE_COMMON,
+    [20, 0.26, 0],
     [24, 0.26, 0],
-    [30, 0.26, -4],
-    [30, 0.26, -12],
-    [30, 0.26, -23.5],
-    [x, 0.26, -23.5],
-    [x, 0.26, Number((z - 3.4).toFixed(6))],
+    [28, 0.26, 0],
+    [32, 0.26, -4],
+    [32, 0.26, z],
+    [Number((x + 5.8).toFixed(6)), 0.26, z],
   ];
 }
 
@@ -253,23 +253,23 @@ export const VEHICLE_JOBS = {
       vehicleId: 'fire-truck',
     },
     {
-      celebrationStarCenters: createFireCelebrationCenters(FIRE_WINDOW_LEFT_TARGET),
+      celebrationStarCenters: createFireCelebrationCenters(FIRE_HYDRANT_TARGET),
       destinationDistrict: 'fire',
-      id: 'fire-window-left',
+      id: 'fire-hydrant',
       kind: 'fire-rescue',
-      label: 'ひだりのまどをけそう',
-      routeMarkers: createWindowFireRoute(FIRE_WINDOW_LEFT_TARGET),
-      sprayTarget: FIRE_WINDOW_LEFT_TARGET,
+      label: 'しょうかせんのそばをけそう',
+      routeMarkers: createOutdoorFireRoute(FIRE_HYDRANT_TARGET),
+      sprayTarget: FIRE_HYDRANT_TARGET,
       vehicleId: 'fire-truck',
     },
     {
-      celebrationStarCenters: createFireCelebrationCenters(FIRE_WINDOW_RIGHT_TARGET),
+      celebrationStarCenters: createFireCelebrationCenters(FIRE_PLANTER_TARGET),
       destinationDistrict: 'fire',
-      id: 'fire-window-right',
+      id: 'fire-planter',
       kind: 'fire-rescue',
-      label: 'みぎのまどをけそう',
-      routeMarkers: createWindowFireRoute(FIRE_WINDOW_RIGHT_TARGET),
-      sprayTarget: FIRE_WINDOW_RIGHT_TARGET,
+      label: 'おはなのそばをけそう',
+      routeMarkers: createOutdoorFireRoute(FIRE_PLANTER_TARGET),
+      sprayTarget: FIRE_PLANTER_TARGET,
       vehicleId: 'fire-truck',
     },
   ],
