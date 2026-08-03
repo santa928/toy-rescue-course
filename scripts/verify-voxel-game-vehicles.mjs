@@ -177,6 +177,7 @@ async function setPrimaryAction(page, touch, pressed) {
 /** telemetryの3対象へ安全な外側レーンから1個ずつブレードを当て、job座標に依存せず完了する。 */
 async function clearCurrentDebrisJob(page, viewport, touchDriver) {
   const initial = await readGameState(page);
+  const initialGuidedTarget = initial.mission.guidance.targetPosition;
   const targets = [...initial.landmarks.bulldozerDebris]
     .sort((left, right) => left.position[2] - right.position[2]);
   assert.equal(targets.length, 3, `${viewport.name}: current job does not expose three debris targets.`);
@@ -211,6 +212,10 @@ async function clearCurrentDebrisJob(page, viewport, touchDriver) {
       touchDriver,
       0.35,
     );
+    if (targetIndex === 1) {
+      await waitForFrames(page, 2);
+      await page.screenshot({ path: `${outputDirectory}/${viewport.name}-next-target.png` });
+    }
     await setPrimaryAction(page, viewport.touch, true);
     try {
       const expectedClearedCount = clearedCount + 1;
@@ -224,6 +229,16 @@ async function clearCurrentDebrisJob(page, viewport, touchDriver) {
       clearedCount = expectedClearedCount;
       if (targetIndex === 0) {
         await waitForFrames(page, 2);
+        const nextTarget = await readGameState(page);
+        assert.equal(nextTarget.bulldozer.targetMarkerCount, 4,
+          `${viewport.name}: cycle 2 next target marker disappeared after the first clear.`);
+        assert.deepEqual(
+          nextTarget.bulldozer.targetMarkerCenter.filter((_, index) => index !== 1),
+          nextTarget.mission.guidance.targetPosition.filter((_, index) => index !== 1),
+          `${viewport.name}: cycle 2 target marker did not follow the guided debris.`,
+        );
+        assert.notDeepEqual(nextTarget.mission.guidance.targetPosition, initialGuidedTarget,
+          `${viewport.name}: cycle 2 target marker did not advance after the first clear.`);
         await page.screenshot({ path: `${outputDirectory}/${viewport.name}-cycle-2-worksite.png` });
       }
     } finally {
@@ -289,6 +304,21 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(selected.mission.jobLabel, 'きたのがれきをかたづけよう');
     assert.equal(selected.mission.jobCycle, 1);
     assert.equal(selected.mission.jobSeed, 1);
+    assert.equal(
+      selected.mission.guidance.instructionLabel,
+      'ブレードをおしながら がれきにぶつかる',
+      `${viewport.name}: bulldozer instruction does not explain the required action.`,
+    );
+    assert.equal(selected.mission.guidance.targetLabel, 'つぎの がれき');
+    assert.equal(selected.visuals.targetBeaconCubeCount, 4,
+      `${viewport.name}: initial bulldozer target beacon is incomplete.`);
+    assert.equal(selected.bulldozer.targetMarkerCount, 4,
+      `${viewport.name}: initial bulldozer target marker is incomplete.`);
+    assert.deepEqual(
+      selected.bulldozer.targetMarkerCenter.filter((_, index) => index !== 1),
+      selected.mission.guidance.targetPosition.filter((_, index) => index !== 1),
+      `${viewport.name}: initial bulldozer marker does not surround the guided debris.`,
+    );
     assert.deepEqual(
       selected.mission.targetPositions,
       selected.landmarks.bulldozerDebris.map(({ position }) => position),
@@ -364,6 +394,10 @@ async function verifyViewport(browser, viewport, errors) {
       `${viewport.name}: completion phase is wrong: ${completed.mission.phase}.`);
     assert.equal(completed.fire.intensity, 1, `${viewport.name}: bulldozer action extinguished fire.`);
     assert.equal(completed.visuals.waterCubeCount, 0, `${viewport.name}: bulldozer action emitted water.`);
+    assert.equal(completed.visuals.targetBeaconCubeCount, 0,
+      `${viewport.name}: completed bulldozer job kept a target beacon.`);
+    assert.equal(completed.bulldozer.targetMarkerCount, 0,
+      `${viewport.name}: completed bulldozer job kept a target marker.`);
 
     await page.evaluate(() => window.advanceTime?.(1_800));
     await waitForFrames(page, 2);
@@ -514,6 +548,7 @@ try {
     screenshots: viewports.flatMap(({ name }) => [
       `${name}-bulldozer.png`,
       `${name}-worksite.png`,
+      `${name}-next-target.png`,
       `${name}-cycle-2-worksite.png`,
     ]),
     viewports,

@@ -62,6 +62,7 @@ const targets = [
 ];
 const expectedScreenshots = [
   'desktop-driving.png',
+  'desktop-second-fire-wayfinding.png',
   'desktop-water-fire.png',
   'desktop-block-broken.png',
   'desktop-complete.png',
@@ -1132,7 +1133,8 @@ async function driveMissionToFire(page, touchDriver) {
   const initial = await readGameState(page);
   const garage = initial.landmarks.garage;
   const target = initial.landmarks.fireSprayTarget;
-  const routePlan = createFireRoutePlan(initial.mission.jobId, target);
+  const routeMarkerPositions = initial.visualLayout.routeMarkers.map(({ position }) => position);
+  const routePlan = createFireRoutePlan(initial.mission.jobId, target, routeMarkerPositions);
   await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= garage[2] - 3,
     'fire route garage opening', touchDriver);
   await alignWorldCoordinate(page, 2, 0, 'fire route central crossing Z', 0.5, touchDriver);
@@ -1140,13 +1142,13 @@ async function driveMissionToFire(page, touchDriver) {
     'fire route east trunk road', touchDriver);
   await alignWorldCoordinate(page, 0, routePlan.trunkX, 'fire route east road X', 0.4, touchDriver);
   await driveAlongWorldAxis(page, 'negativeZ', (state) => (
-    state.vehicle.position[2] <= routePlan.latitudeZ
+    state.vehicle.position[2] <= routePlan.approachStartZ
   ), 'fire route north road', touchDriver);
   await alignWorldCoordinate(
     page,
     2,
-    routePlan.latitudeZ,
-    'fire route target latitude',
+    routePlan.approachStartZ,
+    'fire route approach latitude',
     0.9,
     touchDriver,
   );
@@ -1155,6 +1157,14 @@ async function driveMissionToFire(page, touchDriver) {
     0,
     routePlan.stagingX,
     `fire route target ${routePlan.approachFace} staging`,
+    0.35,
+    touchDriver,
+  );
+  await alignWorldCoordinate(
+    page,
+    2,
+    routePlan.latitudeZ,
+    'fire route final heading',
     0.35,
     touchDriver,
   );
@@ -1926,6 +1936,7 @@ async function driveMissionBackToGarage(page, touchDriver) {
   const routePlan = createFireRoutePlan(
     initial.mission.jobId,
     initial.landmarks.fireSprayTarget,
+    initial.visualLayout.routeMarkers.map(({ position }) => position),
   );
   if (routePlan.requiresEastLaneBeforeReturn) {
     await driveAlongWorldAxis(
@@ -2050,6 +2061,10 @@ async function verifyCompleteMission(
         `${name}: cycle ${cycleIndex} fire instruction is unclear.`);
       assert.equal(initial.mission.guidance.targetLabel, '火',
         `${name}: cycle ${cycleIndex} fire map target is missing.`);
+      assert.equal(initial.visuals.targetBeaconCubeCount, 6,
+        `${name}: cycle ${cycleIndex} fire target beacon is incomplete.`);
+      assert.equal(initial.visualLayout.targetBeacon.length, 6,
+        `${name}: cycle ${cycleIndex} fire target beacon layout is incomplete.`);
       const initialResetCount = initial.vehicle.resetCount;
       readPoolIdentity(initial, `${name} cycle ${cycleIndex} initial`);
       const fireJourneyStartedAtMs = Date.now();
@@ -2067,6 +2082,13 @@ async function verifyCompleteMission(
           page,
           targetedScreenshot,
           `${name}: targeted capture`,
+        );
+      }
+      if (!hasTouch && cycleIndex === 2) {
+        await captureStableMissionScreenshot(
+          page,
+          `${outputDirectory}/desktop-second-fire-wayfinding.png`,
+          `${name}: second fire wayfinding capture`,
         );
       }
       if (touch) await touch.pressSpray();
@@ -3092,6 +3114,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
     const restoredRoutePlan = createFireRoutePlan(
       restarted.mission.jobId,
       restarted.landmarks.fireSprayTarget,
+      restarted.visualLayout.routeMarkers.map(({ position }) => position),
     );
     const restoredApproach = restoredRoutePlan.approachFace === 'north'
       ? {
