@@ -62,6 +62,10 @@ import {
   resolveVehicleDistrict,
 } from './worldLayout';
 import { WORLD_FRAME_UPDATE_PRIORITIES } from './worldFrameUpdatePriorities';
+import {
+  VehicleActionVfx,
+  type VehicleActionVfxTelemetryRef,
+} from './actionVfx/VehicleActionEffects';
 
 interface VoxelGameSceneProps {
   readonly actionTargetJob: ActionTargetMissionJob;
@@ -85,6 +89,7 @@ interface VoxelGameSceneProps {
   readonly paintColor: string | null;
   readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
   readonly telemetryRef: VehicleTelemetryRef;
+  readonly vehicleActionVfxTelemetryRef: VehicleActionVfxTelemetryRef;
   readonly vehicleId: VehicleId;
 }
 
@@ -282,6 +287,7 @@ export function VoxelGameScene({
   onVehicleSwitchAvailabilityChange,
   paintColor,
   telemetryRef,
+  vehicleActionVfxTelemetryRef,
   vehicleId,
 }: VoxelGameSceneProps): ReactElement {
   const vehicleVisualPositionRef = useRef<VehicleVisualPositionRef['current']>(
@@ -344,6 +350,12 @@ export function VoxelGameScene({
           runtime={actionTargetRuntime}
           snapshotRef={actionTargetMissionSnapshotRef}
           telemetryRef={actionTargetMissionTelemetryRef}
+          vehicleTelemetryRef={telemetryRef}
+        />
+        <VehicleActionVfx
+          commandRef={commandRef}
+          telemetryRef={vehicleActionVfxTelemetryRef}
+          vehicleId={vehicleId}
           vehicleTelemetryRef={telemetryRef}
         />
         <RigidBody colliders={false} type="fixed">

@@ -88,6 +88,10 @@ import { VoxelGameHud } from './ui/VoxelGameHud';
 import { useToyAudioFeedback } from './audio/useToyAudioFeedback';
 import { PhysicalGpuProbe } from './performance/PhysicalGpuCertificationProbe';
 import { isPhysicalGpuProbeEnabled } from './performance/physicalGpuProbe';
+import {
+  createVehicleActionVfxTelemetry,
+  type VehicleActionVfxTelemetry,
+} from './scene/actionVfx/VehicleActionEffects';
 
 const INITIAL_VEHICLE_ID: VehicleId = 'fire-truck';
 const WORLD_DECORATION_BOX_COUNT = flattenDecorationBoxes(
@@ -276,6 +280,9 @@ export function VoxelGameApp(): ReactElement {
     rendererVendor: 'unknown',
     vehicleDrawCalls: 0,
   });
+  const vehicleActionVfxTelemetryRef = useRef<VehicleActionVfxTelemetry>(
+    createVehicleActionVfxTelemetry(),
+  );
   const [coordinatorSnapshot, setCoordinatorSnapshot] = useState<VehicleMissionCoordinatorSnapshot>(
     () => coordinator.getSnapshot(),
   );
@@ -468,6 +475,7 @@ export function VoxelGameApp(): ReactElement {
         coordinateSystem: 'origin=world-center, +x=east, +y=up, +z=south',
         colorEffect,
         controls: { ...command },
+        vehicleActionVfx: { ...vehicleActionVfxTelemetryRef.current },
         fire: {
           intensity: runtime.fireIntensity,
           position: [...fireSceneLayout.firePosition],
@@ -675,6 +683,7 @@ export function VoxelGameApp(): ReactElement {
               : null}
             renderTelemetryRef={renderTelemetryRef}
             telemetryRef={telemetryRef}
+            vehicleActionVfxTelemetryRef={vehicleActionVfxTelemetryRef}
             vehicleId={coordinatorSnapshot.selectedVehicleId}
           />
         </Canvas>

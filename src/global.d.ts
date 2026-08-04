@@ -119,6 +119,7 @@ declare global {
     readonly renderer: import('./voxel-game/scene/VoxelGameScene').VoxelGameRenderTelemetry;
     readonly runtime: import('./voxel-game/domain/VoxelGameRuntime').VoxelGameSnapshot;
     readonly vehicle: import('./voxel-game/scene/VehicleController').VehicleTelemetry;
+    readonly vehicleActionVfx: import('./voxel-game/scene/actionVfx/VehicleActionEffects').VehicleActionVfxTelemetry;
     readonly visualLayout: {
       readonly fireHazard: import('./voxel-game/scene/WaterAndFire').VoxelBox;
       readonly fireLayers: readonly unknown[];

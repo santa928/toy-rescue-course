@@ -236,6 +236,7 @@ export function VoxelGameHud({
         aria-pressed={primaryActionPressed}
         className="primary-action-button"
         data-pressed={primaryActionPressed}
+        data-spectacle-action={selectedVehicleId !== 'fire-truck'}
         data-vehicle={selectedVehicleId}
         onLostPointerCapture={handlePrimaryActionLostPointerCapture}
         onPointerCancel={handlePrimaryActionPointerEnd}
