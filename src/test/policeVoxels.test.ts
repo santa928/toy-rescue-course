@@ -10,6 +10,7 @@ import {
 } from '../vehicle-lab/model/voxelModel';
 import {
   POLICE_RENDER_PLAN,
+  getPoliceActionPose,
   getPoliceBeaconScales,
 } from '../vehicle-lab/scene/VoxelPolice';
 
@@ -55,5 +56,30 @@ describe('POLICE_VOXELS', () => {
     expect(first.red).not.toBe(first.blue);
     expect(second.red).toBeCloseTo(first.blue, 5);
     expect(second.blue).toBeCloseTo(first.red, 5);
+  });
+
+  it('押下直後に赤青灯が大きくburstし、hold中は2Hz以下で交互点灯する', () => {
+    const press = getPoliceActionPose(true, 0.08);
+    const firstHold = getPoliceActionPose(true, 0.3);
+    const secondHold = getPoliceActionPose(true, 0.8);
+
+    expect(press.phase).toBe('press');
+    expect(Math.max(press.redScale, press.blueScale)).toBeGreaterThan(1.16);
+    expect(press.redScale).not.toBe(press.blueScale);
+    expect(firstHold.phase).toBe('hold');
+    expect(firstHold.flashHz).toBeLessThanOrEqual(2);
+    expect(secondHold.redScale).toBeCloseTo(firstHold.blueScale, 5);
+    expect(secondHold.blueScale).toBeCloseTo(firstHold.redScale, 5);
+  });
+
+  it('非押下と不正時刻ではneutral poseへ戻る', () => {
+    const neutral = {
+      blueScale: 1,
+      flashHz: 0,
+      phase: 'idle',
+      redScale: 1,
+    };
+    expect(getPoliceActionPose(false, 0.1)).toEqual(neutral);
+    expect(getPoliceActionPose(true, Number.NaN)).toEqual(neutral);
   });
 });

@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 import {
+  WORLD_AXIS_INPUTS,
   createDomTouchStickDriver,
   createDriveHarness,
+  releaseKeyboardKeys,
+  syncKeyboardKeys,
 } from './voxel-game-e2e/drive-harness.mjs';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
@@ -259,21 +262,56 @@ async function patrolCheckpoint(
   viewport,
   touchDriver,
   expectedCompletedCount,
+  targetIndex,
+  captureSpectacle = false,
 ) {
   let completed = null;
   let latest = null;
+  const heldKeys = new Set();
   await setPrimaryAction(page, viewport.touch, true);
   try {
-    latest = await driveAlongWorldAxis(page, {
-      axis: 'positiveZ',
-      brakeAfterArrival: false,
-      description: `${viewport.name}: patrol checkpoint ${expectedCompletedCount}`,
-      maxBursts: 180,
-      predicate: (state) => state.police.completedCount >= expectedCompletedCount,
-      touchDriver,
-    });
-    completed = latest;
+    if (captureSpectacle) {
+      const input = WORLD_AXIS_INPUTS.positiveZ;
+      if (touchDriver) await touchDriver.setStick(...input.stick);
+      else await syncKeyboardKeys(page, heldKeys, input.keys);
+      let chaseCaptured = false;
+      for (let frame = 0; frame < 360; frame += 1) {
+        await waitForFrames(page, 1);
+        latest = await readGameState(page);
+        if (
+          !chaseCaptured
+          && latest.police.completedCount < expectedCompletedCount
+          && latest.police.holdMilliseconds[targetIndex] > 0
+        ) {
+          assert.equal(latest.police.targetAccentVoxelCount, 9,
+            `${viewport.name}: checkpoint accent chase hid gate accents.`);
+          await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-gate-chase.png` });
+          chaseCaptured = true;
+        }
+        if (latest.police.completedCount >= expectedCompletedCount) {
+          completed = latest;
+          break;
+        }
+      }
+      assert(chaseCaptured, `${viewport.name}: checkpoint accent chase was never observed.`);
+      assert(completed, `${viewport.name}: checkpoint did not complete during spectacle capture.`);
+      assert.equal(completed.police.activeParticleCount, 10,
+        `${viewport.name}: checkpoint completion did not emit its ten-cube arch.`);
+      await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-completion-arch.png` });
+    } else {
+      latest = await driveAlongWorldAxis(page, {
+        axis: 'positiveZ',
+        brakeAfterArrival: false,
+        description: `${viewport.name}: patrol checkpoint ${expectedCompletedCount}`,
+        maxBursts: 180,
+        predicate: (state) => state.police.completedCount >= expectedCompletedCount,
+        touchDriver,
+      });
+      completed = latest;
+    }
   } finally {
+    if (touchDriver) await touchDriver.releaseStick();
+    await releaseKeyboardKeys(page, heldKeys);
     await setPrimaryAction(page, viewport.touch, false);
   }
   assert(completed,
@@ -762,6 +800,8 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
         viewport,
         touchDriver,
         index + 1,
+        index,
+        index === 0,
       );
       assert.equal(policeCompleted.police.completedCount, index + 1);
       if (index === 0) {
@@ -874,6 +914,8 @@ try {
       `${name}-ambulance-worksite.png`,
       `${name}-police-garage.png`,
       `${name}-police-checkpoint-before.png`,
+      `${name}-police-gate-chase.png`,
+      `${name}-police-completion-arch.png`,
       `${name}-police-worksite.png`,
     ]),
     viewports,

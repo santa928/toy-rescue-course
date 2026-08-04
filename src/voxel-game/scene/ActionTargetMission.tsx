@@ -105,6 +105,8 @@ const PARTICLE_INSTANCE_COLORS: Readonly<Record<
   patient: [new THREE.Color('#e33a32'), new THREE.Color('#fffdf7')],
   soil: [new THREE.Color('#9a5d2f'), new THREE.Color('#e89a3a')],
 };
+const INSTANCE_WHITE = new THREE.Color('#fffdf7');
+const INSTANCE_COLOR_SCRATCH = new THREE.Color();
 const ROUTE_COLORS: Readonly<Record<ActionTargetKind, string>> = {
   checkpoint: '#4a9cff',
   patient: '#ef5b55',
@@ -140,7 +142,13 @@ function applyTransforms(
     matrix.makeScale(transform.scale[0], transform.scale[1], transform.scale[2]);
     matrix.setPosition(transform.position[0], transform.position[1], transform.position[2]);
     mesh.setMatrixAt(instanceIndex, matrix);
-    if (colors) mesh.setColorAt(instanceIndex, colors[transform.slot % 2]);
+    if (colors) {
+      INSTANCE_COLOR_SCRATCH.copy(colors[transform.slot % 2]);
+      if (transform.colorMixToWhite > 0) {
+        INSTANCE_COLOR_SCRATCH.lerp(INSTANCE_WHITE, Math.min(1, transform.colorMixToWhite));
+      }
+      mesh.setColorAt(instanceIndex, INSTANCE_COLOR_SCRATCH);
+    }
     instanceIndex += 1;
   }
   mesh.count = instanceIndex;
@@ -254,8 +262,10 @@ export function ActionTargetMission({
         deltaSeconds * 1_000,
         job.interaction.holdDurationMs,
       );
-      if (contactActive && (job.targetKind === 'soil' || job.targetKind === 'patient')) {
-        const actionCycleSeconds = job.targetKind === 'soil' ? 0.9 : 1;
+      if (contactActive) {
+        const actionCycleSeconds = job.targetKind === 'soil'
+          ? 0.9
+          : job.targetKind === 'checkpoint' ? 0.5 : 1;
         vfxInteraction = {
           actionCycleProgress: (
             telemetry.holdMilliseconds[index] / 1_000 % actionCycleSeconds

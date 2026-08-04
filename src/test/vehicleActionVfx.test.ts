@@ -3,6 +3,7 @@ import {
   VEHICLE_ACTION_VOXEL_POOL_SIZE,
   createVehicleActionInstanceColorArray,
   createVehicleActionVfxFrame,
+  getActivePoliceTrailCount,
   updateVehicleActionVfxFrame,
 } from '../voxel-game/scene/actionVfx/vehicleActionFrame';
 import type { VehicleId } from '../voxel-game/domain/vehicleDefinitions';
@@ -76,6 +77,17 @@ describe('vehicle action VFX', () => {
     });
 
     expect(new Set(signatures).size).toBe(SPECTACLE_VEHICLES.length);
+  });
+
+  it('パトカーのtrailはサイレン走行中だけ後方6slotへ出る', () => {
+    expect(getActivePoliceTrailCount({ actionActive: true, speed: 2 })).toBe(6);
+    expect(getActivePoliceTrailCount({ actionActive: true, speed: 0.34 })).toBe(0);
+    expect(getActivePoliceTrailCount({ actionActive: false, speed: 2 })).toBe(0);
+
+    const moving = pressVehicleAction('police', 1.1);
+    expect(moving.activeCount).toBe(18);
+    expect(Math.max(...moving.voxels.filter(({ active }) => active)
+      .map(({ position }) => position[1]))).toBeLessThanOrEqual(2.92);
   });
 
   it('押し続ける間は配列を再生成せずcycleを繰り返す', () => {

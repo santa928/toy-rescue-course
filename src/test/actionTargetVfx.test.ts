@@ -9,6 +9,7 @@ import {
   ACTION_TARGET_ROUTE_POOL_SIZE,
   ACTION_TARGET_STAR_POOL_SIZE,
   createActionTargetVfxFrame,
+  getCheckpointAccentOrder,
   getPatientGlyphKinds,
   getPatientRecoveryPose,
   updateActionTargetVfxFrame,
@@ -304,5 +305,70 @@ describe('action target VFX', () => {
     );
     expect(frame.targetBodies.filter(({ active }) => active)).toHaveLength(12);
     expect(frame.particles.some(({ active }) => active)).toBe(true);
+  });
+
+  it('巡回門はhold進捗に合わせて3つのaccentを入口から中央へ順に点灯する', () => {
+    expect(getCheckpointAccentOrder(0)).toEqual([]);
+    expect(getCheckpointAccentOrder(0.34)).toEqual([0]);
+    expect(getCheckpointAccentOrder(0.6)).toEqual([0, 1]);
+    expect(getCheckpointAccentOrder(1)).toEqual([0, 1, 2]);
+
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(CHECKPOINT_JOB.targets.map(({ id }) => id));
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      new Float64Array(3).fill(-1),
+      0.15,
+      CHECKPOINT_JOB,
+      true,
+      {
+        actionCycleProgress: 0.3,
+        contactPoint: [0, 0.7, 16.7],
+        forward: [0, 0, 1],
+        holdProgress: 0.6,
+        sourceIndex: 0,
+      },
+    );
+
+    const firstGate = frame.targetAccents.filter(({ sourceIndex }) => sourceIndex === 0);
+    expect(firstGate[0].scale[0]).toBeGreaterThan(firstGate[2].scale[0]);
+    expect(firstGate[1].scale[0]).toBeGreaterThan(firstGate[2].scale[0]);
+  });
+
+  it('巡回門完了時は赤青10粒が左右対称のarchへ広がり1秒で白へ収束する', () => {
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(CHECKPOINT_JOB.targets.map(({ id }) => id));
+    runtime.registerTargetCompletion('checkpoint-a');
+    const completionTimes = new Float64Array([1, -1, -1]);
+
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      completionTimes,
+      1.1,
+      CHECKPOINT_JOB,
+      true,
+    );
+    const earlyArch = frame.particles.filter(({ active, sourceIndex }) => (
+      active && sourceIndex === 0
+    ));
+    expect(earlyArch).toHaveLength(10);
+    expect(earlyArch.some(({ position }) => position[0] < -1)).toBe(true);
+    expect(earlyArch.some(({ position }) => position[0] > 1)).toBe(true);
+    expect(Math.max(...earlyArch.map(({ position }) => position[1]))).toBeGreaterThan(2.4);
+    expect(earlyArch.every(({ colorMixToWhite }) => colorMixToWhite < 0.2)).toBe(true);
+
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      completionTimes,
+      1.9,
+      CHECKPOINT_JOB,
+      true,
+    );
+    expect(frame.particles.filter(({ active, sourceIndex }) => (
+      active && sourceIndex === 0
+    )).every(({ colorMixToWhite }) => colorMixToWhite > 0.8)).toBe(true);
   });
 });

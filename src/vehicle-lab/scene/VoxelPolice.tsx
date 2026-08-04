@@ -46,6 +46,47 @@ export type VoxelPoliceProps = ThreeElements['group'] & {
   readonly paintColor?: string | null;
 };
 
+export interface PoliceActionPose {
+  readonly blueScale: number;
+  readonly flashHz: number;
+  readonly phase: 'hold' | 'idle' | 'press';
+  readonly redScale: number;
+}
+
+const IDLE_POLICE_POSE: PoliceActionPose = {
+  blueScale: 1,
+  flashHz: 0,
+  phase: 'idle',
+  redScale: 1,
+};
+
+/** 押下burstと0.5秒ごとの赤青hold切替を決定的な車体poseへ変換する。 */
+export function getPoliceActionPose(
+  actionActive: boolean,
+  actionElapsedSeconds: number,
+): PoliceActionPose {
+  if (!actionActive || !Number.isFinite(actionElapsedSeconds) || actionElapsedSeconds < 0) {
+    return IDLE_POLICE_POSE;
+  }
+  const redActive = Math.floor(actionElapsedSeconds * 2) % 2 === 0;
+  if (actionElapsedSeconds < 0.18) {
+    const burst = Math.sin(actionElapsedSeconds / 0.18 * Math.PI);
+    const activeScale = 1 + burst * 0.22;
+    return {
+      blueScale: redActive ? 0.82 : activeScale,
+      flashHz: 2,
+      phase: 'press',
+      redScale: redActive ? activeScale : 0.82,
+    };
+  }
+  return {
+    blueScale: redActive ? 0.82 : 1.14,
+    flashHz: 2,
+    phase: 'hold',
+    redScale: redActive ? 1.14 : 0.82,
+  };
+}
+
 /** サイレン中は0.5秒ごとに赤青灯の大きさを交互へ切り替える。 */
 export function getPoliceBeaconScales(
   actionActive: boolean,
@@ -105,18 +146,20 @@ export function VoxelPolice({
 }: VoxelPoliceProps): ReactElement {
   const redBeaconRef = useRef<THREE.Group>(null);
   const blueBeaconRef = useRef<THREE.Group>(null);
+  const actionElapsedSecondsRef = useRef(0);
   assertValidVoxelModel(POLICE_VOXELS, POLICE_PALETTE_IDS);
 
-  useFrame(({ clock }) => {
+  useFrame((_state, delta) => {
     const red = redBeaconRef.current;
     const blue = blueBeaconRef.current;
     if (!red || !blue) return;
-    const scales = getPoliceBeaconScales(
-      actionActiveRef?.current === true,
-      clock.elapsedTime,
-    );
-    red.scale.setScalar(scales.red);
-    blue.scale.setScalar(scales.blue);
+    const actionActive = actionActiveRef?.current === true;
+    actionElapsedSecondsRef.current = actionActive
+      ? actionElapsedSecondsRef.current + Math.max(0, Math.min(delta, 0.05))
+      : 0;
+    const pose = getPoliceActionPose(actionActive, actionElapsedSecondsRef.current);
+    red.scale.setScalar(pose.redScale);
+    blue.scale.setScalar(pose.blueScale);
   });
 
   return (

@@ -225,9 +225,10 @@ function updatePoliceVoxels(
   basis: Parameters<typeof showVoxel>[2],
   progress: number,
   speed: number,
+  actionActive: boolean,
   tailScale: number,
 ): void {
-  for (let slot = 0; slot < 12; slot += 1) {
+  for (let slot = 0; slot < 8; slot += 1) {
     const side = slot % 2 === 0 ? -1 : 1;
     const step = Math.floor(slot / 2);
     const palette: VehicleActionPalette = side < 0 ? 'police-red' : 'police-blue';
@@ -235,12 +236,24 @@ function updatePoliceVoxels(
       frame,
       slot,
       basis,
-      [side * (0.9 + step * 0.18 + progress * 0.45), 1.15 + (step % 3) * 0.28, 0.35 - step * 0.22],
+      [side * (0.9 + step * 0.22 + progress * 0.55), 1.08 + step * 0.18, 0.28 - step * 0.2],
       (0.2 + (step % 2) * 0.06) * tailScale,
       palette,
     );
   }
-  if (speed < 0.35) return;
+  for (let slot = 8; slot < 12; slot += 1) {
+    const step = slot - 8;
+    const redPhase = progress < 0.5;
+    showVoxel(
+      frame,
+      slot,
+      basis,
+      [(step % 2 === 0 ? -0.3 : 0.3), 1.18 + step * 0.32, 0],
+      (0.18 + (step % 2) * 0.035) * tailScale,
+      redPhase === (step % 2 === 0) ? 'police-red' : 'police-blue',
+    );
+  }
+  if (getActivePoliceTrailCount({ actionActive, speed }) === 0) return;
   for (let slot = 12; slot < 18; slot += 1) {
     const step = slot - 12;
     showVoxel(
@@ -252,6 +265,17 @@ function updatePoliceVoxels(
       step % 2 === 0 ? 'police-red' : 'police-blue',
     );
   }
+}
+
+/** サイレン走行時だけ確保済み後方trail 6slotを有効化する。 */
+export function getActivePoliceTrailCount({
+  actionActive,
+  speed,
+}: {
+  readonly actionActive: boolean;
+  readonly speed: number;
+}): number {
+  return actionActive && Number.isFinite(speed) && speed >= 0.35 ? 6 : 0;
 }
 
 /** 入力と車両telemetryから自由アクションの固定frameをin-place更新する。 */
@@ -325,6 +349,13 @@ export function updateVehicleActionVfxFrame(
   } else if (input.vehicleId === 'ambulance') {
     updateAmbulanceVoxels(frame, basis, frame.cycleProgress, tailScale);
   } else {
-    updatePoliceVoxels(frame, basis, frame.cycleProgress, safeSpeed, tailScale);
+    updatePoliceVoxels(
+      frame,
+      basis,
+      frame.cycleProgress,
+      safeSpeed,
+      input.actionActive,
+      tailScale,
+    );
   }
 }

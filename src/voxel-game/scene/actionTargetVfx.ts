@@ -30,6 +30,7 @@ export interface ActionTargetVfxJob {
 /** 固定pool内の1 voxelを毎frame in-place更新する描画target。 */
 export interface ActionTargetVoxelTransform {
   active: boolean;
+  colorMixToWhite: number;
   readonly position: [number, number, number];
   readonly scale: [number, number, number];
   readonly slot: number;
@@ -63,6 +64,8 @@ const HIDDEN_Y = -40;
 const PARTICLE_LIFETIME_SECONDS = 1.1;
 const PATIENT_RISE_SECONDS = 0.65;
 const PATIENT_GLYPH_LIFETIME_SECONDS = 1.3;
+const CHECKPOINT_ARCH_WHITE_SECONDS = 1;
+const CHECKPOINT_ARCH_LIFETIME_SECONDS = 1.8;
 const BODY_SHAPES: Readonly<Record<ActionTargetKind, readonly {
   readonly offset: WorldPoint;
   readonly scale: WorldPoint;
@@ -146,6 +149,7 @@ const STAR_OFFSETS = [
 function createTransform(slot: number, sourceIndex: number): ActionTargetVoxelTransform {
   return {
     active: false,
+    colorMixToWhite: 0,
     position: [0, HIDDEN_Y, 0],
     scale: [0, 0, 0],
     slot,
@@ -156,6 +160,7 @@ function createTransform(slot: number, sourceIndex: number): ActionTargetVoxelTr
 /** transformを描画対象外のzero scale位置へin-placeで戻す。 */
 export function hideActionTargetTransform(transform: ActionTargetVoxelTransform): void {
   transform.active = false;
+  transform.colorMixToWhite = 0;
   transform.position[0] = 0;
   transform.position[1] = HIDDEN_Y;
   transform.position[2] = 0;
@@ -234,6 +239,21 @@ export function getPatientRecoveryPose(
   };
 }
 
+const CHECKPOINT_ACCENT_ORDERS = [
+  [],
+  [0],
+  [0, 1],
+  [0, 1, 2],
+] as const;
+
+/** 巡回hold進捗から入口側より点灯済みとなるaccent順を返す。 */
+export function getCheckpointAccentOrder(holdProgress: number): readonly number[] {
+  if (!Number.isFinite(holdProgress) || holdProgress <= 0) return CHECKPOINT_ACCENT_ORDERS[0];
+  const progress = Math.min(1, holdProgress);
+  const count = progress < 0.4 ? 1 : progress < 0.7 ? 2 : 3;
+  return CHECKPOINT_ACCENT_ORDERS[count];
+}
+
 /** 現在snapshotと完了時刻から全固定slotを配列再生成なしで更新する。 */
 export function updateActionTargetVfxFrame(
   frame: ActionTargetVfxFrame,
@@ -308,6 +328,13 @@ export function updateActionTargetVfxFrame(
     const rise = recovery.rise;
     const startShape = patientVisible && patientShape ? patientShape : shape;
     const pulse = 1 + Math.sin(safeElapsed * 5 + transform.slot) * 0.08;
+    const checkpointChase = job.targetKind === 'checkpoint'
+      && interaction?.sourceIndex === transform.sourceIndex
+      ? getCheckpointAccentOrder(interaction.holdProgress)
+      : null;
+    const chaseScale = checkpointChase
+      ? (checkpointChase.includes(shapeIndex) ? 1.46 : 0.72)
+      : 1;
     transform.active = true;
     transform.position[0] = source.position[0]
       + startShape.offset[0] + (shape.offset[0] - startShape.offset[0]) * rise;
@@ -316,11 +343,11 @@ export function updateActionTargetVfxFrame(
     transform.position[2] = source.position[2]
       + startShape.offset[2] + (shape.offset[2] - startShape.offset[2]) * rise;
     transform.scale[0] = (startShape.scale[0]
-      + (shape.scale[0] - startShape.scale[0]) * rise) * pulse;
+      + (shape.scale[0] - startShape.scale[0]) * rise) * pulse * chaseScale;
     transform.scale[1] = (startShape.scale[1]
-      + (shape.scale[1] - startShape.scale[1]) * rise) * pulse * recovery.scaleY;
+      + (shape.scale[1] - startShape.scale[1]) * rise) * pulse * recovery.scaleY * chaseScale;
     transform.scale[2] = (startShape.scale[2]
-      + (shape.scale[2] - startShape.scale[2]) * rise) * pulse;
+      + (shape.scale[2] - startShape.scale[2]) * rise) * pulse * chaseScale;
   }
 
   for (const transform of frame.particles) {
@@ -329,8 +356,29 @@ export function updateActionTargetVfxFrame(
     const age = safeElapsed - completionTime;
     const localSlot = transform.slot % PARTICLES_PER_TARGET;
     const direction = PARTICLE_DIRECTIONS[localSlot];
+    transform.colorMixToWhite = 0;
     if (!enabled || !source || !direction) {
       hideActionTargetTransform(transform);
+      continue;
+    }
+    if (job.targetKind === 'checkpoint' && completionTime >= 0 && age >= 0) {
+      if (age >= CHECKPOINT_ARCH_LIFETIME_SECONDS) {
+        hideActionTargetTransform(transform);
+        continue;
+      }
+      const step = localSlot / (PARTICLES_PER_TARGET - 1);
+      const archX = (step - 0.5) * 4.4;
+      const archY = Math.sin(step * Math.PI) * 2.2;
+      const spread = Math.min(1, age / 0.15);
+      transform.active = true;
+      transform.colorMixToWhite = Math.min(1, age / CHECKPOINT_ARCH_WHITE_SECONDS);
+      transform.position[0] = source.position[0] + archX * spread;
+      transform.position[1] = source.position[1] + 0.5 + archY * spread + age * 0.18;
+      transform.position[2] = source.position[2] + age * 0.45;
+      const size = 0.28 - age * 0.055;
+      transform.scale[0] = size;
+      transform.scale[1] = size;
+      transform.scale[2] = size;
       continue;
     }
     if (
