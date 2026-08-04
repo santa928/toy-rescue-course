@@ -80,6 +80,77 @@ describe('action target VFX', () => {
     expect(frame.stars.some(({ active }) => active)).toBe(false);
   });
 
+  it('土山接触中は9粒をbucketへ吸引し、hold進捗で上段から土山を縮める', () => {
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(JOB.targets.map(({ id }) => id));
+    const completionTimes = new Float64Array(3).fill(-1);
+
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      completionTimes,
+      0.4,
+      JOB,
+      true,
+    );
+    const initialScaleY = frame.targetBodies
+      .filter(({ sourceIndex }) => sourceIndex === 0)
+      .reduce((sum, { scale }) => sum + scale[1], 0);
+
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      completionTimes,
+      0.6,
+      JOB,
+      true,
+      {
+        actionCycleProgress: 0.45,
+        contactPoint: [3.2, 0.85, 3],
+        forward: [1, 0, 0],
+        holdProgress: 0.6,
+        sourceIndex: 0,
+      },
+    );
+
+    expect(frame.particles.filter(({ active, sourceIndex }) => (
+      active && sourceIndex === 0
+    )).length).toBeGreaterThan(6);
+    expect(frame.particles.filter(({ active, sourceIndex }) => (
+      active && sourceIndex !== 0
+    ))).toHaveLength(0);
+    const dugScaleY = frame.targetBodies
+      .filter(({ sourceIndex }) => sourceIndex === 0)
+      .reduce((sum, { scale }) => sum + scale[1], 0);
+    expect(dugScaleY).toBeLessThan(initialScaleY);
+  });
+
+  it('掘削cycle後半は土粒をbucketから車体横へ放物線で運ぶ', () => {
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(JOB.targets.map(({ id }) => id));
+
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      new Float64Array(3).fill(-1),
+      0.7,
+      JOB,
+      true,
+      {
+        actionCycleProgress: 0.75,
+        contactPoint: [3.2, 0.85, 3],
+        forward: [1, 0, 0],
+        holdProgress: 0.75,
+        sourceIndex: 0,
+      },
+    );
+
+    const particles = frame.particles.filter(({ active }) => active);
+    expect(particles.length).toBeGreaterThan(6);
+    expect(particles.some(({ position }) => position[1] > 1)).toBe(true);
+    expect(particles.some(({ position }) => position[2] !== 3)).toBe(true);
+  });
+
   it('完了対象を隠して粒を流し、disabledでは全slotを非activeにする', () => {
     const frame = createActionTargetVfxFrame();
     const runtime = new ActionTargetMissionRuntime(JOB.targets.map(({ id }) => id));

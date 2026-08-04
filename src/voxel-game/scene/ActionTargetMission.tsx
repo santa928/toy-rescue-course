@@ -25,6 +25,7 @@ import {
   updateActionTargetVfxFrame,
   type ActionTargetKind,
   type ActionTargetVfxFrame,
+  type ActionTargetVfxInteraction,
   type ActionTargetVfxJob,
   type ActionTargetVoxelTransform,
 } from './actionTargetVfx';
@@ -198,6 +199,7 @@ export function ActionTargetMission({
     }
 
     let snapshot = snapshotRef.current;
+    let vfxInteraction: ActionTargetVfxInteraction | null = null;
     const vehicle = vehicleTelemetryRef.current;
     const contactPoint = getActionTargetContactPoint(
       vehicle,
@@ -225,6 +227,17 @@ export function ActionTargetMission({
         deltaSeconds * 1_000,
         job.interaction.holdDurationMs,
       );
+      if (contactActive && job.targetKind === 'soil') {
+        vfxInteraction = {
+          actionCycleProgress: (
+            telemetry.holdMilliseconds[index] / 1_000 % 0.9
+          ) / 0.9,
+          contactPoint,
+          forward: vehicle.forward,
+          holdProgress: telemetry.holdMilliseconds[index] / job.interaction.holdDurationMs,
+          sourceIndex: index,
+        };
+      }
       if (telemetry.holdMilliseconds[index] < job.interaction.holdDurationMs) continue;
       if (registerTargetCompletion(source.id)) {
         completionTimes[index] = clock.elapsedTime;
@@ -241,6 +254,7 @@ export function ActionTargetMission({
       clock.elapsedTime,
       job,
       enabled,
+      vfxInteraction,
     );
     applyTransforms(targetBodyRef.current, telemetry.frame.targetBodies, matrix);
     applyTransforms(

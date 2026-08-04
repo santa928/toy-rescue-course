@@ -20,6 +20,8 @@ const VOXEL_SIZE = 0.24;
 const VOXEL_EDGE = VOXEL_SIZE * 0.94;
 const ARM_LOWERED_Y = -0.2;
 const ARM_RESPONSE = 9;
+const EXCAVATOR_ACTION_CYCLE_SECONDS = 0.9;
+const BUCKET_PIVOT = [0.12, 0.72, -1.92] as const;
 const VOXEL_GEOMETRY = new THREE.BoxGeometry(VOXEL_EDGE, VOXEL_EDGE, VOXEL_EDGE);
 
 export const EXCAVATOR_RENDER_PLAN = createVoxelRenderPlan(
@@ -28,8 +30,11 @@ export const EXCAVATOR_RENDER_PLAN = createVoxelRenderPlan(
   calculateVoxelBounds(EXCAVATOR_VOXELS),
   VOXEL_SIZE,
 );
-const EXCAVATOR_MOVING_BATCHES = EXCAVATOR_RENDER_PLAN.batches.filter(
-  ({ paletteId }) => paletteId === 'arm' || paletteId === 'bucket',
+const EXCAVATOR_ARM_BATCHES = EXCAVATOR_RENDER_PLAN.batches.filter(
+  ({ paletteId }) => paletteId === 'arm',
+);
+const EXCAVATOR_BUCKET_BATCHES = EXCAVATOR_RENDER_PLAN.batches.filter(
+  ({ paletteId }) => paletteId === 'bucket',
 );
 const EXCAVATOR_STATIC_BATCHES = EXCAVATOR_RENDER_PLAN.batches.filter(
   ({ paletteId }) => paletteId !== 'arm' && paletteId !== 'bucket',
@@ -44,6 +49,59 @@ export type VoxelExcavatorProps = ThreeElements['group'] & {
   readonly actionActiveRef?: RefObject<boolean>;
   readonly paintColor?: string | null;
 };
+
+export interface ExcavatorActionPose {
+  readonly armY: number;
+  readonly bucketRotationX: number;
+  readonly phase: 'curl' | 'idle' | 'lift' | 'lower' | 'return';
+}
+
+const IDLE_EXCAVATOR_POSE: ExcavatorActionPose = {
+  armY: 0,
+  bucketRotationX: 0,
+  phase: 'idle',
+};
+
+/** 押下時間をlower、curl、lift、returnの0.9秒掘削poseへ変換する。 */
+export function getExcavatorActionPose(
+  actionActive: boolean,
+  actionElapsedSeconds: number,
+): ExcavatorActionPose {
+  if (!actionActive || !Number.isFinite(actionElapsedSeconds) || actionElapsedSeconds < 0) {
+    return IDLE_EXCAVATOR_POSE;
+  }
+  const cycle = actionElapsedSeconds % EXCAVATOR_ACTION_CYCLE_SECONDS;
+  if (cycle < 0.25) {
+    const progress = cycle / 0.25;
+    return {
+      armY: THREE.MathUtils.lerp(0, -0.26, progress),
+      bucketRotationX: 0,
+      phase: 'lower',
+    };
+  }
+  if (cycle < 0.5) {
+    const progress = (cycle - 0.25) / 0.25;
+    return {
+      armY: -0.26,
+      bucketRotationX: THREE.MathUtils.lerp(0, 0.65, progress),
+      phase: 'curl',
+    };
+  }
+  if (cycle < 0.72) {
+    const progress = (cycle - 0.5) / 0.22;
+    return {
+      armY: THREE.MathUtils.lerp(-0.26, -0.06, progress),
+      bucketRotationX: 0.65,
+      phase: 'lift',
+    };
+  }
+  const progress = (cycle - 0.72) / 0.18;
+  return {
+    armY: THREE.MathUtils.lerp(-0.06, 0, progress),
+    bucketRotationX: THREE.MathUtils.lerp(0.65, 0, progress),
+    phase: 'return',
+  };
+}
 
 /** armとbucketの現在Yを押下状態の目標へframe-rate非依存で近づける。 */
 export function advanceExcavatorArmOffset(
@@ -108,16 +166,21 @@ export function VoxelExcavator({
   ...groupProps
 }: VoxelExcavatorProps): ReactElement {
   const armGroupRef = useRef<THREE.Group>(null);
+  const bucketPivotRef = useRef<THREE.Group>(null);
+  const actionElapsedSecondsRef = useRef(0);
   assertValidVoxelModel(EXCAVATOR_VOXELS, EXCAVATOR_PALETTE_IDS);
 
   useFrame((_state, delta) => {
     const armGroup = armGroupRef.current;
-    if (!armGroup) return;
-    armGroup.position.y = advanceExcavatorArmOffset(
-      armGroup.position.y,
-      actionActiveRef?.current === true,
-      delta,
-    );
+    const bucketPivot = bucketPivotRef.current;
+    if (!armGroup || !bucketPivot) return;
+    const actionActive = actionActiveRef?.current === true;
+    actionElapsedSecondsRef.current = actionActive
+      ? actionElapsedSecondsRef.current + Math.max(0, Math.min(delta, 0.05))
+      : 0;
+    const pose = getExcavatorActionPose(actionActive, actionElapsedSecondsRef.current);
+    armGroup.position.y = pose.armY;
+    bucketPivot.rotation.x = pose.bucketRotationX;
   });
 
   return (
@@ -127,9 +190,16 @@ export function VoxelExcavator({
           <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
         ))}
         <group ref={armGroupRef}>
-          {EXCAVATOR_MOVING_BATCHES.map((batch) => (
+          {EXCAVATOR_ARM_BATCHES.map((batch) => (
             <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
           ))}
+          <group position={BUCKET_PIVOT} ref={bucketPivotRef}>
+            <group position={[-BUCKET_PIVOT[0], -BUCKET_PIVOT[1], -BUCKET_PIVOT[2]]}>
+              {EXCAVATOR_BUCKET_BATCHES.map((batch) => (
+                <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
+              ))}
+            </group>
+          </group>
         </group>
       </group>
     </group>

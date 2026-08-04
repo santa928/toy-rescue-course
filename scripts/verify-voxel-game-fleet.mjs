@@ -167,6 +167,7 @@ async function digTarget(page, viewport, expectedCompletedCount) {
   await setPrimaryAction(page, viewport.touch, true);
   let completed = null;
   let lastState = stopped;
+  let diggingCaptured = false;
   try {
     for (let frame = 0; frame < 150; frame += 1) {
       await waitForFrames(page, 1);
@@ -174,8 +175,23 @@ async function digTarget(page, viewport, expectedCompletedCount) {
       lastState = state;
       assert(state.vehicle.speed <= 0.45,
         `${viewport.name}: excavator exceeded work speed while holding: ${state.vehicle.speed}.`);
+      if (
+        expectedCompletedCount === 1
+        && !diggingCaptured
+        && state.excavator.holdMilliseconds.some((milliseconds) => milliseconds >= 350)
+      ) {
+        assert(state.excavator.activeParticleCount >= 9,
+          `${viewport.name}: excavator hold did not attract nine soil particles.`);
+        await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-digging.png` });
+        diggingCaptured = true;
+      }
       if (state.excavator.completedCount >= expectedCompletedCount) {
         completed = state;
+        if (expectedCompletedCount === 1) {
+          assert(state.excavator.activeParticleCount >= 10,
+            `${viewport.name}: completed soil target did not emit its ten-particle fountain.`);
+          await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-impact.png` });
+        }
         break;
       }
     }
@@ -191,6 +207,9 @@ async function digTarget(page, viewport, expectedCompletedCount) {
       speed: lastState.vehicle.speed,
       targets: lastState.excavator.targets,
     })}.`);
+  if (expectedCompletedCount === 1) {
+    assert(diggingCaptured, `${viewport.name}: excavator digging frame was never observed.`);
+  }
   return completed;
 }
 
@@ -832,6 +851,8 @@ try {
     screenshots: viewports.flatMap(({ name }) => [
       `${name}-excavator-garage.png`,
       `${name}-excavator-worksite.png`,
+      `${name}-excavator-digging.png`,
+      `${name}-excavator-impact.png`,
       `${name}-ambulance-garage.png`,
       `${name}-ambulance-patient-before.png`,
       `${name}-ambulance-worksite.png`,

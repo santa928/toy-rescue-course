@@ -11,6 +11,7 @@ import {
 import {
   EXCAVATOR_RENDER_PLAN,
   advanceExcavatorArmOffset,
+  getExcavatorActionPose,
 } from '../vehicle-lab/scene/VoxelExcavator';
 
 /** 指定model座標にあるショベルカーvoxelのpalette IDを返す。 */
@@ -56,5 +57,27 @@ describe('EXCAVATOR_VOXELS', () => {
     expect(lowered).toBeGreaterThanOrEqual(-0.2);
     expect(returning).toBeGreaterThan(lowered);
     expect(returning).toBeLessThanOrEqual(0);
+  });
+
+  it('押下中は0.9秒でlower・curl・lift・returnの4相を繰り返す', () => {
+    const lower = getExcavatorActionPose(true, 0.1);
+    const curl = getExcavatorActionPose(true, 0.48);
+    const lift = getExcavatorActionPose(true, 0.7);
+    const returning = getExcavatorActionPose(true, 0.82);
+
+    expect(lower.phase).toBe('lower');
+    expect(lower.armY).toBeLessThan(0);
+    expect(curl.phase).toBe('curl');
+    expect(curl.bucketRotationX).toBeGreaterThan(0.5);
+    expect(lift.phase).toBe('lift');
+    expect(lift.armY).toBeGreaterThan(-0.2);
+    expect(returning.phase).toBe('return');
+    expect(returning.bucketRotationX).toBeLessThan(lift.bucketRotationX);
+  });
+
+  it('非押下と不正時刻ではneutral poseを返す', () => {
+    const neutral = { armY: 0, bucketRotationX: 0, phase: 'idle' };
+    expect(getExcavatorActionPose(false, 0.4)).toEqual(neutral);
+    expect(getExcavatorActionPose(true, Number.NaN)).toEqual(neutral);
   });
 });

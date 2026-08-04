@@ -1,9 +1,10 @@
 import type { ActionTargetMissionSnapshot } from '../domain/ActionTargetMissionRuntime';
+import * as THREE from 'three';
 import type { WorldPoint } from './productionWorldMap';
 
 export const ACTION_TARGET_BODY_POOL_SIZE = 18;
 export const ACTION_TARGET_ACCENT_POOL_SIZE = 9;
-export const ACTION_TARGET_PARTICLE_POOL_SIZE = 18;
+export const ACTION_TARGET_PARTICLE_POOL_SIZE = 30;
 export const ACTION_TARGET_ROUTE_POOL_SIZE = 7;
 export const ACTION_TARGET_STAR_POOL_SIZE = 12;
 /** 毎frame遠隔座標へ動かす固定poolは原点の初期境界で描画除外しない。 */
@@ -43,6 +44,15 @@ export interface ActionTargetVfxFrame {
   readonly stars: ActionTargetVoxelTransform[];
   readonly targetAccents: ActionTargetVoxelTransform[];
   readonly targetBodies: ActionTargetVoxelTransform[];
+}
+
+/** 接触中の固有アクションを対象VFXへ渡す固定値。 */
+export interface ActionTargetVfxInteraction {
+  readonly actionCycleProgress: number;
+  readonly contactPoint: WorldPoint;
+  readonly forward: WorldPoint;
+  readonly holdProgress: number;
+  readonly sourceIndex: number;
 }
 
 const TARGET_CAPACITY = 3;
@@ -117,6 +127,8 @@ const PATIENT_LYING_ACCENT_SHAPES = [
 const PARTICLE_DIRECTIONS = [
   [-0.9, 0.9, -0.45], [-0.58, 1.05, 0.7], [-0.18, 0.88, -0.92],
   [0.25, 1.1, 0.88], [0.62, 0.86, -0.58], [0.94, 0.98, 0.38],
+  [-0.78, 1.16, 0.16], [-0.42, 0.82, -0.78], [0.44, 1.2, 0.76],
+  [0.82, 0.9, -0.2],
 ] as const;
 const STAR_OFFSETS = [
   [-1.8, 0.1, -0.5], [-1.2, 0.8, 0.2], [-0.6, 0.2, -0.8],
@@ -208,6 +220,7 @@ export function updateActionTargetVfxFrame(
   elapsedSeconds: number,
   job: ActionTargetVfxJob,
   enabled: boolean,
+  interaction: ActionTargetVfxInteraction | null = null,
 ): void {
   const safeElapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0;
   updateCelebrationCenter(job, frame.celebrationCenter);
@@ -239,7 +252,14 @@ export function updateActionTargetVfxFrame(
     transform.position[2] = source.position[2]
       + startShape.offset[2] + (shape.offset[2] - startShape.offset[2]) * rise;
     transform.scale[0] = startShape.scale[0] + (shape.scale[0] - startShape.scale[0]) * rise;
-    transform.scale[1] = startShape.scale[1] + (shape.scale[1] - startShape.scale[1]) * rise;
+    const baseScaleY = startShape.scale[1] + (shape.scale[1] - startShape.scale[1]) * rise;
+    const soilHold = job.targetKind === 'soil'
+      && interaction?.sourceIndex === transform.sourceIndex
+      ? Math.min(1, Math.max(0, interaction.holdProgress))
+      : 0;
+    const digWeight = (shapeIndex + 1) / BODY_VOXELS_PER_TARGET;
+    transform.scale[1] = baseScaleY * (1 - soilHold * (0.18 + digWeight * 0.48));
+    transform.position[1] -= (baseScaleY - transform.scale[1]) / 2;
     transform.scale[2] = startShape.scale[2] + (shape.scale[2] - startShape.scale[2]) * rise;
   }
 
@@ -282,21 +302,66 @@ export function updateActionTargetVfxFrame(
     const source = job.targets[transform.sourceIndex];
     const completionTime = completionTimesSeconds[transform.sourceIndex] ?? -1;
     const age = safeElapsed - completionTime;
-    const direction = PARTICLE_DIRECTIONS[transform.slot % PARTICLES_PER_TARGET];
-    if (!enabled || !source || !direction || completionTime < 0 || age < 0
-      || age >= PARTICLE_LIFETIME_SECONDS) {
+    const localSlot = transform.slot % PARTICLES_PER_TARGET;
+    const direction = PARTICLE_DIRECTIONS[localSlot];
+    if (!enabled || !source || !direction) {
       hideActionTargetTransform(transform);
       continue;
     }
-    const size = 0.28 * (1 - age / PARTICLE_LIFETIME_SECONDS);
-    transform.active = true;
-    transform.position[0] = source.position[0] + direction[0] * age * 2.4;
-    transform.position[1] = source.position[1] + 0.3
-      + direction[1] * age * 3.2 - 4.8 * age * age;
-    transform.position[2] = source.position[2] + direction[2] * age * 2.4;
-    transform.scale[0] = size;
-    transform.scale[1] = size;
-    transform.scale[2] = size;
+    if (completionTime >= 0 && age >= 0 && age < PARTICLE_LIFETIME_SECONDS) {
+      const size = 0.3 * (1 - age / PARTICLE_LIFETIME_SECONDS);
+      const soilLift = job.targetKind === 'soil' ? 1.28 : 1;
+      transform.active = true;
+      transform.position[0] = source.position[0] + direction[0] * age * 2.5;
+      transform.position[1] = source.position[1] + 0.3
+        + direction[1] * age * 3.2 * soilLift - 4.8 * age * age;
+      transform.position[2] = source.position[2] + direction[2] * age * 2.5;
+      transform.scale[0] = size;
+      transform.scale[1] = size;
+      transform.scale[2] = size;
+      continue;
+    }
+    if (
+      job.targetKind === 'soil'
+      && interaction?.sourceIndex === transform.sourceIndex
+      && localSlot < 9
+      && Number.isFinite(interaction.holdProgress)
+      && interaction.holdProgress > 0
+    ) {
+      const cycle = Math.min(1, Math.max(0, interaction.actionCycleProgress));
+      const forwardLength = Math.hypot(interaction.forward[0], interaction.forward[2]) || 1;
+      const forwardX = interaction.forward[0] / forwardLength;
+      const forwardZ = interaction.forward[2] / forwardLength;
+      const rightX = forwardZ;
+      const rightZ = -forwardX;
+      const angle = localSlot / 9 * Math.PI * 2;
+      const startX = source.position[0] + Math.cos(angle) * 0.82;
+      const startY = source.position[1] + 0.24 + (localSlot % 3) * 0.12;
+      const startZ = source.position[2] + Math.sin(angle) * 0.72;
+      if (cycle < 0.55) {
+        const progress = Math.min(1, cycle / 0.55 + localSlot * 0.035);
+        transform.position[0] = THREE.MathUtils.lerp(startX, interaction.contactPoint[0], progress);
+        transform.position[1] = THREE.MathUtils.lerp(startY, interaction.contactPoint[1] + 0.28, progress)
+          + Math.sin(progress * Math.PI) * 0.25;
+        transform.position[2] = THREE.MathUtils.lerp(startZ, interaction.contactPoint[2], progress);
+      } else {
+        const progress = Math.min(1, (cycle - 0.55) / 0.45 + localSlot * 0.025);
+        const sideDistance = 1.35 + (localSlot % 3) * 0.22;
+        transform.position[0] = interaction.contactPoint[0]
+          + rightX * sideDistance * progress + forwardX * 0.45 * progress;
+        transform.position[1] = interaction.contactPoint[1] + 0.25
+          + Math.sin(progress * Math.PI) * 0.95 + (localSlot % 2) * 0.08;
+        transform.position[2] = interaction.contactPoint[2]
+          + rightZ * sideDistance * progress + forwardZ * 0.45 * progress;
+      }
+      const size = 0.17 + (localSlot % 3) * 0.035;
+      transform.active = true;
+      transform.scale[0] = size;
+      transform.scale[1] = size;
+      transform.scale[2] = size;
+      continue;
+    }
+    hideActionTargetTransform(transform);
   }
 
   for (const transform of frame.routeMarkers) {
