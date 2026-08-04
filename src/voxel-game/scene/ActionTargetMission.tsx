@@ -31,6 +31,15 @@ import {
 } from './actionTargetVfx';
 
 export const ACTION_TARGET_MISSION_DRAW_CALLS = 5;
+export const ACTION_TARGET_MATERIAL_USES_GEOMETRY_VERTEX_COLORS = false;
+
+/** 初回material compile前からinstance色を白で初期化する。 */
+export function createActionTargetInstanceColorArray(count: number): Float32Array {
+  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  const colors = new Float32Array(safeCount * 3);
+  colors.fill(1);
+  return colors;
+}
 
 /** 共通sceneが読む仕事ID、対象、接触条件。 */
 export interface ActionTargetMissionJob extends ActionTargetVfxJob {
@@ -87,6 +96,14 @@ const PARTICLE_COLORS: Readonly<Record<ActionTargetKind, string>> = {
   checkpoint: '#8ec5ff',
   patient: '#ffffff',
   soil: '#b8743c',
+};
+const PARTICLE_INSTANCE_COLORS: Readonly<Record<
+  ActionTargetKind,
+  readonly [THREE.Color, THREE.Color]
+>> = {
+  checkpoint: [new THREE.Color('#e33a32'), new THREE.Color('#1769ff')],
+  patient: [new THREE.Color('#e33a32'), new THREE.Color('#fffdf7')],
+  soil: [new THREE.Color('#9a5d2f'), new THREE.Color('#e89a3a')],
 };
 const ROUTE_COLORS: Readonly<Record<ActionTargetKind, string>> = {
   checkpoint: '#4a9cff',
@@ -145,6 +162,10 @@ function VoxelPool({
   readonly meshRef: RefObject<THREE.InstancedMesh | null>;
   readonly vertexColors?: boolean;
 }): ReactElement {
+  const instanceColorsRef = useRef<Float32Array | null>(null);
+  if (vertexColors && instanceColorsRef.current === null) {
+    instanceColorsRef.current = createActionTargetInstanceColorArray(count);
+  }
   return (
     <instancedMesh
       args={[UNIT_GEOMETRY, undefined, count]}
@@ -152,11 +173,17 @@ function VoxelPool({
       frustumCulled={ACTION_TARGET_DYNAMIC_FRUSTUM_CULLED}
       ref={meshRef}
     >
+      {instanceColorsRef.current ? (
+        <instancedBufferAttribute
+          args={[instanceColorsRef.current, 3]}
+          attach="instanceColor"
+        />
+      ) : null}
       <meshLambertMaterial
         color={color}
         emissive={emissive ? color : undefined}
         emissiveIntensity={emissive ? 0.22 : 0}
-        vertexColors={vertexColors}
+        vertexColors={ACTION_TARGET_MATERIAL_USES_GEOMETRY_VERTEX_COLORS}
       />
     </instancedMesh>
   );
@@ -227,11 +254,12 @@ export function ActionTargetMission({
         deltaSeconds * 1_000,
         job.interaction.holdDurationMs,
       );
-      if (contactActive && job.targetKind === 'soil') {
+      if (contactActive && (job.targetKind === 'soil' || job.targetKind === 'patient')) {
+        const actionCycleSeconds = job.targetKind === 'soil' ? 0.9 : 1;
         vfxInteraction = {
           actionCycleProgress: (
-            telemetry.holdMilliseconds[index] / 1_000 % 0.9
-          ) / 0.9,
+            telemetry.holdMilliseconds[index] / 1_000 % actionCycleSeconds
+          ) / actionCycleSeconds,
           contactPoint,
           forward: vehicle.forward,
           holdProgress: telemetry.holdMilliseconds[index] / job.interaction.holdDurationMs,
@@ -263,7 +291,12 @@ export function ActionTargetMission({
       matrix,
       ACCENT_INSTANCE_COLORS[job.targetKind],
     );
-    applyTransforms(particleRef.current, telemetry.frame.particles, matrix);
+    applyTransforms(
+      particleRef.current,
+      telemetry.frame.particles,
+      matrix,
+      PARTICLE_INSTANCE_COLORS[job.targetKind],
+    );
     applyTransforms(routeRef.current, telemetry.frame.routeMarkers, matrix);
     applyTransforms(starRef.current, telemetry.frame.stars, matrix);
 
@@ -307,6 +340,7 @@ export function ActionTargetMission({
         color={PARTICLE_COLORS[job.targetKind]}
         count={ACTION_TARGET_PARTICLE_POOL_SIZE}
         meshRef={particleRef}
+        vertexColors
       />
       <VoxelPool
         color={ROUTE_COLORS[job.targetKind]}

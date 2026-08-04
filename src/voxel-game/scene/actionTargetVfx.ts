@@ -62,6 +62,7 @@ const PARTICLES_PER_TARGET = ACTION_TARGET_PARTICLE_POOL_SIZE / TARGET_CAPACITY;
 const HIDDEN_Y = -40;
 const PARTICLE_LIFETIME_SECONDS = 1.1;
 const PATIENT_RISE_SECONDS = 0.65;
+const PATIENT_GLYPH_LIFETIME_SECONDS = 1.3;
 const BODY_SHAPES: Readonly<Record<ActionTargetKind, readonly {
   readonly offset: WorldPoint;
   readonly scale: WorldPoint;
@@ -129,6 +130,10 @@ const PARTICLE_DIRECTIONS = [
   [0.25, 1.1, 0.88], [0.62, 0.86, -0.58], [0.94, 0.98, 0.38],
   [-0.78, 1.16, 0.16], [-0.42, 0.82, -0.78], [0.44, 1.2, 0.76],
   [0.82, 0.9, -0.2],
+] as const;
+const PATIENT_GLYPH_OFFSETS = [
+  [-0.65, 0, 0], [-0.95, 0, 0], [-0.35, 0, 0], [-0.65, 0.3, 0], [-0.65, -0.3, 0],
+  [0.4, 0.18, 0], [0.9, 0.18, 0], [0.25, 0.42, 0], [1.05, 0.42, 0], [0.65, -0.2, 0],
 ] as const;
 const STAR_OFFSETS = [
   [-1.8, 0.1, -0.5], [-1.2, 0.8, 0.2], [-0.6, 0.2, -0.8],
@@ -200,16 +205,33 @@ function updateCelebrationCenter(
   target[2] = Math.round(z / count * 2) / 2;
 }
 
-/** 患者の完了時刻から、横たわった0〜立ち上がった1の補間率を返す。 */
-function getPatientRiseProgress(
+export type PatientGlyphKind = 'cross' | 'heart';
+
+/** 手当て進捗中に使う患者glyph種を返す。 */
+export function getPatientGlyphKinds(holdProgress: number): readonly PatientGlyphKind[] {
+  if (!Number.isFinite(holdProgress) || holdProgress <= 0) return [];
+  return ['cross', 'heart'];
+}
+
+/** 患者の完了時刻から予備収縮と0.65秒の起き上がりposeを返す。 */
+export function getPatientRecoveryPose(
   completed: boolean,
   completionTimeSeconds: number,
   elapsedSeconds: number,
-): number {
-  if (!completed || completionTimeSeconds < 0) return 0;
-  return Math.min(1, Math.max(0, (
-    elapsedSeconds - completionTimeSeconds
-  ) / PATIENT_RISE_SECONDS));
+): { readonly rise: number; readonly scaleY: number } {
+  if (!completed || completionTimeSeconds < 0) return { rise: 0, scaleY: 1 };
+  const age = Math.max(0, elapsedSeconds - completionTimeSeconds);
+  if (age <= 0.12) {
+    return {
+      rise: 0,
+      scaleY: 1 - Math.sin(age / 0.12 * Math.PI) * 0.08,
+    };
+  }
+  if (age >= PATIENT_RISE_SECONDS - 1e-9) return { rise: 1, scaleY: 1 };
+  return {
+    rise: Math.min(1, (age - 0.12) / (PATIENT_RISE_SECONDS - 0.12)),
+    scaleY: 1,
+  };
 }
 
 /** 現在snapshotと完了時刻から全固定slotを配列再生成なしで更新する。 */
@@ -236,13 +258,14 @@ export function updateActionTargetVfxFrame(
       hideActionTargetTransform(transform);
       continue;
     }
-    const rise = patientVisible
-      ? getPatientRiseProgress(
+    const recovery = patientVisible
+      ? getPatientRecoveryPose(
         state.completed,
         completionTimesSeconds[transform.sourceIndex] ?? -1,
         safeElapsed,
       )
-      : 1;
+      : { rise: 1, scaleY: 1 };
+    const rise = recovery.rise;
     const startShape = patientVisible && patientShape ? patientShape : shape;
     transform.active = true;
     transform.position[0] = source.position[0]
@@ -258,7 +281,8 @@ export function updateActionTargetVfxFrame(
       ? Math.min(1, Math.max(0, interaction.holdProgress))
       : 0;
     const digWeight = (shapeIndex + 1) / BODY_VOXELS_PER_TARGET;
-    transform.scale[1] = baseScaleY * (1 - soilHold * (0.18 + digWeight * 0.48));
+    transform.scale[1] = baseScaleY * recovery.scaleY
+      * (1 - soilHold * (0.18 + digWeight * 0.48));
     transform.position[1] -= (baseScaleY - transform.scale[1]) / 2;
     transform.scale[2] = startShape.scale[2] + (shape.scale[2] - startShape.scale[2]) * rise;
   }
@@ -274,13 +298,14 @@ export function updateActionTargetVfxFrame(
       hideActionTargetTransform(transform);
       continue;
     }
-    const rise = patientVisible
-      ? getPatientRiseProgress(
+    const recovery = patientVisible
+      ? getPatientRecoveryPose(
         state.completed,
         completionTimesSeconds[transform.sourceIndex] ?? -1,
         safeElapsed,
       )
-      : 1;
+      : { rise: 1, scaleY: 1 };
+    const rise = recovery.rise;
     const startShape = patientVisible && patientShape ? patientShape : shape;
     const pulse = 1 + Math.sin(safeElapsed * 5 + transform.slot) * 0.08;
     transform.active = true;
@@ -293,7 +318,7 @@ export function updateActionTargetVfxFrame(
     transform.scale[0] = (startShape.scale[0]
       + (shape.scale[0] - startShape.scale[0]) * rise) * pulse;
     transform.scale[1] = (startShape.scale[1]
-      + (shape.scale[1] - startShape.scale[1]) * rise) * pulse;
+      + (shape.scale[1] - startShape.scale[1]) * rise) * pulse * recovery.scaleY;
     transform.scale[2] = (startShape.scale[2]
       + (shape.scale[2] - startShape.scale[2]) * rise) * pulse;
   }
@@ -308,6 +333,23 @@ export function updateActionTargetVfxFrame(
       hideActionTargetTransform(transform);
       continue;
     }
+    if (
+      job.targetKind === 'patient'
+      && completionTime >= 0
+      && age >= 0
+      && age < PATIENT_GLYPH_LIFETIME_SECONDS
+    ) {
+      const offset = PATIENT_GLYPH_OFFSETS[localSlot];
+      const remaining = 1 - age / PATIENT_GLYPH_LIFETIME_SECONDS;
+      transform.active = true;
+      transform.position[0] = source.position[0] + offset[0] * (1 + remaining * 0.18);
+      transform.position[1] = source.position[1] + 1.75 + offset[1] + age * 0.22;
+      transform.position[2] = source.position[2] + offset[2];
+      transform.scale[0] = 0.2 * remaining;
+      transform.scale[1] = 0.2 * remaining;
+      transform.scale[2] = 0.2 * remaining;
+      continue;
+    }
     if (completionTime >= 0 && age >= 0 && age < PARTICLE_LIFETIME_SECONDS) {
       const size = 0.3 * (1 - age / PARTICLE_LIFETIME_SECONDS);
       const soilLift = job.targetKind === 'soil' ? 1.28 : 1;
@@ -316,6 +358,27 @@ export function updateActionTargetVfxFrame(
       transform.position[1] = source.position[1] + 0.3
         + direction[1] * age * 3.2 * soilLift - 4.8 * age * age;
       transform.position[2] = source.position[2] + direction[2] * age * 2.5;
+      transform.scale[0] = size;
+      transform.scale[1] = size;
+      transform.scale[2] = size;
+      continue;
+    }
+    if (
+      job.targetKind === 'patient'
+      && interaction?.sourceIndex === transform.sourceIndex
+      && Number.isFinite(interaction.holdProgress)
+      && interaction.holdProgress > 0
+    ) {
+      const hold = Math.min(1, interaction.holdProgress);
+      const angle = localSlot / PARTICLES_PER_TARGET * Math.PI * 2
+        + interaction.actionCycleProgress * Math.PI * 2;
+      const radius = 1.05 + Math.sin(hold * Math.PI) * 0.22;
+      transform.active = true;
+      transform.position[0] = source.position[0] + Math.cos(angle) * radius;
+      transform.position[1] = source.position[1] + 0.2 + hold * 1.6
+        + Math.sin(angle * 2) * 0.06;
+      transform.position[2] = source.position[2] + Math.sin(angle) * radius;
+      const size = 0.16 + (localSlot % 2) * 0.045;
       transform.scale[0] = size;
       transform.scale[1] = size;
       transform.scale[2] = size;

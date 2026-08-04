@@ -10,6 +10,7 @@ import {
 } from '../vehicle-lab/model/voxelModel';
 import {
   AMBULANCE_RENDER_PLAN,
+  getAmbulanceActionPose,
   getAmbulanceCarePulseScale,
 } from '../vehicle-lab/scene/VoxelAmbulance';
 
@@ -53,5 +54,28 @@ describe('AMBULANCE_VOXELS', () => {
     expect(getAmbulanceCarePulseScale(true, 0)).toBeCloseTo(1, 5);
     expect(getAmbulanceCarePulseScale(true, 0.25)).toBeGreaterThan(1);
     expect(getAmbulanceCarePulseScale(true, 0.25)).toBeLessThanOrEqual(1.07);
+  });
+
+  it('押下直後は赤十字と灯火を1.12超までburstし、その後は2Hz以下でholdする', () => {
+    const press = getAmbulanceActionPose(true, 0.08);
+    const hold = getAmbulanceActionPose(true, 0.4);
+
+    expect(press.phase).toBe('press');
+    expect(press.crossScale).toBeGreaterThan(1.12);
+    expect(press.beaconScale).toBeGreaterThan(1.12);
+    expect(hold.phase).toBe('hold');
+    expect(hold.beaconPulseHz).toBeLessThanOrEqual(2);
+    expect(hold.crossScale).toBeLessThanOrEqual(1.08);
+  });
+
+  it('非押下と不正時刻ではneutral poseを返す', () => {
+    const neutral = {
+      beaconPulseHz: 0,
+      beaconScale: 1,
+      crossScale: 1,
+      phase: 'idle',
+    };
+    expect(getAmbulanceActionPose(false, 0.08)).toEqual(neutral);
+    expect(getAmbulanceActionPose(true, Number.NaN)).toEqual(neutral);
   });
 });

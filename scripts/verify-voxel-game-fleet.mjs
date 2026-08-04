@@ -221,14 +221,27 @@ async function careForPatient(page, viewport) {
     `${viewport.name}: ambulance is too fast to provide care: ${stopped.vehicle.speed}.`);
   await setPrimaryAction(page, viewport.touch, true);
   let completed = null;
+  let careCaptured = false;
   try {
     for (let frame = 0; frame < 180; frame += 1) {
       await waitForFrames(page, 1);
       const state = await readGameState(page);
       assert(state.vehicle.speed <= 0.35,
         `${viewport.name}: ambulance exceeded care speed while holding: ${state.vehicle.speed}.`);
+      if (
+        !careCaptured
+        && state.ambulance.holdMilliseconds.some((milliseconds) => milliseconds >= 600)
+      ) {
+        assert(state.ambulance.activeParticleCount >= 10,
+          `${viewport.name}: ambulance care did not emit its ten-particle ring.`);
+        await page.screenshot({ path: `${outputDirectory}/${viewport.name}-ambulance-caring.png` });
+        careCaptured = true;
+      }
       if (state.ambulance.completedCount === 1) {
         completed = state;
+        assert(state.ambulance.activeParticleCount >= 10,
+          `${viewport.name}: patient recovery did not emit its heart and cross glyphs.`);
+        await page.screenshot({ path: `${outputDirectory}/${viewport.name}-ambulance-recovery.png` });
         break;
       }
     }
@@ -236,6 +249,7 @@ async function careForPatient(page, viewport) {
     await setPrimaryAction(page, viewport.touch, false);
   }
   assert(completed, `${viewport.name}: patient did not complete within 180 frames.`);
+  assert(careCaptured, `${viewport.name}: ambulance care frame was never observed.`);
   return completed;
 }
 
@@ -855,6 +869,8 @@ try {
       `${name}-excavator-impact.png`,
       `${name}-ambulance-garage.png`,
       `${name}-ambulance-patient-before.png`,
+      `${name}-ambulance-caring.png`,
+      `${name}-ambulance-recovery.png`,
       `${name}-ambulance-worksite.png`,
       `${name}-police-garage.png`,
       `${name}-police-checkpoint-before.png`,

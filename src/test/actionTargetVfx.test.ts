@@ -9,11 +9,15 @@ import {
   ACTION_TARGET_ROUTE_POOL_SIZE,
   ACTION_TARGET_STAR_POOL_SIZE,
   createActionTargetVfxFrame,
+  getPatientGlyphKinds,
+  getPatientRecoveryPose,
   updateActionTargetVfxFrame,
   type ActionTargetVfxJob,
 } from '../voxel-game/scene/actionTargetVfx';
 import {
+  ACTION_TARGET_MATERIAL_USES_GEOMETRY_VERTEX_COLORS,
   ACTION_TARGET_MISSION_DRAW_CALLS,
+  createActionTargetInstanceColorArray,
   createActionTargetMissionTelemetry,
 } from '../voxel-game/scene/ActionTargetMission';
 
@@ -55,6 +59,14 @@ describe('action target VFX', () => {
       targetAccentVoxelCount: 0,
       targetBodyVoxelCount: 0,
     });
+  });
+
+  it('後から現れるparticleも黒化しない初期instance colorを持つ', () => {
+    const colors = createActionTargetInstanceColorArray(ACTION_TARGET_PARTICLE_POOL_SIZE);
+
+    expect(colors).toHaveLength(ACTION_TARGET_PARTICLE_POOL_SIZE * 3);
+    expect([...colors].every((component) => component === 1)).toBe(true);
+    expect(ACTION_TARGET_MATERIAL_USES_GEOMETRY_VERTEX_COLORS).toBe(false);
   });
 
   it('最大3対象のbody、accent、particle、route、star slotを1回だけ確保する', () => {
@@ -199,6 +211,58 @@ describe('action target VFX', () => {
     expect(frame.targetBodies.filter(({ active }) => active)).toHaveLength(6);
     expect(frame.targetBodies[0].position[1]).toBeGreaterThan(lyingHeadY);
     expect(frame.particles.some(({ active }) => active)).toBe(true);
+  });
+
+  it('手当てhold中は患者周囲の赤白10粒ringを0.2から1.8へ上げる', () => {
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(['patient-a']);
+
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      new Float64Array(3).fill(-1),
+      0.7,
+      PATIENT_JOB,
+      true,
+      {
+        actionCycleProgress: 0.7,
+        contactPoint: [3, 0.85, -3],
+        forward: [1, 0, 0],
+        holdProgress: 0.7,
+        sourceIndex: 0,
+      },
+    );
+
+    const ring = frame.particles.filter(({ active }) => active);
+    expect(ring).toHaveLength(10);
+    expect(ring.every(({ position }) => position[1] > PATIENT_JOB.targets[0].position[1] + 0.2))
+      .toBe(true);
+    expect(getPatientGlyphKinds(0.7)).toEqual(expect.arrayContaining(['cross', 'heart']));
+  });
+
+  it('患者は完了直後0.92倍へ縮み、赤白heart／crossを出して0.65秒後に立つ', () => {
+    expect(getPatientRecoveryPose(true, 1, 1.06)).toMatchObject({
+      rise: 0,
+      scaleY: 0.92,
+    });
+    expect(getPatientRecoveryPose(true, 1, 1.65)).toEqual({ rise: 1, scaleY: 1 });
+
+    const frame = createActionTargetVfxFrame();
+    const runtime = new ActionTargetMissionRuntime(['patient-a']);
+    runtime.registerTargetCompletion('patient-a');
+    const completionTimes = new Float64Array([1, -1, -1]);
+    updateActionTargetVfxFrame(
+      frame,
+      runtime.getSnapshot(),
+      completionTimes,
+      1.06,
+      PATIENT_JOB,
+      true,
+    );
+
+    expect(frame.particles.filter(({ active }) => active)).toHaveLength(10);
+    expect(new Set(frame.particles.filter(({ active }) => active)
+      .map(({ position }) => Math.round(position[0] * 10) / 10)).size).toBeGreaterThan(3);
   });
 
   it('巡回門3つを赤青accent付きで表示し、通過済み門だけ粒へ変える', () => {

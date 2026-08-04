@@ -26,8 +26,11 @@ export const AMBULANCE_RENDER_PLAN = createVoxelRenderPlan(
   calculateVoxelBounds(AMBULANCE_VOXELS),
   VOXEL_SIZE,
 );
-const AMBULANCE_PULSE_BATCHES = AMBULANCE_RENDER_PLAN.batches.filter(
-  ({ paletteId }) => paletteId === 'cross' || paletteId === 'beacon',
+const AMBULANCE_CROSS_BATCHES = AMBULANCE_RENDER_PLAN.batches.filter(
+  ({ paletteId }) => paletteId === 'cross',
+);
+const AMBULANCE_BEACON_BATCHES = AMBULANCE_RENDER_PLAN.batches.filter(
+  ({ paletteId }) => paletteId === 'beacon',
 );
 const AMBULANCE_STATIC_BATCHES = AMBULANCE_RENDER_PLAN.batches.filter(
   ({ paletteId }) => paletteId !== 'cross' && paletteId !== 'beacon',
@@ -43,13 +46,53 @@ export type VoxelAmbulanceProps = ThreeElements['group'] & {
   readonly paintColor?: string | null;
 };
 
+export interface AmbulanceActionPose {
+  readonly beaconPulseHz: number;
+  readonly beaconScale: number;
+  readonly crossScale: number;
+  readonly phase: 'hold' | 'idle' | 'press';
+}
+
+const IDLE_AMBULANCE_POSE: AmbulanceActionPose = {
+  beaconPulseHz: 0,
+  beaconScale: 1,
+  crossScale: 1,
+  phase: 'idle',
+};
+
+/** 押下直後のburstと、その後の1Hzケアpulseを車体poseへ変換する。 */
+export function getAmbulanceActionPose(
+  actionActive: boolean,
+  actionElapsedSeconds: number,
+): AmbulanceActionPose {
+  if (!actionActive || !Number.isFinite(actionElapsedSeconds) || actionElapsedSeconds < 0) {
+    return IDLE_AMBULANCE_POSE;
+  }
+  if (actionElapsedSeconds < 0.22) {
+    const pulse = Math.sin(actionElapsedSeconds / 0.22 * Math.PI);
+    return {
+      beaconPulseHz: 1,
+      beaconScale: 1 + pulse * 0.18,
+      crossScale: 1 + pulse * 0.16,
+      phase: 'press',
+    };
+  }
+  const cycle = (actionElapsedSeconds - 0.22) % 1;
+  const pulse = Math.max(0, Math.sin(cycle * Math.PI * 2));
+  return {
+    beaconPulseHz: 1,
+    beaconScale: 1 + pulse * 0.08,
+    crossScale: 1 + pulse * 0.08,
+    phase: 'hold',
+  };
+}
+
 /** 主操作中だけ赤十字と灯火を1.00〜1.06でゆっくり脈動させる。 */
 export function getAmbulanceCarePulseScale(
   actionActive: boolean,
   elapsedSeconds: number,
 ): number {
-  if (!actionActive || !Number.isFinite(elapsedSeconds)) return 1;
-  return 1 + Math.max(0, Math.sin(Math.max(0, elapsedSeconds) * Math.PI * 2)) * 0.06;
+  return getAmbulanceActionPose(actionActive, elapsedSeconds).crossScale;
 }
 
 /** 同色voxelを1つのInstancedMeshとして描画する。 */
@@ -97,16 +140,22 @@ export function VoxelAmbulance({
   paintColor = null,
   ...groupProps
 }: VoxelAmbulanceProps): ReactElement {
-  const pulseGroupRef = useRef<THREE.Group>(null);
+  const beaconGroupRef = useRef<THREE.Group>(null);
+  const crossGroupRef = useRef<THREE.Group>(null);
+  const actionElapsedSecondsRef = useRef(0);
   assertValidVoxelModel(AMBULANCE_VOXELS, AMBULANCE_PALETTE_IDS);
 
-  useFrame(({ clock }) => {
-    const group = pulseGroupRef.current;
-    if (!group) return;
-    group.scale.setScalar(getAmbulanceCarePulseScale(
-      actionActiveRef?.current === true,
-      clock.elapsedTime,
-    ));
+  useFrame((_state, delta) => {
+    const beaconGroup = beaconGroupRef.current;
+    const crossGroup = crossGroupRef.current;
+    if (!beaconGroup || !crossGroup) return;
+    const actionActive = actionActiveRef?.current === true;
+    actionElapsedSecondsRef.current = actionActive
+      ? actionElapsedSecondsRef.current + Math.max(0, Math.min(delta, 0.05))
+      : 0;
+    const pose = getAmbulanceActionPose(actionActive, actionElapsedSecondsRef.current);
+    beaconGroup.scale.setScalar(pose.beaconScale);
+    crossGroup.scale.setScalar(pose.crossScale);
   });
 
   return (
@@ -115,8 +164,13 @@ export function VoxelAmbulance({
         {AMBULANCE_STATIC_BATCHES.map((batch) => (
           <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
         ))}
-        <group ref={pulseGroupRef}>
-          {AMBULANCE_PULSE_BATCHES.map((batch) => (
+        <group ref={crossGroupRef}>
+          {AMBULANCE_CROSS_BATCHES.map((batch) => (
+            <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
+          ))}
+        </group>
+        <group ref={beaconGroupRef}>
+          {AMBULANCE_BEACON_BATCHES.map((batch) => (
             <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
           ))}
         </group>
