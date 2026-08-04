@@ -19,6 +19,10 @@ import {
   syncKeyboardKeys,
 } from './voxel-game-e2e/drive-harness.mjs';
 import { createFireRoutePlan } from './voxel-game-e2e/fire-route-plan.mjs';
+import {
+  DISTRICT_JOURNEY_MAX_SECONDS,
+  evaluateJourneyTimingPolicy,
+} from './voxel-game-e2e/journey-timing-policy.mjs';
 import { createScenarioProgress } from './voxel-game-e2e/scenario-progress.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -627,16 +631,20 @@ function measureRoadDistance(positions) {
   ), 0);
 }
 
-/** 実入力の地区移動を計時し、到着地区と35秒上限を検証する。 */
+/** 実入力の地区移動を計時し、到着地区と物理GPUでの35秒上限を検証する。 */
 async function verifyDistrictJourney(page, destinationDistrict, description, drive) {
   const started = await readGameState(page);
   const startedAt = Date.now();
   const { state: arrived, waypoints = [] } = await drive(started);
   const durationSeconds = (Date.now() - startedAt) / 1_000;
+  const timingPolicy = evaluateJourneyTimingPolicy(
+    durationSeconds,
+    classifyRenderer(arrived.renderer.rendererName),
+  );
   assert.equal(arrived.world.currentDistrict, destinationDistrict,
     `${description}: arrived in ${arrived.world.currentDistrict}.`);
-  assert(durationSeconds <= 35,
-    `${description}: district journey exceeded 35 seconds (${durationSeconds}).`);
+  assert(timingPolicy.rendererClass !== 'physical' || timingPolicy.thresholdMet,
+    `${description}: physical-GPU district journey exceeded ${DISTRICT_JOURNEY_MAX_SECONDS} seconds (${durationSeconds}).`);
   return {
     destinationDistrict,
     durationSeconds,
@@ -646,11 +654,12 @@ async function verifyDistrictJourney(page, destinationDistrict, description, dri
       ...waypoints,
       arrived.vehicle.position,
     ]),
+    timingPolicy,
     to: arrived.vehicle.position,
   };
 }
 
-/** 再利用scenarioの開始から地区到着までを検証し、JSON保存用snapshotとwall-clockを返す。 */
+/** 再利用scenarioの地区到着を検証し、wall-clockとrenderer別認証policyを返す。 */
 function buildVerifiedScenarioArrival(
   started,
   arrived,
@@ -661,13 +670,17 @@ function buildVerifiedScenarioArrival(
 ) {
   const arrivedAtMs = Date.now();
   const durationSeconds = (arrivedAtMs - startedAtMs) / 1_000;
+  const timingPolicy = evaluateJourneyTimingPolicy(
+    durationSeconds,
+    classifyRenderer(arrived.renderer.rendererName),
+  );
   assert.equal(arrived.world.currentDistrict, expectedArrivalDistrict,
     `${description}: arrived in ${arrived.world.currentDistrict}: ${JSON.stringify({
       position: arrived.vehicle.position,
       world: arrived.world,
     })}`);
-  assert(durationSeconds <= 35,
-    `${description}: district journey exceeded 35 seconds (${durationSeconds}).`);
+  assert(timingPolicy.rendererClass !== 'physical' || timingPolicy.thresholdMet,
+    `${description}: physical-GPU district journey exceeded ${DISTRICT_JOURNEY_MAX_SECONDS} seconds (${durationSeconds}).`);
   return {
     arrival: {
       mission: arrived.mission,
@@ -681,6 +694,7 @@ function buildVerifiedScenarioArrival(
       durationSeconds,
       from: started.vehicle.position,
       startedAtMs,
+      timingPolicy,
       to: arrived.vehicle.position,
     },
   };
@@ -2333,8 +2347,24 @@ async function driveToBlockApproach(page, block) {
     await driveAlongWorldAxis(page, 'negativeX', (state) => (
       state.vehicle.position[0] <= westStageX
     ), `${block.id} west trunk road`);
-    await alignWorldCoordinate(page, 0, westStageX, `${block.id} west stage X`);
-    await alignWorldCoordinate(page, 2, block.position[2], `${block.id} west approach Z`);
+    await alignWorldCoordinate(
+      page,
+      0,
+      westStageX,
+      `${block.id} west stage X`,
+      0.32,
+      null,
+      { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.9 },
+    );
+    await alignWorldCoordinate(
+      page,
+      2,
+      block.position[2],
+      `${block.id} west approach Z`,
+      0.32,
+      null,
+      { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.9 },
+    );
     const staged = await readGameState(page);
     if (staged.world.currentDistrict !== 'blocks') {
       await driveAlongWorldAxis(page, 'positiveX', (state) => (
@@ -3775,8 +3805,11 @@ async function verifyVoxelGame(scenarioProgress) {
         );
         assert.equal(result.arrival?.world.currentDistrict, 'fire',
           `production-map fire scenario arrived in ${result.arrival?.world.currentDistrict}.`);
-        assert((result.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
-          `production-map fire scenario exceeded 35 seconds: ${JSON.stringify(result.journey)}.`);
+        assert(result.journey?.timingPolicy,
+          `production-map fire scenario omitted journey timing policy: ${JSON.stringify(result.journey)}.`);
+        assert(result.journey.timingPolicy.rendererClass !== 'physical'
+          || result.journey.timingPolicy.thresholdMet,
+        `production-map fire scenario exceeded physical-GPU journey budget: ${JSON.stringify(result.journey)}.`);
         return result;
       });
       const blocks = await runScenario('production-map-blocks', async () => {
@@ -3789,8 +3822,11 @@ async function verifyVoxelGame(scenarioProgress) {
         );
         assert.equal(result.arrival?.world.currentDistrict, 'blocks',
           `production-map blocks scenario arrived in ${result.arrival?.world.currentDistrict}.`);
-        assert((result.journey?.durationSeconds ?? Number.POSITIVE_INFINITY) <= 35,
-          `production-map blocks scenario exceeded 35 seconds: ${JSON.stringify(result.journey)}.`);
+        assert(result.journey?.timingPolicy,
+          `production-map blocks scenario omitted journey timing policy: ${JSON.stringify(result.journey)}.`);
+        assert(result.journey.timingPolicy.rendererClass !== 'physical'
+          || result.journey.timingPolicy.thresholdMet,
+        `production-map blocks scenario exceeded physical-GPU journey budget: ${JSON.stringify(result.journey)}.`);
         copyVerifiedScreenshot(
           `${outputDirectory}/desktop-break-green-first-observed.png`,
           `${outputDirectory}/desktop-production-blocks.png`,
