@@ -30,7 +30,8 @@ import {
   type ActionTargetVoxelTransform,
 } from './actionTargetVfx';
 
-export const ACTION_TARGET_MISSION_DRAW_CALLS = 5;
+export const ACTION_TARGET_MISSION_DRAW_CALLS = 2;
+export const ACTION_TARGET_COMBINED_EMISSIVE_INTENSITY = 0.08;
 export const ACTION_TARGET_MATERIAL_USES_GEOMETRY_VERTEX_COLORS = false;
 
 /** 初回material compile前からinstance色を白で初期化する。 */
@@ -79,6 +80,11 @@ const BODY_COLORS: Readonly<Record<ActionTargetKind, string>> = {
   patient: '#f3eee3',
   soil: '#9a5d2f',
 };
+const BODY_MATERIAL_COLORS: Readonly<Record<ActionTargetKind, THREE.Color>> = {
+  checkpoint: new THREE.Color(BODY_COLORS.checkpoint),
+  patient: new THREE.Color(BODY_COLORS.patient),
+  soil: new THREE.Color(BODY_COLORS.soil),
+};
 const ACCENT_COLORS: Readonly<Record<ActionTargetKind, readonly [string, string]>> = {
   checkpoint: ['#e33a32', '#1769ff'],
   patient: ['#d92d24', '#f5b8b3'],
@@ -97,6 +103,11 @@ const PARTICLE_COLORS: Readonly<Record<ActionTargetKind, string>> = {
   patient: '#ffffff',
   soil: '#b8743c',
 };
+const PARTICLE_MATERIAL_COLORS: Readonly<Record<ActionTargetKind, THREE.Color>> = {
+  checkpoint: new THREE.Color(PARTICLE_COLORS.checkpoint),
+  patient: new THREE.Color(PARTICLE_COLORS.patient),
+  soil: new THREE.Color(PARTICLE_COLORS.soil),
+};
 const PARTICLE_INSTANCE_COLORS: Readonly<Record<
   ActionTargetKind,
   readonly [THREE.Color, THREE.Color]
@@ -111,6 +122,11 @@ const ROUTE_COLORS: Readonly<Record<ActionTargetKind, string>> = {
   checkpoint: '#4a9cff',
   patient: '#ef5b55',
   soil: '#f59e0b',
+};
+const ROUTE_MATERIAL_COLORS: Readonly<Record<ActionTargetKind, THREE.Color>> = {
+  checkpoint: new THREE.Color(ROUTE_COLORS.checkpoint),
+  patient: new THREE.Color(ROUTE_COLORS.patient),
+  soil: new THREE.Color(ROUTE_COLORS.soil),
 };
 
 /** 外部refへ渡せる、全固定slotを確保済みの初期telemetryを返す。 */
@@ -156,17 +172,46 @@ function applyTransforms(
   if (colors && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }
 
+/** 異なるmaterial色だったtransform群を、見た目を保ったinstance色へ合成して追記する。 */
+function appendColoredTransforms(
+  mesh: THREE.InstancedMesh | null,
+  transforms: readonly ActionTargetVoxelTransform[],
+  matrix: THREE.Matrix4,
+  startIndex: number,
+  materialColor: THREE.Color,
+  colors: readonly [THREE.Color, THREE.Color] | null = null,
+): number {
+  if (!mesh) return startIndex;
+  let instanceIndex = startIndex;
+  for (const transform of transforms) {
+    if (!transform.active) continue;
+    matrix.makeScale(transform.scale[0], transform.scale[1], transform.scale[2]);
+    matrix.setPosition(transform.position[0], transform.position[1], transform.position[2]);
+    mesh.setMatrixAt(instanceIndex, matrix);
+    INSTANCE_COLOR_SCRATCH.copy(colors ? colors[transform.slot % 2] : INSTANCE_WHITE);
+    if (colors && transform.colorMixToWhite > 0) {
+      INSTANCE_COLOR_SCRATCH.lerp(INSTANCE_WHITE, Math.min(1, transform.colorMixToWhite));
+    }
+    INSTANCE_COLOR_SCRATCH.multiply(materialColor);
+    mesh.setColorAt(instanceIndex, INSTANCE_COLOR_SCRATCH);
+    instanceIndex += 1;
+  }
+  return instanceIndex;
+}
+
 /** 固定slot群を1つのInstancedMeshとして描画する。 */
 function VoxelPool({
   color,
   count,
   emissive = false,
+  emissiveIntensity,
   meshRef,
   vertexColors = false,
 }: {
   readonly color: string;
   readonly count: number;
   readonly emissive?: boolean;
+  readonly emissiveIntensity?: number;
   readonly meshRef: RefObject<THREE.InstancedMesh | null>;
   readonly vertexColors?: boolean;
 }): ReactElement {
@@ -174,6 +219,7 @@ function VoxelPool({
   if (vertexColors && instanceColorsRef.current === null) {
     instanceColorsRef.current = createActionTargetInstanceColorArray(count);
   }
+  const resolvedEmissiveIntensity = emissiveIntensity ?? (emissive ? 0.22 : 0);
   return (
     <instancedMesh
       args={[UNIT_GEOMETRY, undefined, count]}
@@ -189,15 +235,15 @@ function VoxelPool({
       ) : null}
       <meshLambertMaterial
         color={color}
-        emissive={emissive ? color : undefined}
-        emissiveIntensity={emissive ? 0.22 : 0}
+        emissive={resolvedEmissiveIntensity > 0 ? color : undefined}
+        emissiveIntensity={resolvedEmissiveIntensity}
         vertexColors={ACTION_TARGET_MATERIAL_USES_GEOMETRY_VERTEX_COLORS}
       />
     </instancedMesh>
   );
 }
 
-/** 追加3車種の対象、粒、道しるべ、成功星を固定5 batchで描画する。 */
+/** 追加3車種の対象・粒・道しるべを統合し、成功星と合わせた固定2 batchで描画する。 */
 export function ActionTargetMission({
   commandRef,
   enabled,
@@ -208,10 +254,7 @@ export function ActionTargetMission({
   telemetryRef,
   vehicleTelemetryRef,
 }: ActionTargetMissionProps): ReactElement {
-  const targetBodyRef = useRef<THREE.InstancedMesh>(null);
-  const targetAccentRef = useRef<THREE.InstancedMesh>(null);
-  const particleRef = useRef<THREE.InstancedMesh>(null);
-  const routeRef = useRef<THREE.InstancedMesh>(null);
+  const targetAndParticleRef = useRef<THREE.InstancedMesh>(null);
   const starRef = useRef<THREE.InstancedMesh>(null);
   const matrixRef = useRef<THREE.Matrix4 | null>(null);
   if (matrixRef.current === null) matrixRef.current = new THREE.Matrix4();
@@ -294,20 +337,43 @@ export function ActionTargetMission({
       enabled,
       vfxInteraction,
     );
-    applyTransforms(targetBodyRef.current, telemetry.frame.targetBodies, matrix);
-    applyTransforms(
-      targetAccentRef.current,
+    let combinedCount = appendColoredTransforms(
+      targetAndParticleRef.current,
+      telemetry.frame.targetBodies,
+      matrix,
+      0,
+      BODY_MATERIAL_COLORS[job.targetKind],
+    );
+    combinedCount = appendColoredTransforms(
+      targetAndParticleRef.current,
       telemetry.frame.targetAccents,
       matrix,
+      combinedCount,
+      INSTANCE_WHITE,
       ACCENT_INSTANCE_COLORS[job.targetKind],
     );
-    applyTransforms(
-      particleRef.current,
+    combinedCount = appendColoredTransforms(
+      targetAndParticleRef.current,
       telemetry.frame.particles,
       matrix,
+      combinedCount,
+      PARTICLE_MATERIAL_COLORS[job.targetKind],
       PARTICLE_INSTANCE_COLORS[job.targetKind],
     );
-    applyTransforms(routeRef.current, telemetry.frame.routeMarkers, matrix);
+    combinedCount = appendColoredTransforms(
+      targetAndParticleRef.current,
+      telemetry.frame.routeMarkers,
+      matrix,
+      combinedCount,
+      ROUTE_MATERIAL_COLORS[job.targetKind],
+    );
+    if (targetAndParticleRef.current) {
+      targetAndParticleRef.current.count = combinedCount;
+      targetAndParticleRef.current.instanceMatrix.needsUpdate = true;
+      if (targetAndParticleRef.current.instanceColor) {
+        targetAndParticleRef.current.instanceColor.needsUpdate = true;
+      }
+    }
     applyTransforms(starRef.current, telemetry.frame.stars, matrix);
 
     telemetry.completedCount = snapshot.completedCount;
@@ -336,27 +402,16 @@ export function ActionTargetMission({
   return (
     <group>
       <VoxelPool
-        color={BODY_COLORS[job.targetKind]}
-        count={ACTION_TARGET_BODY_POOL_SIZE}
-        meshRef={targetBodyRef}
-      />
-      <VoxelPool
         color="#ffffff"
-        count={ACTION_TARGET_ACCENT_POOL_SIZE}
-        meshRef={targetAccentRef}
+        count={
+          ACTION_TARGET_BODY_POOL_SIZE
+          + ACTION_TARGET_ACCENT_POOL_SIZE
+          + ACTION_TARGET_PARTICLE_POOL_SIZE
+          + ACTION_TARGET_ROUTE_POOL_SIZE
+        }
+        emissiveIntensity={ACTION_TARGET_COMBINED_EMISSIVE_INTENSITY}
+        meshRef={targetAndParticleRef}
         vertexColors
-      />
-      <VoxelPool
-        color={PARTICLE_COLORS[job.targetKind]}
-        count={ACTION_TARGET_PARTICLE_POOL_SIZE}
-        meshRef={particleRef}
-        vertexColors
-      />
-      <VoxelPool
-        color={ROUTE_COLORS[job.targetKind]}
-        count={ACTION_TARGET_ROUTE_POOL_SIZE}
-        emissive
-        meshRef={routeRef}
       />
       <VoxelPool
         color="#fff1a6"

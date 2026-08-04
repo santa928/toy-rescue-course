@@ -19,13 +19,13 @@ function expectFiniteFrame(frame: ReturnType<typeof createColorPlayVfxFrame>): v
 }
 
 describe('color play VFX', () => {
-  it('3色それぞれpool 8・shower 18の固定slotを持ち、全78 cube・5 draw callに収める', () => {
+  it('3色それぞれpool 8・shower 18の固定slotを持ち、全78 cube・1 draw callに収める', () => {
     const frame = createColorPlayVfxFrame();
 
     expect(COLOR_PLAY_POOL_SLOT_COUNT).toBe(8);
     expect(COLOR_PLAY_SHOWER_SLOT_COUNT).toBe(18);
     expect(COLOR_PLAY_TOTAL_CUBE_COUNT).toBe(78);
-    expect(COLOR_PLAY_STATION_DRAW_CALLS).toBe(5);
+    expect(COLOR_PLAY_STATION_DRAW_CALLS).toBe(1);
     expect(frame.instances).toHaveLength(78);
 
     for (const colorId of ['red', 'blue', 'yellow'] as const) {

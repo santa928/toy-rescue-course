@@ -14,8 +14,8 @@ export const COLOR_PLAY_SHOWER_SLOT_COUNT = 18;
 /** 赤青黄のpoolとshowerを合わせた動的voxel総数。 */
 export const COLOR_PLAY_TOTAL_CUBE_COUNT = 78;
 
-/** 3色の動的batch、白frame、濃灰baseを合わせたdraw call数。 */
-export const COLOR_PLAY_STATION_DRAW_CALLS = 5;
+/** 動的voxel、白frame、濃灰baseをinstance色付きで統合したdraw call数。 */
+export const COLOR_PLAY_STATION_DRAW_CALLS = 1;
 
 /** 色遊びVFXの1固定slotを表すin-place更新可能なtransform。 */
 export interface ColorPlayVfxInstance {

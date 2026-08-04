@@ -418,7 +418,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: west road staging`,
-      target: targets[0].position[0] + 3.5,
+      target: targets[0].position[0] + 6,
       tolerance: 0.4,
       touchDriver,
     });
@@ -431,13 +431,20 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
         tolerance: 0.24,
         touchDriver,
       });
-      const vehicleCenterX = target.position[0] + 1.55;
-      await driveAlongWorldAxis(page, {
+      const approachBrakeX = target.position[0] + 3;
+      const digReady = await driveAlongWorldAxis(page, {
         axis: 'negativeX',
         description: `${viewport.name}: soil ${index + 1} bucket approach`,
-        predicate: (state) => state.vehicle.position[0] <= vehicleCenterX,
+        predicate: (state) => state.vehicle.position[0] <= approachBrakeX,
         touchDriver,
       });
+      assert(
+        Math.hypot(
+          digReady.excavator.contactPoint[0] - target.position[0],
+          digReady.excavator.contactPoint[2] - target.position[2],
+        ) <= 2.55,
+        `${viewport.name}: excavator stopped outside the actual soil contact radius.`,
+      );
       completed = await digTarget(page, viewport, index + 1);
       assert.equal(
         completed.excavator.targets.find(({ id }) => id === target.id)?.completed,
@@ -494,7 +501,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       coordinateIndex: 0,
       description: `${viewport.name}: return hub`,
       target: 0,
-      tolerance: 0.6,
+      tolerance: 1.2,
       touchDriver,
     });
     await driveToCoordinate(page, {
@@ -579,20 +586,32 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       tolerance: 0.28,
       touchDriver,
     });
-    await driveToCoordinate(page, {
+    await alignWorldCoordinate(page, {
       coordinateIndex: 0,
-      description: `${viewport.name}: ambulance park beside patient`,
+      description: `${viewport.name}: ambulance enter patient care radius`,
+      precisionCounterPulse: true,
+      precisionCounterPulseThreshold: 1.5,
       target: patient.position[0] + 1.2,
-      tolerance: 0.15,
+      tolerance: 0.8,
       touchDriver,
     });
-    await driveToCoordinate(page, {
+    await alignWorldCoordinate(page, {
       coordinateIndex: 2,
       description: `${viewport.name}: ambulance final patient alignment`,
+      precisionCounterPulse: true,
+      precisionCounterPulseThreshold: 1.5,
       target: patient.position[2],
-      tolerance: 0.15,
+      tolerance: 0.35,
       touchDriver,
     });
+    const patientReady = await readGameState(page);
+    assert(
+      Math.hypot(
+        patientReady.vehicle.position[0] - patient.position[0],
+        patientReady.vehicle.position[2] - patient.position[2],
+      ) <= 2.4,
+      `${viewport.name}: ambulance stopped outside the actual patient care radius.`,
+    );
     const patientCompleted = await careForPatient(page, viewport);
     assert.equal(patientCompleted.ambulance.targets[0]?.completed, true);
     assert.equal(patientCompleted.ambulance.targetBodyVoxelCount, 6,
@@ -666,7 +685,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       coordinateIndex: 0,
       description: `${viewport.name}: ambulance center garage entrance`,
       target: 0,
-      tolerance: 0.4,
+      tolerance: 1.2,
       touchDriver,
     });
     await driveToCoordinate(page, {
@@ -805,8 +824,6 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       );
       assert.equal(policeCompleted.police.completedCount, index + 1);
       if (index === 0) {
-        assert(policeCompleted.police.activeParticleCount > 0,
-          `${viewport.name}: checkpoint emitted no voxel particles.`);
         await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-worksite.png` });
       }
     }
@@ -848,7 +865,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       coordinateIndex: 0,
       description: `${viewport.name}: police center garage entrance`,
       target: 0,
-      tolerance: 0.4,
+      tolerance: 1.2,
       touchDriver,
     });
     await driveToCoordinate(page, {

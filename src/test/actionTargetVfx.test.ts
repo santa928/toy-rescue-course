@@ -16,6 +16,7 @@ import {
   type ActionTargetVfxJob,
 } from '../voxel-game/scene/actionTargetVfx';
 import {
+  ACTION_TARGET_COMBINED_EMISSIVE_INTENSITY,
   ACTION_TARGET_MATERIAL_USES_GEOMETRY_VERTEX_COLORS,
   ACTION_TARGET_MISSION_DRAW_CALLS,
   createActionTargetInstanceColorArray,
@@ -49,8 +50,9 @@ const CHECKPOINT_JOB: ActionTargetVfxJob = {
 };
 
 describe('action target VFX', () => {
-  it('共通sceneを固定5 batchと非active telemetryで開始する', () => {
-    expect(ACTION_TARGET_MISSION_DRAW_CALLS).toBe(5);
+  it('共通sceneを固定2 batchと非active telemetryで開始する', () => {
+    expect(ACTION_TARGET_MISSION_DRAW_CALLS).toBe(2);
+    expect(ACTION_TARGET_COMBINED_EMISSIVE_INTENSITY).toBe(0.08);
     expect(ACTION_TARGET_DYNAMIC_FRUSTUM_CULLED).toBe(false);
     expect(createActionTargetMissionTelemetry()).toMatchObject({
       activeParticleCount: 0,
