@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createBulldozerMissionTelemetry,
   getBladeCenter,
+  isBladeTouchingDebris,
   shouldClearDebris,
 } from '../voxel-game/scene/BulldozerDebrisMission';
 
@@ -37,5 +38,16 @@ describe('bulldozer debris mission', () => {
     expect(shouldClearDebris({ ...VALID_CONTACT, speed: 0.599 })).toBe(false);
     expect(shouldClearDebris({ ...VALID_CONTACT, speed: Number.NaN })).toBe(false);
     expect(shouldClearDebris({ ...VALID_CONTACT, bladeCenter: [-20, 0.7, 12] })).toBe(false);
+  });
+
+  it('片付け速度未満でも作動中のblade接触を亀裂演出へ渡す', () => {
+    expect(isBladeTouchingDebris({ ...VALID_CONTACT, speed: 0 })).toBe(true);
+    expect(isBladeTouchingDebris({ ...VALID_CONTACT, actionActive: false, speed: 0 })).toBe(false);
+    expect(isBladeTouchingDebris({ ...VALID_CONTACT, vehicleId: 'excavator', speed: 0 })).toBe(false);
+    expect(isBladeTouchingDebris({
+      ...VALID_CONTACT,
+      bladeCenter: [-20, 0.7, 12],
+      speed: 0,
+    })).toBe(false);
   });
 });

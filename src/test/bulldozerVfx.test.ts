@@ -6,6 +6,7 @@ import {
 } from '../voxel-game/domain/vehicleJobs';
 import {
   BULLDOZER_CHIP_POOL_SIZE,
+  BULLDOZER_CHIPS_PER_SOURCE,
   BULLDOZER_DEBRIS_VOXEL_POOL_SIZE,
   BULLDOZER_DYNAMIC_FRUSTUM_CULLED,
   BULLDOZER_STAR_POOL_SIZE,
@@ -136,7 +137,7 @@ describe('bulldozer VFX frame', () => {
         job,
       );
 
-      expect(frame.chips.filter(({ active }) => active)).toHaveLength(18);
+      expect(frame.chips.filter(({ active }) => active)).toHaveLength(36);
       expect(frame.chips[0]?.position).toEqual([
         job.debris[0].position[0],
         job.debris[0].position[1] + 0.3,
@@ -150,7 +151,7 @@ describe('bulldozer VFX frame', () => {
     },
   );
 
-  it('3塊×4 voxel、18 chip、7 route、4 target、固定成功星slotを一度だけ確保する', () => {
+  it('3塊×4 voxel、36 chip、7 route、4 target、固定成功星slotを一度だけ確保する', () => {
     const frame = createBulldozerVfxFrame();
 
     expect(BULLDOZER_DYNAMIC_FRUSTUM_CULLED).toBe(false);
@@ -158,6 +159,7 @@ describe('bulldozer VFX frame', () => {
     expect(frame.chips).toHaveLength(BULLDOZER_CHIP_POOL_SIZE);
     expect(frame.routeMarkers).toHaveLength(BULLDOZER_ROUTE_MARKER_POSITIONS.length + 4);
     expect(frame.stars).toHaveLength(BULLDOZER_STAR_POOL_SIZE);
+    expect(BULLDOZER_CHIPS_PER_SOURCE).toBe(12);
   });
 
   it('assigned中は3塊、7 route、次対象を囲む浮いた4本ポールを表示し、chipと星を隠す', () => {
@@ -202,7 +204,7 @@ describe('bulldozer VFX frame', () => {
     expect(readTargetMarkerCenter(frame)).toEqual([-24, 13]);
   });
 
-  it('片付けた1塊を隠し、そのpaletteの6 chipを流動的に飛ばす', () => {
+  it('片付けた1塊を隠し、黄灰茶の12 chipをring状かつ前方へ飛ばす', () => {
     const frame = createBulldozerVfxFrame();
     const clearTimes = new Float64Array([0, -1, -1]);
     const snapshot: BulldozerMissionSnapshot = {
@@ -220,9 +222,39 @@ describe('bulldozer VFX frame', () => {
     expect(frame.debris.filter(({ active }) => active)).toHaveLength(8);
     expect(frame.debris.filter(({ active, sourceIndex }) => active && sourceIndex === 0))
       .toHaveLength(0);
-    expect(frame.chips.filter(({ active }) => active)).toHaveLength(6);
+    const activeChips = frame.chips.filter(({ active }) => active);
+    expect(activeChips).toHaveLength(12);
+    expect(new Set(activeChips.map(({ palette }) => palette))).toEqual(
+      new Set(['crate', 'stone', 'timber']),
+    );
     expect(frame.chips.filter(({ active }) => active).some(({ position }) => position[1] > 0.8))
       .toBe(true);
+  });
+
+  it('作動中の接触progressではblade前面から三色の3方向亀裂を9個表示する', () => {
+    const frame = createBulldozerVfxFrame();
+
+    updateBulldozerVfxFrame(
+      frame,
+      INITIAL_SNAPSHOT,
+      new Float64Array([-1, -1, -1]),
+      0.25,
+      VEHICLE_JOBS.bulldozer[0],
+      {
+        bladeCenter: [-29.5, 0.35, 12.5],
+        forward: [0, 0, 1],
+        progress: 0.5,
+        sourceIndex: 0,
+      },
+    );
+
+    const cracks = frame.chips.filter(({ active }) => active);
+    expect(cracks).toHaveLength(9);
+    expect(new Set(cracks.map(({ palette }) => palette))).toEqual(
+      new Set(['crate', 'stone', 'timber']),
+    );
+    expect(new Set(cracks.map(({ position }) => Math.sign(position[0] + 29.5))).size)
+      .toBeGreaterThan(1);
   });
 
   it('成功中はrouteを隠し、固定slotの星を表示する', () => {

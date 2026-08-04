@@ -10,11 +10,13 @@ import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetryRef } from './VehicleController';
 import type { WorldPoint } from './productionWorldMap';
 import {
+  BULLDOZER_CHIPS_PER_SOURCE,
   BULLDOZER_DYNAMIC_FRUSTUM_CULLED,
   BULLDOZER_GUIDE_POOL_SIZE,
   createBulldozerVfxFrame,
   hideBulldozerMissionFrame,
   updateBulldozerVfxFrame,
+  type BulldozerVfxContact,
   type BulldozerVfxFrame,
   type BulldozerVfxPaletteId,
   type BulldozerVoxelTransform,
@@ -88,11 +90,16 @@ export function getBladeCenter(
 
 /** ブルドーザーの作動中bladeが十分な速度でがれきへ触れたか判定する。 */
 export function shouldClearDebris(contact: BulldozerDebrisContact): boolean {
+  return Number.isFinite(contact.speed)
+    && contact.speed >= MINIMUM_CLEAR_SPEED
+    && isBladeTouchingDebris(contact);
+}
+
+/** 速度に依存せず、作動中bladeががれきへ触れているかを接触演出用に判定する。 */
+export function isBladeTouchingDebris(contact: BulldozerDebrisContact): boolean {
   if (
     contact.vehicleId !== 'bulldozer'
     || !contact.actionActive
-    || !Number.isFinite(contact.speed)
-    || contact.speed < MINIMUM_CLEAR_SPEED
     || !Number.isFinite(contact.debrisRadius)
     || contact.debrisRadius <= 0
     || !contact.bladeCenter.every(Number.isFinite)
@@ -218,6 +225,7 @@ export function BulldozerDebrisMission({
     let snapshot = snapshotRef.current;
     const vehicle = vehicleTelemetryRef.current;
     const bladeCenter = getBladeCenter(vehicle, missionTelemetryRef.current.bladeCenter);
+    let vfxContact: BulldozerVfxContact | null = null;
 
     for (let index = 0; index < snapshot.debris.length; index += 1) {
       if (!snapshot.debris[index].cleared) clearTimes[index] = -1;
@@ -237,6 +245,14 @@ export function BulldozerDebrisMission({
         contact.debrisRadius = source.radius;
         contact.speed = vehicle.speed;
         contact.vehicleId = vehicleId;
+        if (isBladeTouchingDebris(contact)) {
+          vfxContact = {
+            bladeCenter,
+            forward: vehicle.forward,
+            progress: (elapsedSeconds % 0.55) / 0.55,
+            sourceIndex: index,
+          };
+        }
         if (!shouldClearDebris(contact)) continue;
         if (coordinator.registerDebrisClear(source.id)) {
           clearTimes[index] = elapsedSeconds;
@@ -248,7 +264,7 @@ export function BulldozerDebrisMission({
     }
 
     const frame = missionTelemetryRef.current.frame;
-    updateBulldozerVfxFrame(frame, snapshot, clearTimes, elapsedSeconds, job);
+    updateBulldozerVfxFrame(frame, snapshot, clearTimes, elapsedSeconds, job, vfxContact);
     if (!enabled) hideBulldozerMissionFrame(frame);
 
     const matrix = matrixRef.current;
@@ -302,9 +318,9 @@ export function BulldozerDebrisMission({
       <VoxelPool count={4} meshRef={debrisTimberRef} palette="timber" />
       <VoxelPool count={4} meshRef={debrisStoneRef} palette="stone" />
       <VoxelPool count={4} meshRef={debrisCrateRef} palette="crate" />
-      <VoxelPool count={6} meshRef={chipTimberRef} palette="timber" />
-      <VoxelPool count={6} meshRef={chipStoneRef} palette="stone" />
-      <VoxelPool count={6} meshRef={chipCrateRef} palette="crate" />
+      <VoxelPool count={BULLDOZER_CHIPS_PER_SOURCE} meshRef={chipTimberRef} palette="timber" />
+      <VoxelPool count={BULLDOZER_CHIPS_PER_SOURCE} meshRef={chipStoneRef} palette="stone" />
+      <VoxelPool count={BULLDOZER_CHIPS_PER_SOURCE} meshRef={chipCrateRef} palette="crate" />
       <VoxelPool count={BULLDOZER_GUIDE_POOL_SIZE} meshRef={routeRef} palette="route" />
       <VoxelPool count={12} meshRef={starRef} palette="star" />
     </group>

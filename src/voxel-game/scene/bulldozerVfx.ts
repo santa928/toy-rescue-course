@@ -7,7 +7,7 @@ import type { BulldozerDebrisPaletteId } from './productionWorldMap';
 import { BULLDOZER_DEBRIS, BULLDOZER_ROUTE_MARKER_POSITIONS } from './worldLayout';
 
 export const BULLDOZER_DEBRIS_VOXELS_PER_SOURCE = 4;
-export const BULLDOZER_CHIPS_PER_SOURCE = 6;
+export const BULLDOZER_CHIPS_PER_SOURCE = 12;
 export const BULLDOZER_DEBRIS_VOXEL_POOL_SIZE =
   BULLDOZER_DEBRIS.length * BULLDOZER_DEBRIS_VOXELS_PER_SOURCE;
 export const BULLDOZER_CHIP_POOL_SIZE = BULLDOZER_DEBRIS.length * BULLDOZER_CHIPS_PER_SOURCE;
@@ -33,9 +33,18 @@ export interface BulldozerVoxelTransform {
 export interface BulldozerVfxFrame {
   readonly celebrationCenter: [number, number, number];
   readonly chips: BulldozerVoxelTransform[];
+  readonly clearDirections: [number, number][];
   readonly debris: BulldozerVoxelTransform[];
   readonly routeMarkers: BulldozerVoxelTransform[];
   readonly stars: BulldozerVoxelTransform[];
+}
+
+/** 接触中のblade基準と周期を既存chip poolへ渡す。 */
+export interface BulldozerVfxContact {
+  readonly bladeCenter: readonly [number, number, number];
+  readonly forward: readonly [number, number, number];
+  readonly progress: number;
+  readonly sourceIndex: number;
 }
 
 const HIDDEN_Y = -40;
@@ -53,7 +62,14 @@ const CHIP_DIRECTIONS = [
   [0.28, 1.08, 0.88],
   [0.64, 0.84, -0.56],
   [0.92, 0.96, 0.36],
+  [-0.96, 0.7, 0.12],
+  [-0.7, 1.12, -0.72],
+  [-0.34, 0.76, 0.98],
+  [0.12, 1.18, -1],
+  [0.52, 0.72, 0.86],
+  [0.88, 1.04, -0.14],
 ] as const;
+const IMPACT_PALETTES = ['crate', 'stone', 'timber'] as const;
 const STAR_OFFSETS = [
   [-1.8, 0.1, -0.5], [-1.2, 0.8, 0.2], [-0.6, 0.2, -0.8],
   [0, 1, 0], [0.6, 0.35, 0.7], [1.2, 0.85, -0.2],
@@ -106,6 +122,7 @@ export function hideBulldozerMissionFrame(frame: BulldozerVfxFrame): void {
 export function createBulldozerVfxFrame(): BulldozerVfxFrame {
   return {
     celebrationCenter: [0, HIDDEN_Y, 0],
+    clearDirections: BULLDOZER_DEBRIS.map(() => [0, 1]),
     debris: Array.from({ length: BULLDOZER_DEBRIS_VOXEL_POOL_SIZE }, (_, slot) => {
       const sourceIndex = Math.floor(slot / BULLDOZER_DEBRIS_VOXELS_PER_SOURCE);
       return createTransform(slot, sourceIndex, BULLDOZER_DEBRIS[sourceIndex].palette);
@@ -153,9 +170,18 @@ export function updateBulldozerVfxFrame(
   clearTimesSeconds: Float64Array,
   elapsedSeconds: number,
   job: BulldozerVehicleJobDefinition = VEHICLE_JOBS.bulldozer[0],
+  contact: BulldozerVfxContact | null = null,
 ): void {
   const safeElapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0;
   updateBulldozerCelebrationCenter(job, frame.celebrationCenter);
+  if (contact && Number.isInteger(contact.sourceIndex)) {
+    const direction = frame.clearDirections[contact.sourceIndex];
+    const length = Math.hypot(contact.forward[0], contact.forward[2]);
+    if (direction && Number.isFinite(length) && length > 0.001) {
+      direction[0] = contact.forward[0] / length;
+      direction[1] = contact.forward[2] / length;
+    }
+  }
 
   for (const transform of frame.debris) {
     const source = job.debris[transform.sourceIndex];
@@ -179,22 +205,62 @@ export function updateBulldozerVfxFrame(
     const source = job.debris[transform.sourceIndex];
     const clearTime = clearTimesSeconds[transform.sourceIndex] ?? -1;
     const age = safeElapsed - clearTime;
-    if (!source || clearTime < 0 || age < 0 || age >= CHIP_LIFETIME_SECONDS) {
+    const localSlot = transform.slot % BULLDOZER_CHIPS_PER_SOURCE;
+    if (!source) {
       hideBulldozerTransform(transform);
       continue;
     }
-    const direction = CHIP_DIRECTIONS[transform.slot % BULLDOZER_CHIPS_PER_SOURCE];
-    const remaining = 1 - age / CHIP_LIFETIME_SECONDS;
-    const size = 0.28 * remaining;
-    transform.active = true;
-    transform.palette = source.palette;
-    transform.position[0] = source.position[0] + direction[0] * age * 2.4;
-    transform.position[1] = source.position[1] + 0.3
-      + direction[1] * age * 3.2 - 4.8 * age * age;
-    transform.position[2] = source.position[2] + direction[2] * age * 2.4;
-    transform.scale[0] = size;
-    transform.scale[1] = size;
-    transform.scale[2] = size;
+    if (clearTime >= 0 && age >= 0 && age < CHIP_LIFETIME_SECONDS) {
+      const direction = CHIP_DIRECTIONS[localSlot];
+      const clearForward = frame.clearDirections[transform.sourceIndex] ?? [0, 1];
+      const rightX = clearForward[1];
+      const rightZ = -clearForward[0];
+      const remaining = 1 - age / CHIP_LIFETIME_SECONDS;
+      const size = 0.3 * remaining;
+      const forwardPush = age * 1.9;
+      transform.active = true;
+      transform.palette = IMPACT_PALETTES[localSlot % IMPACT_PALETTES.length];
+      transform.position[0] = source.position[0]
+        + rightX * direction[0] * age * 2.5
+        + clearForward[0] * (direction[2] * age * 1.2 + forwardPush);
+      transform.position[1] = source.position[1] + 0.3
+        + direction[1] * age * 3.2 - 4.8 * age * age;
+      transform.position[2] = source.position[2]
+        + rightZ * direction[0] * age * 2.5
+        + clearForward[1] * (direction[2] * age * 1.2 + forwardPush);
+      transform.scale[0] = size;
+      transform.scale[1] = size;
+      transform.scale[2] = size;
+      continue;
+    }
+    if (
+      contact
+      && contact.sourceIndex === transform.sourceIndex
+      && localSlot < 9
+      && Number.isFinite(contact.progress)
+      && contact.progress > 0
+    ) {
+      const forwardLength = Math.hypot(contact.forward[0], contact.forward[2]) || 1;
+      const forwardX = contact.forward[0] / forwardLength;
+      const forwardZ = contact.forward[2] / forwardLength;
+      const rightX = forwardZ;
+      const rightZ = -forwardX;
+      const ray = Math.floor(localSlot / 3) - 1;
+      const step = localSlot % 3 + 1;
+      const distance = step * 0.34 * (0.8 + Math.min(contact.progress, 1) * 0.2);
+      transform.active = true;
+      transform.palette = IMPACT_PALETTES[localSlot % IMPACT_PALETTES.length];
+      transform.position[0] = contact.bladeCenter[0]
+        + forwardX * distance + rightX * ray * distance * 0.58;
+      transform.position[1] = source.position[1] + 0.12 + (step % 2) * 0.04;
+      transform.position[2] = contact.bladeCenter[2]
+        + forwardZ * distance + rightZ * ray * distance * 0.58;
+      transform.scale[0] = 0.18;
+      transform.scale[1] = 0.1;
+      transform.scale[2] = 0.22 + step * 0.04;
+      continue;
+    }
+    hideBulldozerTransform(transform);
   }
 
   const nextTargetIndex = snapshot.debris.findIndex(({ cleared }) => !cleared);

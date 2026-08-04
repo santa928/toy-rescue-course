@@ -11,6 +11,7 @@ import {
 import {
   BULLDOZER_RENDER_PLAN,
   advanceBulldozerBladeOffset,
+  getBulldozerActionPose,
 } from '../vehicle-lab/scene/VoxelBulldozer';
 
 /** 指定model座標にあるブルドーザーvoxelのpalette IDを返す。 */
@@ -66,5 +67,34 @@ describe('BULLDOZER_VOXELS', () => {
     expect(lowered).toBeGreaterThanOrEqual(-0.12);
     expect(returning).toBeGreaterThan(lowered);
     expect(returning).toBeLessThanOrEqual(0);
+  });
+
+  it('押下中は0.55秒でslam・bounce・hold・resetの4相を繰り返す', () => {
+    const slam = getBulldozerActionPose(true, 0.04);
+    const impact = getBulldozerActionPose(true, 0.12);
+    const bounce = getBulldozerActionPose(true, 0.2);
+    const reset = getBulldozerActionPose(true, 0.5);
+
+    expect(slam.bladeY).toBeLessThan(0);
+    expect(slam.bodyScaleY).toBeLessThan(1);
+    expect(impact.phase).toBe('impact');
+    expect(impact.bladeY).toBeLessThanOrEqual(slam.bladeY);
+    expect(bounce.phase).toBe('bounce');
+    expect(bounce.bladeY).toBeGreaterThan(impact.bladeY);
+    expect(reset.phase).toBe('reset');
+    expect(reset.bladeY).toBeGreaterThan(bounce.bladeY);
+  });
+
+  it('非押下と不正時刻ではcolliderを動かさないneutral poseへ戻す', () => {
+    expect(getBulldozerActionPose(false, 0.12)).toEqual({
+      bladeY: 0,
+      bodyScaleY: 1,
+      phase: 'idle',
+    });
+    expect(getBulldozerActionPose(true, Number.NaN)).toEqual({
+      bladeY: 0,
+      bodyScaleY: 1,
+      phase: 'idle',
+    });
   });
 });

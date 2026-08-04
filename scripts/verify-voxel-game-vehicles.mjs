@@ -372,13 +372,19 @@ async function verifyViewport(browser, viewport, errors) {
     const actionStarted = await readGameState(page);
     assert.equal(actionStarted.controls.primaryAction, true,
       `${viewport.name}: primary action did not activate.`);
-    await driveAlongWorldAxis(
+    assert(actionStarted.vehicleActionVfx.activeCubeCount >= 8,
+      `${viewport.name}: free bulldozer action did not emit its voxel fan.`);
+    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-blade-action.png` });
+    const firstClear = await driveAlongWorldAxis(
       page,
       'positiveZ',
       (state) => state.bulldozer.clearedCount >= 1,
       `${viewport.name} clear crate`,
       activeTouchDriver,
     );
+    assert(firstClear.bulldozer.activeChipCount >= 12,
+      `${viewport.name}: bulldozer impact did not emit the 12-chip burst.`);
+    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-debris-impact.png` });
     await setPrimaryAction(page, viewport.touch, false);
     await alignWorldCoordinate(page, 2, 13, `${viewport.name} debris row`, activeTouchDriver, 0.5);
     await setPrimaryAction(page, viewport.touch, true);
@@ -548,6 +554,8 @@ try {
     screenshots: viewports.flatMap(({ name }) => [
       `${name}-bulldozer.png`,
       `${name}-worksite.png`,
+      `${name}-blade-action.png`,
+      `${name}-debris-impact.png`,
       `${name}-next-target.png`,
       `${name}-cycle-2-worksite.png`,
     ]),
