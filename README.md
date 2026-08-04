@@ -44,13 +44,15 @@ docker compose up --build web
 
 中央車庫の中で停止すると「しょうぼうしゃ」「ブルドーザー」「ショベルカー」「きゅうきゅうしゃ」「パトカー」を選べます。選択に失敗や解除条件はなく、車庫へ戻れば何度でも乗り換えられます。消防車の主操作は放水、ブルドーザーは前面ブレード、ショベルカーはバケット、救急車は手当て、パトカーはサイレンです。
 
-放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。ブルドーザーでは西地区の道しるべをたどり、走りながらブレードを動かして3個の工事がれきへ触れると、ボクセル破片へ崩して片付けられます。ショベルカーでは西地区の土山へ近づいて停止し、バケットを0.7秒動かすと茶色いボクセル粒へ崩して掘れます。救急車では公園の患者の横へ停止し、手当てを1.2秒続けると、横たわった患者が起き上がります。パトカーでは南地区の赤青の巡回門へ向かい、サイレンを鳴らして走り抜けると巡回できます。各車種には3件の仕事があり、仕事を終えて自由走行から車庫へ戻ると、同じ仕事が連続しない次の依頼へ進みます。未完了の帰庫や乗り換えでは依頼を変えません。
+放水すると青と白のボクセル水粒がノズルから流れ、火へ届いたときだけ着弾飛沫が広がります。消防車以外の主操作は、仕事対象から離れていても押した瞬間から車種固有の玩具アクションが出ます。ブルドーザーはブレードを落として黄色い衝撃と亀裂、土煙を広げ、ショベルカーは0.9秒の「下げる・すくう・持ち上げる・戻す」で土色cubeを放ります。救急車は赤白の十字waveとheartを広げ、パトカーは0.5秒の赤青灯、beam、走行trailを出します。共通の最大48 slotを1 draw callで描くため、派手さを増やしても車体物理やカメラは動かしません。
+
+仕事対象の近くでは同じアクションが仕事へ作用します。ブルドーザーは西地区の道しるべをたどり、走りながらブレードを動かして3個の工事がれきへ触れると12個相当のボクセル破片へ崩します。ショベルカーは土山の横でバケットを0.7秒動かすと掘削が進み、救急車は患者の横で手当てを1.2秒続けると患者が起き上がり、パトカーは赤青の巡回門をサイレン中に走り抜けると巡回できます。黄色い成功星、成功音、振動は仕事が成立した時だけ出るので、どこでも遊べる自由アクションを完了と誤認しません。各車種には3件の仕事があり、仕事を終えて自由走行から車庫へ戻ると、同じ仕事が連続しない次の依頼へ進みます。未完了の帰庫や乗り換えでは依頼を変えません。
 
 通常プレイの仕事順はページを開くたびに変わり、検証や再現ではURLへ`?job-seed=1`のような10進整数を付けると同じ順序になります。現在のjob ID、仕事名、巡回番号、seed、実判定対象座標、具体的な操作文、次ターゲット、達成数は`render_game_to_text()`の`mission`へ公開します。
 
 音は初期状態ではオフで、右上の`おと オフ`を押した後だけ始まります。外部音源を読み込まず、木琴風の五音BGM、小さな速度連動エンジン音、放水・ブレード・バケット・手当て・赤青サイレンをWeb Audioで生成します。乗り換え、対象完了、仕事完了には短い合図が入り、touch対応端末では対象／仕事完了だけ短く振動します。非表示中とオフ中はAudioContextを停止し、設定は保存しません。現在の有効状態、context、車種、action kind、gain、cue／振動回数は`render_game_to_text()`の`audio`へ公開します。
 
-どちらの車でも赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。北の公園の木の幹と火災建物本体には進入できません。
+どの車でも赤・黄・青・緑の積み木へ勢いよくぶつかると、元の積み木の内側から6片へ連続して崩れ、少し待って車両が離れていれば同じ場所へ復元します。北の公園の木の幹と火災建物本体には進入できません。
 
 南地区には赤・青・黄の色水プールと色シャワーがあります。通り抜けると選んだ車の塗装部分だけが12秒間その色に変わり、同じ場所へ入り直すと12秒へ戻ります。別の色へ入れば即座に上書きされ、時間切れか車庫で別の車へ乗り換えると元の玩具色へ戻ります。窓、タイヤ、履帯、梯子、ブレード、バケット、灯火は元の色を保つので、車の役割は見分けられます。
 
@@ -78,7 +80,7 @@ docker compose up --build web
 接地位置へ生成するので、起動時と車庫リセット時の0.8unit落下は発生しません。
 
 最終E2E、3 viewportの代表画像、software renderer分類はDocker内で生成します。
-物理GPU性能は、同じ3 viewportをホストの物理GPU対応ブラウザで別途認証します。
+物理GPU性能は、代表Desktop viewportをホストの物理GPU対応ブラウザで車種別に認証します。
 
 ```bash
 docker compose --profile e2e run --rm --build voxel-game-e2e
@@ -111,7 +113,7 @@ VOXEL_GAME_FOCUS=nonbreak docker compose --profile e2e run --rm --build voxel-ga
 
 ## 検証
 
-テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。カメラ安定化後のfresh unit testは49 files / 473 testsです。
+テスト、3つのHTML entryのbuild、3 viewportの実ブラウザ検証は、すべてDocker内で実行します。玩具アクション強化後のfresh unit testは50 files / 515 testsです。
 
 ```bash
 docker compose run --rm web npm test
@@ -132,8 +134,8 @@ docker compose --profile e2e run --rm --build voxel-game-camera-stability-e2e
 
 production buildはReact、Three、R3F、Drei、React Three Rapier、Rapier compat、ゲーム固有entryを
 決定的なchunkへ分割します。`postbuild`が3つのHTML entryからのasset参照と、game entry 350kB、
-通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-02の画面全体スワイプ運転実装後の実測は
-game 162,182 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
+通常chunk 600kB、Three 750kB、Rapier 2.25MBの上限を自動検証します。2026-08-04の玩具アクション強化後の実測は
+game 180,389 bytes、通常vendor最大192,532 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesです。
 
 Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状態読取、keyboard／touch stick、
 制動、world軸走行、座標補正を`scripts/voxel-game-e2e/drive-harness.mjs`で共有します。canonicalの
@@ -142,14 +144,12 @@ Voxel Gameのcanonical、二車種、色替えE2Eは、frame待機、公開状�
 
 ```bash
 docker compose run --rm web node --test \
-  scripts/voxel-game-e2e/drive-harness.node-test.mjs \
-  scripts/voxel-game-e2e/scenario-progress.node-test.mjs \
-  scripts/voxel-game-e2e/fire-route-plan.node-test.mjs \
+  scripts/voxel-game-e2e/*.node-test.mjs \
   scripts/voxel-game-screenshot-proof.node-test.mjs \
   scripts/voxel-game-break-physics-contract.node-test.mjs
 ```
-共有走行、scenario進捗、HUD screenshot proof、job別火災経路を含むNode test 24件を実行します。
-canonical fullの最新manifestは全scenario成功、33 artifacts＝33 screenshot proofs、contract failure 0、
+共有走行、回転車体とsolidのSAT接触、scenario進捗、HUD screenshot proof、job別火災経路を含むNode test 32件を実行します。
+canonical fullの最新manifestは19 scenario成功、37 artifacts＝37 screenshot proofs、contract failure 0、
 browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目へ進みます。96×96マップ専用E2Eは、こうじヤード68unit、おもちゃのまち71unitの実走、別出口、代表solid衝突、7地区、40 solid、HUD 8px安全余白を3 viewportで確認します。
 
 カメラ安定性専用E2EはDesktop／Tablet／Mobile landscapeで車体を車庫壁へ押し付け、車体の
@@ -169,6 +169,8 @@ console／page／request errorがないことを実ブラウザで確認しま�
 
 ブラウザ検証結果、12枚の固定方向画像、Desktopのdesign／near／far画像は `output/vehicle-lab/` に生成されます。このディレクトリはgit管理しません。
 
-Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む代表画像は `output/voxel-game/` に生成されます。二車種の乗り換え・ブルドーザー2仕事・帰庫再開の結果と9枚の代表画像は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚の代表画像は `output/voxel-game-colors/` に生成されます。ショベルカーの3土山、救急車の患者手当て、パトカーの3地点巡回について、成功、帰庫、次仕事までを3 viewportで実走した24枚は `output/voxel-game-fleet/` へ生成されます。実AudioContextのon/off、5車種action、速度連動engine、HUD実寸とオン／オフ6枚は`output/voxel-game-audio/`へ生成されます。追加2地区の経路、物理、HUD実寸と6枚は`output/voxel-game-map/`へ生成されます。全画面スワイプ運転の任意原点、上下左右、HUD競合、同時主操作、3 viewportの12枚は`output/voxel-game-swipe/`へ生成されます。積み木の同一面5位置について、衝突前後10枚と速度・接触回数は`output/voxel-game-break-coverage/`へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
+Voxel Gameの `run-manifest.json`、`results.json`、3 viewport・水・破壊・物理接触を含む37枚の代表画像は `output/voxel-game/` に生成されます。乗り換え、ブルドーザー3仕事、自由blade、対象衝撃、帰庫再開の結果と18枚は `output/voxel-game-vehicles/` に、色替えの実走、再接触、上書き、時間切れ、乗り換え競合の結果と6枚は `output/voxel-game-colors/` に生成されます。ショベルカーの掘削cycle、救急車のcare wave、パトカーの赤青巡回について、自由action、対象作用、成功、帰庫、次仕事までを3 viewportで実走した42枚は `output/voxel-game-fleet/` へ生成されます。実AudioContextのon/off、5車種action、速度連動engine、HUD実寸とオン／オフ6枚は`output/voxel-game-audio/`へ生成されます。追加2地区の経路、物理、HUD実寸と6枚は`output/voxel-game-map/`へ生成されます。全画面スワイプ運転の任意原点、上下左右、HUD競合、同時主操作、3 viewportの12枚は`output/voxel-game-swipe/`へ生成されます。積み木の同一面5位置について、衝突前後10枚と速度・接触回数は`output/voxel-game-break-coverage/`へ生成されます。software／unknown rendererのfpsは記録しますが、物理GPU性能としては認証しません。
 
 2026-08-02の地区床・街角装飾版を1280×720の `ANGLE Metal Renderer: Apple M4` で各車2秒warm-up＋12秒計測しました。5台すべてmedian 59.88fps、p10は55.87〜57.47fps、平均は59.90〜59.98fpsで、認証目標のmedian 55fps以上／p10 45fps以上を満たしています。sceneは消防車30、ブルドーザー29、ショベルカー・救急車・パトカー32 calls、各車体は7 callsでした。96×96ちょうど、40 static collider、床1 `InstancedMesh`と既存palette batchのまま性能目標を満たしたため、chunk streaming／LODは導入しません。一辺96unit超への拡張または将来の物理GPU性能未達時だけ再評価します。再測定時は `/?gpu-cert=<任意の非空値>` を開くと、通常プレイへ影響しない12秒probeがhidden DOMへ1回だけ結果を出します。
+
+2026-08-04の玩具アクション強化版も同じApple M4実GPU、1280×720、2秒warm-up＋12秒で再測定しました。4車種すべてmedian 59.88fps、p10 56.50〜57.14fps、平均60.00fpsで、sceneはブルドーザー33、ショベルカー・救急車・パトカー34 calls、各車体7 callsです。共通48-slot action VFXを1 `InstancedMesh`、対象VFXを2 batch、色遊びを1 batchへ集約した状態で性能目標を維持しています。

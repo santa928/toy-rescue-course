@@ -181,18 +181,29 @@ Rapier bodyとdraw callも増えるため、箱庭の玩具表現には合わな
 - 各車種4状態×3 viewportの代表画像を保存し、車体、粒子、対象、操作ボタンを原寸目視する。
 - canonical full、production smoke、公開URLのfocus E2Eを回帰する。
 
+## 実装・検証結果（2026-08-04）
+
+- 共通48-slotの`VehicleActionVfx`を1 `InstancedMesh`で実装し、車種切替時と非active時はslotを隠す。
+- ブルドーザーはblade slam、亀裂、12個相当の破片、ショベルカーは0.9秒の掘削cycle、救急車は十字waveとheart、パトカーは0.5秒の赤青灯、beam、trail、archを実装した。
+- 対象VFXは5描画から2描画、色遊びは5描画から1描画へ集約し、仕事判定、物理body、camera座標は変更していない。
+- fresh unitは50 files / 515 tests、E2E補助は32 tests、production buildはgame 180,389 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで全予算内。
+- 車種別E2Eはブルドーザー18枚、ショベルカー・救急車・パトカー42枚、AudioContext 6枚をDesktop、Tablet、Mobile landscapeで生成し、自由action、対象作用、成功、HUD境界を確認した。
+- canonical fullは19 scenario、37 artifacts、contract failure 0、console／page／request error 0/0/0。代表8 solidの安定後最大貫通深さは0.00143以下だった。
+- Apple M4実GPUの1280×720、2秒warm-up＋12秒計測で4車種ともmedian 59.88fps、p10 56.50〜57.14fps、平均60.00fps。sceneは33〜34 calls、車体は7 callsだった。
+- feature SHA `c465eaf`のGitHub Pages run `30939984761`はbuild／deploy成功。公開URLの実pointer actionではactive cubeがブルドーザー14、ショベルカー12、救急車16、パトカー12、press count 1→4、release復帰、browser error 0を確認した。
+
 ## 受け入れ条件
 
-- [ ] 4車種すべてで、対象外でも押下100ms以内に車体、周囲VFX、HUDの3箇所が反応する。
-- [ ] 音を切っても4車種のアクションを静止画と短い連続frameで区別できる。
-- [ ] 対象作用中と対象外actionを誤認せず、既存仕事条件と完了数が変わらない。
-- [ ] 各車種の完了演出が共通星だけでなく役割色と対象変化を持つ。
-- [ ] camera座標、車体物理位置、操作方向へVFX由来の振動やdriftがない。
-- [ ] 4車種の車体draw call 7以下、scene最大34 calls以下を維持する。
-- [ ] game entry 350kB、通常chunk 600kB、Three 750kB、Rapier 2.25MB以内を維持する。
-- [ ] Desktop、Tablet、Mobile landscapeでHUDの重なり、はみ出し、操作阻害がない。
-- [ ] fresh unit、budget build、専用E2E、canonical、production smoke、公開E2Eが成功する。
-- [ ] task単位の日本語commit、secret scan、main push、Pages成功、remote SHA一致を確認する。
+- [x] 4車種すべてで、対象外でも押下100ms以内に車体、周囲VFX、HUDの3箇所が反応する。
+- [x] 音を切っても4車種のアクションを静止画と短い連続frameで区別できる。
+- [x] 対象作用中と対象外actionを誤認せず、既存仕事条件と完了数が変わらない。
+- [x] 各車種の完了演出が共通星だけでなく役割色と対象変化を持つ。
+- [x] camera座標、車体物理位置、操作方向へVFX由来の振動やdriftがない。
+- [x] 4車種の車体draw call 7以下、scene最大34 calls以下を維持する。
+- [x] game entry 350kB、通常chunk 600kB、Three 750kB、Rapier 2.25MB以内を維持する。
+- [x] Desktop、Tablet、Mobile landscapeでHUDの重なり、はみ出し、操作阻害がない。
+- [x] fresh unit、budget build、専用E2E、canonical、production smoke、公開E2Eが成功する。
+- [x] task単位の日本語commit、secret scan、main push、Pages成功、remote SHA一致を確認する。
 
 ## 非対象
 

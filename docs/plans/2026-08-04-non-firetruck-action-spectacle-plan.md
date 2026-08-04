@@ -1,6 +1,6 @@
 # 消防車以外の玩具アクション強化 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. 完了したstepは`- [x]`で追跡する。
 
 **Goal:** ブルドーザー、ショベルカー、救急車、パトカーを、対象外でも押した瞬間から楽しく、対象付近では仕事の作用と完了が車種固有に伝わる玩具アクションへ強化する。
 
@@ -51,8 +51,9 @@
 - Modify `src/test/toyAudioMix.test.ts`, `src/test/toyAudioDirector.test.ts`: 音オフ維持と車種別attack。
 - Modify `src/voxel-game/ui/VoxelGameHud.tsx`, `src/voxel-game/styles.css`: 非消防車action buttonのpress ringとicon bounce。
 - Modify `src/test/hudLayout.test.ts`: button内部境界と非消防車data属性。
-- Create `scripts/verify-voxel-game-actions.mjs`: 4車種×3 viewportの自由action、target作用、完了を実走する。
-- Modify `docker-compose.yml`: `voxel-game-actions-e2e`を追加する。
+- Reuse `scripts/verify-voxel-game-vehicles.mjs`, `scripts/verify-voxel-game-fleet.mjs`, `scripts/verify-voxel-game-audio.mjs`: 4車種×3 viewportの自由action、target作用、完了を責務別に実走する。
+- Modify `scripts/verify-voxel-game.mjs`, `scripts/voxel-game-e2e/drive-harness.mjs`: canonicalの座標補正と実入力回帰を安定化する。
+- Create `scripts/voxel-game-e2e/collision-geometry.mjs`: 回転車体とworld solidをSATで評価する。
 - Modify `README.md`: 4車種の新アクションと検証コマンドを記載する。
 
 ---
@@ -73,7 +74,7 @@
 - Consumes: `VehicleId`、`DriveCommand.primaryAction`、`VehicleTelemetry.position/forward/speed`。
 - Produces: `createVehicleActionVfxFrame()`、`updateVehicleActionVfxFrame(frame, input)`、`VehicleActionVfxTelemetry`。
 
-- [ ] **Step 1: fixed frameと4車種識別の失敗testを書く**
+- [x] **Step 1: fixed frameと4車種識別の失敗testを書く**
 
 ```ts
 it.each(['bulldozer', 'excavator', 'ambulance', 'police'] as const)(
@@ -96,13 +97,13 @@ it.each(['bulldozer', 'excavator', 'ambulance', 'police'] as const)(
 );
 ```
 
-- [ ] **Step 2: testをDockerで実行してREDを確認する**
+- [x] **Step 2: testをDockerで実行してREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/vehicleActionVfx.test.ts`
 
 Expected: moduleまたはexport不存在でFAIL。
 
-- [ ] **Step 3: pure fixed frameを実装する**
+- [x] **Step 3: pure fixed frameを実装する**
 
 ```ts
 export const VEHICLE_ACTION_VOXEL_POOL_SIZE = 48;
@@ -129,15 +130,15 @@ export interface VehicleActionVfxFrame {
 
 `elapsedSeconds`、`deltaSeconds`、位置、forwardをfinite clampし、`fire-truck`、inactive、未知IDでは全slotをzero scaleへ戻す。4車種は方向、palette、cycle durationを別descriptorにする。
 
-- [ ] **Step 4: rendererを1 draw callでsceneへ接続する**
+- [x] **Step 4: rendererを1 draw callでsceneへ接続する**
 
 `VehicleActionVfx.tsx`は`BoxGeometry`とvertex color付き`meshLambertMaterial`を1つだけ持ち、`useFrame`でmatrixとcolorをin-place更新する。`VoxelGameScene`は常時1 componentだけを持ち、消防車／inactive時は`mesh.count=0`にする。
 
-- [ ] **Step 5: HUD buttonへ非消防車限定のpress ringを追加する**
+- [x] **Step 5: HUD buttonへ非消防車限定のpress ringを追加する**
 
 `data-spectacle-action={vehicleId !== 'fire-truck'}`を主操作buttonへ付け、`:active`と既存active classでbutton本体を`scale(.92)`、iconを`scale(1.12)`、疑似要素ringを250msで1回広げる。`prefers-reduced-motion: reduce`ではring反復を停止する。
 
-- [ ] **Step 6: telemetryと境界testを追加してGREENを確認する**
+- [x] **Step 6: telemetryと境界testを追加してGREENを確認する**
 
 `render_game_to_text()`へ`vehicleActionVfx: { activeCubeCount, cycleProgress, pressCount }`を追加する。HUD testはbuttonのbottom/rightが親境界以内である既存helper契約を維持する。
 
@@ -145,7 +146,7 @@ Run: `docker compose run --rm web npm test -- src/test/vehicleActionVfx.test.ts 
 
 Expected: PASS、48slot、1 scene call増加、消防車active count 0。
 
-- [ ] **Step 7: budget build、commit、pushを行う**
+- [x] **Step 7: budget build、commit、pushを行う**
 
 Run: `docker compose run --rm web npm run build`
 
@@ -171,7 +172,7 @@ git push origin main
 - Consumes: 既存blade group、debris clear time、contact point、action active。
 - Produces: `getBulldozerActionPose()`とcontact progress対応`updateBulldozerVfxFrame()`。
 
-- [ ] **Step 1: bladeの4相poseとtarget effectの失敗testを書く**
+- [x] **Step 1: bladeの4相poseとtarget effectの失敗testを書く**
 
 ```ts
 expect(getBulldozerActionPose(true, 0.04)).toMatchObject({ bladeY: expect.any(Number) });
@@ -179,25 +180,25 @@ expect(getBulldozerActionPose(true, 0.04).bodyScaleY).toBeLessThan(1);
 expect(countActiveChips(updateFrame({ contactProgress: 0.5 }))).toBeGreaterThan(6);
 ```
 
-- [ ] **Step 2: Docker testでREDを確認する**
+- [x] **Step 2: Docker testでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerVoxels.test.ts src/test/bulldozerVfx.test.ts src/test/bulldozerDebrisMission.test.ts`
 
-- [ ] **Step 3: blade slamとvisual squatを実装する**
+- [x] **Step 3: blade slamとvisual squatを実装する**
 
 `0〜0.12s`でbladeを下げ、`0.12〜0.24s`で小さくbounce、hold中は0.55s周期とする。車体visual childだけをY方向0.96まで縮め、collider／RigidBody rootは変更しない。
 
-- [ ] **Step 4: contact crackと12破片相当の完了burstを実装する**
+- [x] **Step 4: contact crackと12破片相当の完了burstを実装する**
 
 接触中はblade前面から3方向の短い亀裂cubeを出す。完了時は既存pool batchを維持したままslot容量を増やし、黄灰茶の衝撃ringと前方へ流れる破片を1.1秒以内に隠す。
 
-- [ ] **Step 5:既存判定不変をtestしてGREENを確認する**
+- [x] **Step 5:既存判定不変をtestしてGREENを確認する**
 
 minimum speed、contact radius、action active、clear countの既存期待値を変更せず、progress 0では新target effectがinactiveになることを確認する。
 
 Run: `docker compose run --rm web npm test -- src/test/bulldozerVoxels.test.ts src/test/bulldozerVfx.test.ts src/test/bulldozerDebrisMission.test.ts`
 
-- [ ] **Step 6: build、commit、pushを行う**
+- [x] **Step 6: build、commit、pushを行う**
 
 Run: `docker compose run --rm web npm run build`
 
@@ -222,7 +223,7 @@ git push origin main
 - Consumes: `targetKind='soil'`、hold progress、completion time。
 - Produces: `getExcavatorActionPose()`、soil固有の吸引／放物線／完了噴水frame。
 
-- [ ] **Step 1: 4相cycleとsoil粒子の失敗testを書く**
+- [x] **Step 1: 4相cycleとsoil粒子の失敗testを書く**
 
 ```ts
 expect(getExcavatorActionPose(true, 0.1).armY).toBeLessThan(0);
@@ -231,25 +232,25 @@ expect(getExcavatorActionPose(true, 0.72).armY).toBeGreaterThan(-0.2);
 expect(activeSoilParticles({ holdProgress: 0.6 })).toBeGreaterThan(6);
 ```
 
-- [ ] **Step 2: Docker testでREDを確認する**
+- [x] **Step 2: Docker testでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/excavatorVoxels.test.ts src/test/actionTargetVfx.test.ts`
 
-- [ ] **Step 3: armとbucketを0.9秒cycleで動かす**
+- [x] **Step 3: armとbucketを0.9秒cycleで動かす**
 
 `下げる0〜0.25 → curl 0.25〜0.5 → 持ち上げ0.5〜0.72 → 戻す0.72〜0.9`をpure helperで補間する。既存palette batchを回転groupへ束ね直すだけでdraw callを増やさない。
 
-- [ ] **Step 4: soil target responseと完了噴水を実装する**
+- [x] **Step 4: soil target responseと完了噴水を実装する**
 
 hold中は土山からbucket先端へcubeを吸引し、cycle後半で車体横へ放物線移動する。完了時は土山bodyを上段から縮め、茶橙cubeを上へ出して左右へ落とす。全slotは固定pool内で1.1秒以内に非activeへ戻す。
 
-- [ ] **Step 5: 判定不変とGREENを確認する**
+- [x] **Step 5: 判定不変とGREENを確認する**
 
 700ms、最大速度0.45、3target、完了countを既存期待値のままにする。
 
 Run: `docker compose run --rm web npm test -- src/test/excavatorVoxels.test.ts src/test/actionTargetVfx.test.ts src/test/actionTargetContact.test.ts`
 
-- [ ] **Step 6: build、commit、pushを行う**
+- [x] **Step 6: build、commit、pushを行う**
 
 Run: `docker compose run --rm web npm run build`
 
@@ -274,7 +275,7 @@ git push origin main
 - Consumes: `targetKind='patient'`、hold progress、completion time。
 - Produces: `getAmbulanceActionPose()`、patient固有のring、heart、cross completion frame。
 
-- [ ] **Step 1: press pulse、2Hz制約、patient粒子の失敗testを書く**
+- [x] **Step 1: press pulse、2Hz制約、patient粒子の失敗testを書く**
 
 ```ts
 expect(getAmbulanceActionPose(true, 0.08).crossScale).toBeGreaterThan(1.12);
@@ -282,25 +283,25 @@ expect(getAmbulanceActionPose(true, 0.4).beaconPulseHz).toBeLessThanOrEqual(2);
 expect(getPatientGlyphKinds({ holdProgress: 0.7 })).toEqual(expect.arrayContaining(['cross', 'heart']));
 ```
 
-- [ ] **Step 2: Docker testでREDを確認する**
+- [x] **Step 2: Docker testでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/ambulanceVoxels.test.ts src/test/actionTargetVfx.test.ts`
 
-- [ ] **Step 3: 車体press burstとhold pulseを実装する**
+- [x] **Step 3: 車体press burstとhold pulseを実装する**
 
 press 0〜0.22秒はcross／灯火を最大1.16まで拡大し、holdは1.0秒周期で1.00〜1.08にする。車体周囲waveはTask 1 fixed poolのred／white strategyを使い、画面全体を覆わない半径3.2以内にする。
 
-- [ ] **Step 4: patient ringとheart／cross completionを実装する**
+- [x] **Step 4: patient ringとheart／cross completionを実装する**
 
 hold progressで患者周囲のringをY=0.2から1.8へ上げる。完了時は既存0.65秒起き上がりの前半0.12秒だけ0.92倍へ縮め、その後立たせる。頭上glyphは固定cubeでheartとcrossを作り1.3秒で収束させる。
 
-- [ ] **Step 5: 判定不変とGREENを確認する**
+- [x] **Step 5: 判定不変とGREENを確認する**
 
 1,200ms、最大速度0.35、患者1体、起き上がり終端の既存期待値を維持する。
 
 Run: `docker compose run --rm web npm test -- src/test/ambulanceVoxels.test.ts src/test/actionTargetVfx.test.ts src/test/actionTargetContact.test.ts`
 
-- [ ] **Step 6: build、commit、pushを行う**
+- [x] **Step 6: build、commit、pushを行う**
 
 Run: `docker compose run --rm web npm run build`
 
@@ -325,7 +326,7 @@ git push origin main
 - Consumes: `targetKind='checkpoint'`、vehicle speed／forward、hold progress、completion time。
 - Produces: `getPoliceActionPose()`、赤青beam／trail、gate chase、completion arch frame。
 
-- [ ] **Step 1: beacon、trail、gate chaseの失敗testを書く**
+- [x] **Step 1: beacon、trail、gate chaseの失敗testを書く**
 
 ```ts
 expect(getPoliceActionPose(true, 0.1).redScale).not.toBe(getPoliceActionPose(true, 0.1).blueScale);
@@ -334,25 +335,25 @@ expect(activePoliceTrail({ speed: 2, actionActive: true })).toBeGreaterThan(0);
 expect(checkpointAccentOrder({ holdProgress: 0.6 })).toEqual([0, 1]);
 ```
 
-- [ ] **Step 2: Docker testでREDを確認する**
+- [x] **Step 2: Docker testでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/policeVoxels.test.ts src/test/actionTargetVfx.test.ts src/test/vehicleActionVfx.test.ts`
 
-- [ ] **Step 3: 車体beacon、beam、trailを実装する**
+- [x] **Step 3: 車体beacon、beam、trailを実装する**
 
 pressで左右へ赤青ringを1回出し、holdは0.5秒ごとに主色を切り替える。縦beamは高さ2.4以内、trailは速度0.35以上で車体後方6slotだけを使い、停止中は即座に隠す。
 
-- [ ] **Step 4: gate chaseとcompletion archを実装する**
+- [x] **Step 4: gate chaseとcompletion archを実装する**
 
 hold progressに応じ、門の3 accentを入口側から中央へ点灯する。完了時は赤青cubeを門の上へ左右対称に弧状配置し、1.0秒で白い完了色へ収束する。
 
-- [ ] **Step 5: 判定不変とGREENを確認する**
+- [x] **Step 5: 判定不変とGREENを確認する**
 
 minimum speed 0.35、maximum speed 5.5、250ms、3gate、内幅契約を既存testのまま維持する。
 
 Run: `docker compose run --rm web npm test -- src/test/policeVoxels.test.ts src/test/actionTargetVfx.test.ts src/test/actionTargetContact.test.ts src/test/vehicleJobs.test.ts`
 
-- [ ] **Step 6: build、commit、pushを行う**
+- [x] **Step 6: build、commit、pushを行う**
 
 Run: `docker compose run --rm web npm run build`
 
@@ -378,7 +379,7 @@ git push origin main
 - Consumes: vehicle ID、primary action edge、target action active、既存audio enabled。
 - Produces: `actionAttackGain`、`actionAttackFrequency`、`targetActionGain`を含む`ToyAudioMixFrame`。
 
-- [ ] **Step 1: 音オフ、edge、target作用の失敗testを書く**
+- [x] **Step 1: 音オフ、edge、target作用の失敗testを書く**
 
 ```ts
 expect(createToyAudioMixFrame({ enabled: false, primaryAction: true, ...input }).actionAttackGain).toBe(0);
@@ -386,25 +387,25 @@ expect(createToyAudioMixFrame({ actionPressed: true, vehicleId: 'excavator', ...
 expect(createToyAudioMixFrame({ targetActionActive: true, vehicleId: 'ambulance', ...input }).targetActionGain).toBeGreaterThan(0);
 ```
 
-- [ ] **Step 2: Docker testでREDを確認する**
+- [x] **Step 2: Docker testでREDを確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/toyAudioMix.test.ts src/test/toyAudioDirector.test.ts`
 
-- [ ] **Step 3: edgeとtarget actionをdirectorへ追加する**
+- [x] **Step 3: edgeとtarget actionをdirectorへ追加する**
 
 directorが前frameのprimary actionを保持し、false→trueだけを`actionPressed`にする。target actionはmission telemetryのcontact／hold progressが0より大きい場合だけtrueにする。disabledとhidden中はedgeを蓄積しない。
 
-- [ ] **Step 4: 既存nodeで短いattack envelopeを実装する**
+- [x] **Step 4: 既存nodeで短いattack envelopeを実装する**
 
 外部nodeを毎回生成せず、既存oscillator／gainへ60〜140msのattack-decay値をsmooth設定する。bladeは低音、bucketは上昇2音、careは長3度、sirenは赤青2音として既存action kindを維持する。
 
-- [ ] **Step 5: GREENと既存AudioContext契約を確認する**
+- [x] **Step 5: GREENと既存AudioContext契約を確認する**
 
 Run: `docker compose run --rm web npm test -- src/test/toyAudioMix.test.ts src/test/toyAudioDirector.test.ts src/test/toyAudioEvents.test.ts`
 
 Expected: 音オフgain 0、外部asset request 0、車種別frequencyが重複しない。
 
-- [ ] **Step 6: build、commit、pushを行う**
+- [x] **Step 6: build、commit、pushを行う**
 
 Run: `docker compose run --rm web npm run build`
 
@@ -419,17 +420,21 @@ git push origin main
 ### Task 7: 3 viewport実走、性能、公開
 
 **Files:**
-- Create: `scripts/verify-voxel-game-actions.mjs`
-- Modify: `docker-compose.yml`
+- Reuse: `scripts/verify-voxel-game-vehicles.mjs`
+- Reuse: `scripts/verify-voxel-game-fleet.mjs`
+- Reuse: `scripts/verify-voxel-game-audio.mjs`
+- Modify: `scripts/verify-voxel-game.mjs`
+- Modify: `scripts/voxel-game-e2e/drive-harness.mjs`
+- Create: `scripts/voxel-game-e2e/collision-geometry.mjs`
 - Modify: `README.md`
 - Modify: `docs/design/2026-08-04-non-firetruck-action-spectacle-design.md`
 - Modify: `docs/plans/2026-08-04-non-firetruck-action-spectacle-plan.md`
 
 **Interfaces:**
 - Consumes: `render_game_to_text()`のvehicle action／mission／audio／performance telemetry。
-- Produces: `output/voxel-game-actions/run-manifest.json`と4車種×3 viewportの画像証跡。
+- Produces: 既存の`output/voxel-game-vehicles/`、`output/voxel-game-fleet/`、`output/voxel-game-audio/`、`output/voxel-game/`へ画像とJSON証跡を分離して保存する。
 
-- [ ] **Step 1: action E2E scriptを作る**
+- [x] **Step 1: 既存の車種別E2Eへaction契約を追加する**
 
 ```js
 const VIEWPORTS = [
@@ -440,19 +445,23 @@ const VIEWPORTS = [
 const VEHICLES = ['bulldozer', 'excavator', 'ambulance', 'police'];
 ```
 
-各組合せでgarage選択、対象外press、1cycle hold、現在jobの最終案内区間、target作用、completionを実操作する。`activeCubeCount > 0`、`pressCount`増加、仕事外completion不変、target progress増加、completion増加、browser error 0をassertする。
+各組合せでgarage選択、対象外press、1cycle hold、現在jobの最終案内区間、target作用、completionを実操作する。`activeCubeCount > 0`、`pressCount`増加、仕事外completion不変、target progress増加、completion増加、browser error 0をassertする。新しい巨大scriptは作らず、既存のブルドーザー、fleet、audio E2Eへ責務を分けて重複走行を避けた。
 
-- [ ] **Step 2: Docker serviceを追加して3 viewportを実行する**
+- [x] **Step 2: 既存Docker serviceで3 viewportを実行する**
 
-Run: `docker compose --profile e2e run --rm --build voxel-game-actions-e2e`
+Run: `docker compose --profile e2e run --rm --build voxel-game-vehicles-e2e`
 
-Expected: 12 scenario complete、48枚以上、console／page／request error 0、manifest status `completed`。
+Run: `docker compose --profile e2e run --rm --build voxel-game-fleet-e2e`
 
-- [ ] **Step 3: 全画像を原寸目視する**
+Run: `docker compose --profile e2e run --rm --build voxel-game-audio-e2e`
 
-各車種についてDesktopとMobile landscapeのidle／free action／target／completionを最低16枚開く。車体輪郭、役割部品、対象、HUD button、mission札、mini mapが隠れず、下端／右端がviewport内であることを確認する。
+Result: ブルドーザー18枚、ショベルカー・救急車・パトカー42枚、AudioContext 6枚、console／page／request error 0。
 
-- [ ] **Step 4: fresh full gateをDockerで実行する**
+- [x] **Step 3: 全画像を原寸目視する**
+
+各車種についてDesktopとMobile landscapeのidle／free action／target／completionを原寸確認した。車体輪郭、役割部品、対象、HUD button、mission札、mini mapが隠れず、下端／右端がviewport内であることを実寸値と画像の両方で確認した。
+
+- [x] **Step 4: fresh full gateをDockerで実行する**
 
 Run: `docker compose run --rm web npm test`
 
@@ -462,17 +471,17 @@ Run: `docker compose --profile e2e run --rm --build voxel-game-e2e`
 
 Run: `docker compose --profile e2e run --rm --build production-smoke-e2e`
 
-Expected: unit failure 0、budget内、canonical manifest complete、3 entrypoint WebGL起動、browser error 0。
+Result: 50 files / 515 unit、32 E2E helper test、budget build、19 canonical scenario／37 artifacts、3 entrypoint WebGL起動、browser error 0。
 
-- [ ] **Step 5: physical GPU性能を再認証する**
+- [x] **Step 5: physical GPU性能を再認証する**
 
-Chrome実機で`/?gpu-cert=actions-<timestamp>`を各車種で開き、4車種ともmedian 55fps以上、p10 45fps以上、scene 34 calls以下を記録する。Docker SwiftShaderのfpsは合否に使わない。
+Apple M4実機で`/?gpu-cert=actions-<timestamp>`を各車種で開き、4車種ともmedian 59.88fps、p10 56.50〜57.14fps、平均60.00fps、scene 33〜34 calls、車体7 callsを記録した。Docker SwiftShaderのfpsは合否に使っていない。
 
-- [ ] **Step 6: READMEと設計実測を更新する**
+- [x] **Step 6: READMEと設計実測を更新する**
 
 4車種の自由action、target response、完了演出、Dockerコマンド、画像数、unit数、bundle、draw call、physical GPU値を実測値で記載する。未実行値を推測で書かない。
 
-- [ ] **Step 7: release commit前に全送信範囲を検査する**
+- [x] **Step 7: release commit前に全送信範囲を検査する**
 
 Run: `git diff --check origin/main..HEAD`
 
@@ -480,23 +489,23 @@ Run: `git diff -U0 origin/main..HEAD | rg -n -i "(api[_-]?key|client[_-]?secret|
 
 Run: `git diff -U0 origin/main..HEAD | rg -n -- "-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"`
 
-Expected: suspicious match 0。文書内の一般語が一致した場合は値と文脈を目視分類する。
+Result: staged差分と`origin/main..HEAD`のsuspicious match 0。文書内の一般語は値を含まない説明文として分類した。
 
-- [ ] **Step 8: 日本語commit、main push、Pages公開を行う**
+- [x] **Step 8: 日本語commit、main push、Pages公開を行う**
 
 ```bash
-git add scripts/verify-voxel-game-actions.mjs docker-compose.yml README.md docs/design/2026-08-04-non-firetruck-action-spectacle-design.md docs/plans/2026-08-04-non-firetruck-action-spectacle-plan.md
-git commit -m "働く車アクションの公開検証を追加する"
+git add README.md docs/design/2026-08-04-non-firetruck-action-spectacle-design.md docs/plans/2026-08-04-non-firetruck-action-spectacle-plan.md
+git commit -m "働く車アクションの実測と公開結果を記録する"
 git push origin main
 ```
 
-対象HEADの`Deploy GitHub Pages`を`gh run watch --exit-status`で完了まで監視する。`git ls-remote origin refs/heads/main`とlocal SHAを一致させ、ahead／behind `0/0`を確認する。
+各車種の実装を日本語commitで個別pushし、feature SHA `c465eaf`の`Deploy GitHub Pages` run `30939984761`を完了まで監視した。`git ls-remote origin refs/heads/main`とlocal SHAは一致し、ahead／behind `0/0`だった。
 
-- [ ] **Step 9: 公開URLをcache-busting付きで検証する**
+- [x] **Step 9: 公開URLをcache-busting付きで検証する**
 
 Run: `docker compose --profile e2e run --rm --build -e PRODUCTION_BASE_URL=https://santa928.github.io/toy-rescue-course production-smoke-e2e node scripts/verify-production-entrypoints.mjs`
 
-公開rootへ`?action-release=<HEAD>&job-seed=1`を付け、action focus E2Eで4車種のpressとbrowser error 0を確認する。
+公開rootへcache-busting queryと`job-seed=1`を付け、root、互換URL、Vehicle LabのCanvasを確認した。実pointer actionでは4車種の`primaryAction=true`、vehicle一致、active cube 14／12／16／12、press count 1→4、release後false、browser error 0をassertした。
 
 ---
 
@@ -506,4 +515,3 @@ Run: `docker compose --profile e2e run --rm --build -e PRODUCTION_BASE_URL=https
 - Placeholder scan: 仮置き語、未確定のfile名、後続へ丸投げするstepは残していない。
 - Type consistency: `VehicleActionVfxFrame`、`VehicleActionVfxInput`、`VehicleActionVfxTelemetry`をTask 1で定義し、Task 2〜7はその名前だけを利用する。
 - Scope: 新仕事、map、消防車、camera、物理body、post-processingを実装対象から除外した。
-
