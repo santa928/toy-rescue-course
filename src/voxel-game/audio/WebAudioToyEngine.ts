@@ -133,12 +133,16 @@ export class WebAudioToyEngine implements ToyAudioBackend {
     }
     setSmoothValue(this.bgmOscillator.frequency, frame.bgmFrequency, now);
     setSmoothValue(this.engineOscillator.frequency, frame.engineFrequency, now);
-    setSmoothValue(this.actionOscillatorA.frequency, frame.actionFrequencyA, now);
+    setSmoothValue(
+      this.actionOscillatorA.frequency,
+      frame.actionAttackGain > 0 ? frame.actionAttackFrequency : frame.actionFrequencyA,
+      now,
+    );
     setSmoothValue(this.actionOscillatorB.frequency, frame.actionFrequencyB, now);
     setSmoothValue(this.bgmGain.gain, frame.bgmGain, now);
     setSmoothValue(this.engineGain.gain, frame.engineGain, now);
-    setSmoothValue(this.actionGainA.gain, frame.actionGainA, now);
-    setSmoothValue(this.actionGainB.gain, frame.actionGainB, now);
+    setSmoothValue(this.actionGainA.gain, frame.actionGainA + frame.actionAttackGain, now);
+    setSmoothValue(this.actionGainB.gain, frame.actionGainB + frame.targetActionGain, now);
     setSmoothValue(this.noiseGain.gain, frame.noiseGain, now);
   }
 

@@ -5,15 +5,20 @@ export type ToyAudioActionKind = 'water' | 'blade' | 'bucket' | 'care' | 'siren'
 
 /** 1 audio frameを決定するframework非依存の入力。 */
 export interface ToyAudioMixInput {
+  readonly actionAttackAgeSeconds?: number;
+  readonly actionPressed: boolean;
   readonly elapsedSeconds: number;
   readonly enabled: boolean;
   readonly primaryAction: boolean;
   readonly speed: number;
+  readonly targetActionActive: boolean;
   readonly vehicleId: VehicleId;
 }
 
 /** 固定Web Audio graphへ適用するscalarだけのmix frame。 */
 export interface ToyAudioMixFrame {
+  readonly actionAttackFrequency: number;
+  readonly actionAttackGain: number;
   readonly actionFrequencyA: number;
   readonly actionFrequencyB: number;
   readonly actionGainA: number;
@@ -25,6 +30,7 @@ export interface ToyAudioMixFrame {
   readonly engineFrequency: number;
   readonly engineGain: number;
   readonly noiseGain: number;
+  readonly targetActionGain: number;
 }
 
 const MAX_VEHICLE_SPEED = 7.4;
@@ -47,6 +53,54 @@ const ENGINE_BASE_FREQUENCY: Readonly<Record<VehicleId, number>> = {
   'fire-truck': 88,
   police: 104,
 };
+
+const ACTION_ATTACK_FREQUENCY: Readonly<Record<VehicleId, number>> = {
+  ambulance: 523.25,
+  bulldozer: 74,
+  excavator: 196,
+  'fire-truck': 880,
+  police: 622.25,
+};
+
+const ACTION_ATTACK_GAIN: Readonly<Record<VehicleId, number>> = {
+  ambulance: 0.025,
+  bulldozer: 0.032,
+  excavator: 0.028,
+  'fire-truck': 0.018,
+  police: 0.026,
+};
+
+const TARGET_ACTION_GAIN: Readonly<Record<VehicleId, number>> = {
+  ambulance: 0.01,
+  bulldozer: 0.012,
+  excavator: 0.012,
+  'fire-truck': 0.006,
+  police: 0.012,
+};
+
+const ACTION_ATTACK_DURATION_SECONDS = 0.14;
+
+/** scene refから音へ渡す対象作用の最小scalar入力。 */
+export interface ToyTargetActionInput {
+  readonly actionTargetHoldMilliseconds: ArrayLike<number>;
+  readonly bulldozerActiveChipCount: number;
+  readonly primaryAction: boolean;
+  readonly vehicleId: VehicleId;
+}
+
+/** 選択車種と主操作中の実target telemetryだけから対象作用を判定する。 */
+export function deriveToyTargetActionActive(input: ToyTargetActionInput): boolean {
+  if (!input.primaryAction || input.vehicleId === 'fire-truck') return false;
+  if (input.vehicleId === 'bulldozer') {
+    return Number.isFinite(input.bulldozerActiveChipCount)
+      && input.bulldozerActiveChipCount > 0;
+  }
+  for (let index = 0; index < input.actionTargetHoldMilliseconds.length; index += 1) {
+    const milliseconds = input.actionTargetHoldMilliseconds[index];
+    if (Number.isFinite(milliseconds) && milliseconds > 0) return true;
+  }
+  return false;
+}
 
 /** 非有限値をfallbackへ戻し、指定範囲内へ収める。 */
 function clampFinite(value: number, minimum: number, maximum: number, fallback: number): number {
@@ -139,9 +193,20 @@ export function createToyAudioMixFrame(input: ToyAudioMixInput): ToyAudioMixFram
   const enabled = input.enabled;
   const action = createActionMix(actionKind, elapsedSeconds, enabled && input.primaryAction);
   const engineBase = ENGINE_BASE_FREQUENCY[input.vehicleId];
+  const attackAge = clampFinite(
+    input.actionAttackAgeSeconds ?? 0,
+    0,
+    ACTION_ATTACK_DURATION_SECONDS,
+    0,
+  );
+  const attackEnvelope = input.actionPressed
+    ? (1 - attackAge / ACTION_ATTACK_DURATION_SECONDS) ** 2
+    : 0;
 
   return {
     ...action,
+    actionAttackFrequency: ACTION_ATTACK_FREQUENCY[input.vehicleId],
+    actionAttackGain: enabled ? ACTION_ATTACK_GAIN[input.vehicleId] * attackEnvelope : 0,
     actionKind,
     bgmFrequency: PENTATONIC_FREQUENCIES[noteIndex] ?? PENTATONIC_FREQUENCIES[0],
     bgmGain: enabled ? 0.012 + ((1 - stepProgress) ** 2) * 0.02 : 0,
@@ -151,5 +216,8 @@ export function createToyAudioMixFrame(input: ToyAudioMixInput): ToyAudioMixFram
     noiseGain: enabled ? action.noiseGain : 0,
     actionGainA: enabled ? action.actionGainA : 0,
     actionGainB: enabled ? action.actionGainB : 0,
+    targetActionGain: enabled && input.primaryAction && input.targetActionActive
+      ? TARGET_ACTION_GAIN[input.vehicleId]
+      : 0,
   };
 }

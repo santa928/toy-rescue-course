@@ -44,6 +44,7 @@ function frameInput() {
     elapsedSeconds: 1,
     primaryAction: true,
     speed: 3.7,
+    targetActionActive: false,
     vehicleId: 'police' as const,
   };
 }
@@ -128,5 +129,40 @@ describe('ToyAudioDirector', () => {
       contextState: 'unavailable',
       enabled: false,
     });
+  });
+
+  it('有効中のfalse→trueだけを140ms以内のattackへ変換する', async () => {
+    const backend = new FakeToyAudioBackend();
+    const director = new ToyAudioDirector({
+      available: true,
+      backendFactory: () => backend,
+    });
+
+    director.update({ ...frameInput(), elapsedSeconds: 0.9, primaryAction: true });
+    await director.setEnabled(true);
+    director.update({ ...frameInput(), elapsedSeconds: 1, primaryAction: true });
+    expect(backend.frames.at(-1)?.actionAttackGain).toBe(0);
+
+    director.update({ ...frameInput(), elapsedSeconds: 1.1, primaryAction: false });
+    director.update({ ...frameInput(), elapsedSeconds: 1.12, primaryAction: true });
+    expect(backend.frames.at(-1)?.actionAttackGain).toBeGreaterThan(0);
+    director.update({ ...frameInput(), elapsedSeconds: 1.2, primaryAction: true });
+    expect(backend.frames.at(-1)?.actionAttackGain).toBeGreaterThan(0);
+    director.update({ ...frameInput(), elapsedSeconds: 1.28, primaryAction: true });
+    expect(backend.frames.at(-1)?.actionAttackGain).toBe(0);
+  });
+
+  it('対象作用中は固有音へtarget gainを重ねる', async () => {
+    const backend = new FakeToyAudioBackend();
+    const director = new ToyAudioDirector({
+      available: true,
+      backendFactory: () => backend,
+    });
+    await director.setEnabled(true);
+
+    director.update({ ...frameInput(), targetActionActive: true });
+
+    expect(backend.frames.at(-1)?.targetActionGain).toBeGreaterThan(0);
+    expect(director.getTelemetry().targetActionGain).toBeGreaterThan(0);
   });
 });

@@ -3,11 +3,14 @@ import type { MutableRefObject, RefObject } from 'react';
 import type { VehicleMissionCoordinator } from '../domain/VehicleMissionCoordinator';
 import type { DriveCommand } from '../input/controlState';
 import type { VehicleTelemetry } from '../scene/VehicleController';
+import type { ActionTargetMissionTelemetry } from '../scene/ActionTargetMission';
+import type { BulldozerMissionTelemetry } from '../scene/BulldozerDebrisMission';
 import {
   ToyAudioDirector,
   type ToyAudioTelemetry,
 } from './ToyAudioDirector';
 import { deriveToyAudioEvents } from './toyAudioEvents';
+import { deriveToyTargetActionActive } from './toyAudioMix';
 import {
   createBrowserToyAudioBackend,
   isBrowserToyAudioAvailable,
@@ -22,6 +25,8 @@ export interface ToyAudioUiState {
 }
 
 interface UseToyAudioFeedbackOptions {
+  readonly actionTargetMissionTelemetryRef: MutableRefObject<ActionTargetMissionTelemetry>;
+  readonly bulldozerMissionTelemetryRef: MutableRefObject<BulldozerMissionTelemetry>;
   readonly commandRef: RefObject<DriveCommand>;
   readonly coordinator: VehicleMissionCoordinator;
   readonly telemetryRef: MutableRefObject<VehicleTelemetry>;
@@ -48,6 +53,8 @@ function createAudioUiState(
 
 /** 既存refを1 RAFで読み、固定audio graphとmission cueへ接続する。 */
 export function useToyAudioFeedback({
+  actionTargetMissionTelemetryRef,
+  bulldozerMissionTelemetryRef,
   commandRef,
   coordinator,
   telemetryRef,
@@ -97,10 +104,19 @@ export function useToyAudioFeedback({
     /** 物理telemetryと入力refだけを読み、React stateを更新せずmixを進める。 */
     const updateAudioFrame = (elapsedMilliseconds: number): void => {
       const vehicle = telemetryRef.current;
+      const command = commandRef.current;
+      const targetActionActive = deriveToyTargetActionActive({
+        actionTargetHoldMilliseconds:
+          actionTargetMissionTelemetryRef.current.holdMilliseconds,
+        bulldozerActiveChipCount: bulldozerMissionTelemetryRef.current.activeChipCount,
+        primaryAction: command.primaryAction,
+        vehicleId: vehicle.id,
+      });
       director.update({
         elapsedSeconds: elapsedMilliseconds / 1_000,
-        primaryAction: commandRef.current.primaryAction,
+        primaryAction: command.primaryAction,
         speed: vehicle.speed,
+        targetActionActive,
         vehicleId: vehicle.id,
       });
       audioTelemetryRef.current = director.getTelemetry();
@@ -111,7 +127,13 @@ export function useToyAudioFeedback({
       window.cancelAnimationFrame(animationFrame);
       void director.dispose();
     };
-  }, [commandRef, director, telemetryRef]);
+  }, [
+    actionTargetMissionTelemetryRef,
+    bulldozerMissionTelemetryRef,
+    commandRef,
+    director,
+    telemetryRef,
+  ]);
 
   useEffect(() => {
     let previous = coordinator.getSnapshot();

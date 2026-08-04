@@ -145,6 +145,7 @@ async function verifyViewport(browser, viewport, errors) {
       && typeof window.render_game_to_text === 'function', undefined, { timeout: 12_000 });
     const initial = await readGameState(page, ['audio', 'controls', 'vehicle', 'vehicleSelection']);
     assert.deepEqual(initial.audio, {
+      actionAttackGain: 0,
       actionGain: 0,
       actionKind: 'water',
       activeVehicleId: 'fire-truck',
@@ -157,6 +158,7 @@ async function verifyViewport(browser, viewport, errors) {
       engineGain: 0,
       lastCue: null,
       noiseGain: 0,
+      targetActionGain: 0,
       vibrationCount: 0,
     });
     assert(Number.isInteger(initial.audio.bgmStep));
@@ -178,7 +180,9 @@ async function verifyViewport(browser, viewport, errors) {
     assert(enabled.audio.bgmGain > 0, `${viewport.name}: BGM gain remained zero.`);
     assert(enabled.audio.engineGain > 0, `${viewport.name}: idle engine gain remained zero.`);
     assert.equal(enabled.audio.actionGain, 0);
+    assert.equal(enabled.audio.actionAttackGain, 0);
     assert.equal(enabled.audio.noiseGain, 0);
+    assert.equal(enabled.audio.targetActionGain, 0);
     assert.equal(await page.locator('.audio-toggle-button').getAttribute('data-enabled'), 'true');
     assert.equal(await page.getByRole('button', { name: 'おとと振動をオフにする' })
       .getAttribute('aria-pressed'), 'true');
@@ -193,23 +197,38 @@ async function verifyViewport(browser, viewport, errors) {
         await waitForFrames(page, 4);
       }
       await setPrimaryAction(page, viewport.touch, true);
-      await waitForFrames(page, 4);
-      const active = await readGameState(page);
+      let active = null;
+      for (let frame = 0; frame < 8; frame += 1) {
+        await waitForFrames(page, 1);
+        const sample = await readGameState(page);
+        if (sample.audio.actionAttackGain > 0) {
+          active = sample;
+          break;
+        }
+      }
+      assert(active, `${viewport.name}: ${vehicleId} press attack frame was not observed.`);
       assert.equal(active.audio.activeVehicleId, vehicleId);
       assert.equal(active.audio.actionKind, actionKind);
+      assert(active.audio.actionAttackGain > 0,
+        `${viewport.name}: ${vehicleId} emitted no press attack.`);
+      assert.equal(active.audio.targetActionGain, 0,
+        `${viewport.name}: ${vehicleId} emitted target gain away from a target.`);
       assert(active.audio.actionGain + active.audio.noiseGain > 0,
         `${viewport.name}: ${vehicleId} emitted no action mix.`);
       actionSamples.push({
+        actionAttackGain: active.audio.actionAttackGain,
         actionGain: active.audio.actionGain,
         actionKind: active.audio.actionKind,
         noiseGain: active.audio.noiseGain,
         vehicleId,
       });
       await setPrimaryAction(page, viewport.touch, false);
-      await waitForFrames(page, 3);
+      await waitForFrames(page, 12);
       const released = await readGameState(page);
       assert.equal(released.audio.actionGain + released.audio.noiseGain, 0,
         `${viewport.name}: ${vehicleId} action mix remained active after release.`);
+      assert.equal(released.audio.actionAttackGain, 0,
+        `${viewport.name}: ${vehicleId} press attack exceeded 140ms.`);
     }
     const afterVehicles = await readGameState(page);
     assert.equal(afterVehicles.audio.cueCount, 4,
@@ -245,7 +264,9 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(disabled.audio.bgmGain, 0);
     assert.equal(disabled.audio.engineGain, 0);
     assert.equal(disabled.audio.actionGain, 0);
+    assert.equal(disabled.audio.actionAttackGain, 0);
     assert.equal(disabled.audio.noiseGain, 0);
+    assert.equal(disabled.audio.targetActionGain, 0);
 
     return {
       actionSamples,

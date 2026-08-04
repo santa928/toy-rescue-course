@@ -296,6 +296,8 @@ export function VoxelGameApp(): ReactElement {
     createInitialVehicleTelemetry(INITIAL_VEHICLE_ID),
   );
   const { audioState, audioTelemetryRef, toggleAudio } = useToyAudioFeedback({
+    actionTargetMissionTelemetryRef,
+    bulldozerMissionTelemetryRef,
     commandRef: controls.commandRef,
     coordinator,
     telemetryRef,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { VEHICLE_DEFINITIONS } from '../voxel-game/domain/vehicleDefinitions';
 import {
   createToyAudioMixFrame,
+  deriveToyTargetActionActive,
   type ToyAudioMixFrame,
 } from '../voxel-game/audio/toyAudioMix';
 
@@ -10,10 +11,12 @@ function createFrame(
   overrides: Partial<Parameters<typeof createToyAudioMixFrame>[0]> = {},
 ): ToyAudioMixFrame {
   return createToyAudioMixFrame({
+    actionPressed: false,
     elapsedSeconds: 0,
     enabled: true,
     primaryAction: false,
     speed: 0,
+    targetActionActive: false,
     vehicleId: 'fire-truck',
     ...overrides,
   });
@@ -24,15 +27,19 @@ describe('createToyAudioMixFrame', () => {
     expect(createFrame({
       elapsedSeconds: 1.2,
       enabled: false,
+      actionPressed: true,
       primaryAction: true,
       speed: 7.4,
+      targetActionActive: true,
       vehicleId: 'police',
     })).toMatchObject({
+      actionAttackGain: 0,
       actionGainA: 0,
       actionGainB: 0,
       bgmGain: 0,
       engineGain: 0,
       noiseGain: 0,
+      targetActionGain: 0,
     });
   });
 
@@ -84,6 +91,62 @@ describe('createToyAudioMixFrame', () => {
     expect(blue.actionGainA).toBeGreaterThan(0);
   });
 
+  it.each([
+    ['bulldozer', 74],
+    ['excavator', 196],
+    ['ambulance', 523.25],
+    ['police', 622.25],
+  ] as const)('%sは押下edgeで固有attackを返す', (vehicleId, frequency) => {
+    const attack = createFrame({
+      actionPressed: true,
+      primaryAction: true,
+      vehicleId,
+    });
+
+    expect(attack.actionAttackGain).toBeGreaterThan(0);
+    expect(attack.actionAttackFrequency).toBe(frequency);
+  });
+
+  it('対象へ作用中だけ車種actionを補強するtarget gainを返す', () => {
+    const free = createFrame({ primaryAction: true, vehicleId: 'ambulance' });
+    const target = createFrame({
+      primaryAction: true,
+      targetActionActive: true,
+      vehicleId: 'ambulance',
+    });
+
+    expect(free.targetActionGain).toBe(0);
+    expect(target.targetActionGain).toBeGreaterThan(0);
+    expect(target.targetActionGain).toBeLessThanOrEqual(0.03);
+  });
+
+  it('scene telemetryから選択車種の実対象作用だけを判定する', () => {
+    expect(deriveToyTargetActionActive({
+      actionTargetHoldMilliseconds: [0, 80, 0],
+      bulldozerActiveChipCount: 0,
+      primaryAction: true,
+      vehicleId: 'ambulance',
+    })).toBe(true);
+    expect(deriveToyTargetActionActive({
+      actionTargetHoldMilliseconds: [0, 0, 0],
+      bulldozerActiveChipCount: 9,
+      primaryAction: true,
+      vehicleId: 'bulldozer',
+    })).toBe(true);
+    expect(deriveToyTargetActionActive({
+      actionTargetHoldMilliseconds: [0, 80, 0],
+      bulldozerActiveChipCount: 9,
+      primaryAction: false,
+      vehicleId: 'bulldozer',
+    })).toBe(false);
+    expect(deriveToyTargetActionActive({
+      actionTargetHoldMilliseconds: [0, 80, 0],
+      bulldozerActiveChipCount: 9,
+      primaryAction: true,
+      vehicleId: 'fire-truck',
+    })).toBe(false);
+  });
+
   it('全車種・不正時刻でも有限かつ小音量のscalarだけを返す', () => {
     for (const { id } of VEHICLE_DEFINITIONS) {
       const frame = createFrame({
@@ -99,9 +162,11 @@ describe('createToyAudioMixFrame', () => {
       expect(Math.max(
         frame.actionGainA,
         frame.actionGainB,
+        frame.actionAttackGain,
         frame.bgmGain,
         frame.engineGain,
         frame.noiseGain,
+        frame.targetActionGain,
       )).toBeLessThanOrEqual(0.08);
     }
   });

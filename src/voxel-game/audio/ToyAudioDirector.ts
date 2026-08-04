@@ -31,6 +31,7 @@ export interface ToyAudioBackend {
 
 /** HUDとE2Eへ公開する低頻度状態と最新mix scalar。 */
 export interface ToyAudioTelemetry {
+  readonly actionAttackGain: number;
   readonly actionGain: number;
   readonly actionKind: ToyAudioActionKind;
   readonly activeVehicleId: ToyAudioMixInput['vehicleId'];
@@ -43,6 +44,7 @@ export interface ToyAudioTelemetry {
   readonly engineGain: number;
   readonly lastCue: ToyAudioCue | null;
   readonly noiseGain: number;
+  readonly targetActionGain: number;
   readonly vibrationCount: number;
 }
 
@@ -53,24 +55,36 @@ export interface ToyAudioDirectorOptions {
   readonly vibrate?: (pattern: number[]) => boolean;
 }
 
-export type ToyAudioFrameInput = Omit<ToyAudioMixInput, 'enabled'>;
+export type ToyAudioFrameInput = Omit<
+  ToyAudioMixInput,
+  'actionAttackAgeSeconds' | 'actionPressed' | 'enabled'
+>;
 
 const INITIAL_FRAME_INPUT: ToyAudioFrameInput = {
   elapsedSeconds: 0,
   primaryAction: false,
   speed: 0,
+  targetActionActive: false,
   vehicleId: 'fire-truck',
 };
 
+const ACTION_ATTACK_DURATION_SECONDS = 0.14;
+
 /** user activation、固定graph、mission cue、振動をReact外で所有する。 */
 export class ToyAudioDirector {
+  private actionAttackStartedAtSeconds = -1;
   private backend: ToyAudioBackend | null = null;
   private contextState: ToyAudioContextState;
   private cueCount = 0;
   private enabled = false;
   private lastCue: ToyAudioCue | null = null;
   private lastFrameInput = INITIAL_FRAME_INPUT;
-  private lastMix = createToyAudioMixFrame({ ...INITIAL_FRAME_INPUT, enabled: false });
+  private lastMix = createToyAudioMixFrame({
+    ...INITIAL_FRAME_INPUT,
+    actionPressed: false,
+    enabled: false,
+  });
+  private previousPrimaryAction = false;
   private vibrationCount = 0;
 
   /** 対応可否とlazy backend factoryを保存し、AudioContextはまだ生成しない。 */
@@ -81,7 +95,9 @@ export class ToyAudioDirector {
   /** enabledと最新mixを変更不能telemetryとして返す。 */
   public getTelemetry(): ToyAudioTelemetry {
     return {
-      actionGain: this.lastMix.actionGainA + this.lastMix.actionGainB,
+      actionAttackGain: this.lastMix.actionAttackGain,
+      actionGain: this.lastMix.actionGainA + this.lastMix.actionGainB
+        + this.lastMix.actionAttackGain + this.lastMix.targetActionGain,
       actionKind: this.lastMix.actionKind,
       activeVehicleId: this.lastFrameInput.vehicleId,
       available: this.options.available,
@@ -93,6 +109,7 @@ export class ToyAudioDirector {
       engineGain: this.lastMix.engineGain,
       lastCue: this.lastCue,
       noiseGain: this.lastMix.noiseGain,
+      targetActionGain: this.lastMix.targetActionGain,
       vibrationCount: this.vibrationCount,
     };
   }
@@ -101,6 +118,8 @@ export class ToyAudioDirector {
   public async setEnabled(enabled: boolean): Promise<boolean> {
     if (!enabled) {
       this.enabled = false;
+      this.actionAttackStartedAtSeconds = -1;
+      this.previousPrimaryAction = this.lastFrameInput.primaryAction;
       this.applyCurrentFrame();
       if (this.backend && this.backend.state !== 'closed') {
         try {
@@ -134,6 +153,8 @@ export class ToyAudioDirector {
     try {
       if (visible) await this.backend.resume();
       else {
+        this.actionAttackStartedAtSeconds = -1;
+        this.previousPrimaryAction = this.lastFrameInput.primaryAction;
         this.applySilentFrame();
         await this.backend.suspend();
       }
@@ -145,6 +166,15 @@ export class ToyAudioDirector {
 
   /** 最新telemetry入力をpure mixへ変換し、生成済みgraphだけへ適用する。 */
   public update(input: ToyAudioFrameInput): void {
+    const canStartAttack = this.enabled && this.contextState === 'running';
+    if (canStartAttack && input.primaryAction && !this.previousPrimaryAction) {
+      this.actionAttackStartedAtSeconds = Number.isFinite(input.elapsedSeconds)
+        ? Math.max(0, input.elapsedSeconds)
+        : -1;
+    } else if (!canStartAttack) {
+      this.actionAttackStartedAtSeconds = -1;
+    }
+    this.previousPrimaryAction = input.primaryAction;
     this.lastFrameInput = input;
     this.applyCurrentFrame();
   }
@@ -167,6 +197,7 @@ export class ToyAudioDirector {
   /** 固定graphを閉じ、以後の再生を止める。 */
   public async dispose(): Promise<void> {
     this.enabled = false;
+    this.actionAttackStartedAtSeconds = -1;
     if (!this.backend) return;
     try {
       this.applySilentFrame();
@@ -179,8 +210,20 @@ export class ToyAudioDirector {
 
   /** enabled状態を反映した最新frameを保存し、backendがあれば適用する。 */
   private applyCurrentFrame(): void {
+    const elapsedSeconds = Number.isFinite(this.lastFrameInput.elapsedSeconds)
+      ? Math.max(0, this.lastFrameInput.elapsedSeconds)
+      : 0;
+    const attackAgeSeconds = this.actionAttackStartedAtSeconds < 0
+      ? Number.POSITIVE_INFINITY
+      : elapsedSeconds - this.actionAttackStartedAtSeconds;
+    const actionPressed = this.enabled
+      && this.contextState === 'running'
+      && attackAgeSeconds >= 0
+      && attackAgeSeconds < ACTION_ATTACK_DURATION_SECONDS;
     this.lastMix = createToyAudioMixFrame({
       ...this.lastFrameInput,
+      actionAttackAgeSeconds: actionPressed ? attackAgeSeconds : ACTION_ATTACK_DURATION_SECONDS,
+      actionPressed,
       enabled: this.enabled && this.contextState === 'running',
     });
     if (this.backend && this.backend.state !== 'closed') this.backend.applyFrame(this.lastMix);
@@ -188,7 +231,12 @@ export class ToyAudioDirector {
 
   /** 入力は維持してgainだけ0のframeをgraphへ適用する。 */
   private applySilentFrame(): void {
-    this.lastMix = createToyAudioMixFrame({ ...this.lastFrameInput, enabled: false });
+    this.lastMix = createToyAudioMixFrame({
+      ...this.lastFrameInput,
+      actionAttackAgeSeconds: ACTION_ATTACK_DURATION_SECONDS,
+      actionPressed: false,
+      enabled: false,
+    });
     if (this.backend && this.backend.state !== 'closed') this.backend.applyFrame(this.lastMix);
   }
 }
