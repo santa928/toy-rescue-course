@@ -130,7 +130,7 @@ test('座標合わせはX/Z以外と非finite targetを入力前に拒否する'
   );
 });
 
-test('精密座標合わせは指定範囲で1frame補正後に逆入力で能動制動する', async () => {
+test('精密座標合わせは指定frame補正後に1frame逆入力で能動制動する', async () => {
   const states = [
     { vehicle: { position: [0, 0, 0], resetCount: 0, speed: 0 } },
     { vehicle: { position: [0, 0, 0], resetCount: 0, speed: 0 } },
@@ -138,8 +138,9 @@ test('精密座標合わせは指定範囲で1frame補正後に逆入力で能�
     { vehicle: { position: [0.8, 0, 0], resetCount: 0, speed: 0 } },
   ];
   const touchEvents = [];
+  const waitedFrameCounts = [];
   const harness = createDriveHarness({
-    frameWaiter: async () => {},
+    frameWaiter: async (_page, frameCount) => { waitedFrameCounts.push(frameCount); },
     requiredFields: ['vehicle'],
     stateReader: async () => states.shift(),
   });
@@ -152,6 +153,7 @@ test('精密座標合わせは指定範囲で1frame補正後に逆入力で能�
     coordinateIndex: 0,
     description: 'precision X',
     precisionCounterPulse: true,
+    precisionNudgeFrameCount: 2,
     precisionCounterPulseThreshold: 1,
     target: 0.8,
     tolerance: 0.35,
@@ -165,4 +167,32 @@ test('精密座標合わせは指定範囲で1frame補正後に逆入力で能�
     ['set', ...WORLD_AXIS_INPUTS.negativeX.stick],
     'release',
   ]);
+  assert.deepEqual(waitedFrameCounts, [2, 1, 1]);
+});
+
+test('座標合わせは目標を跨いだ次の補正を1frameへ縮める', async () => {
+  const states = [
+    { vehicle: { position: [0, 0, 0], resetCount: 0, speed: 0 } },
+    { vehicle: { position: [0, 0, 0], resetCount: 0, speed: 0 } },
+    { vehicle: { position: [4.8, 0, 0], resetCount: 0, speed: 0 } },
+    { vehicle: { position: [4.8, 0, 0], resetCount: 0, speed: 0 } },
+    { vehicle: { position: [3.05, 0, 0], resetCount: 0, speed: 0 } },
+    { vehicle: { position: [3.05, 0, 0], resetCount: 0, speed: 0 } },
+  ];
+  const waitedFrameCounts = [];
+  const harness = createDriveHarness({
+    frameWaiter: async (_page, frameCount) => { waitedFrameCounts.push(frameCount); },
+    requiredFields: ['vehicle'],
+    stateReader: async () => states.shift(),
+  });
+
+  const aligned = await harness.alignWorldCoordinate(createKeyboardPage(), {
+    coordinateIndex: 0,
+    description: 'overshoot recovery X',
+    target: 3,
+    tolerance: 0.1,
+  });
+
+  assert.equal(aligned.vehicle.position[0], 3.05);
+  assert.deepEqual(waitedFrameCounts, [5, 1, 1, 1]);
 });

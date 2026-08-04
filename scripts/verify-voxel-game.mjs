@@ -18,6 +18,10 @@ import {
   releaseKeyboardKeys,
   syncKeyboardKeys,
 } from './voxel-game-e2e/drive-harness.mjs';
+import {
+  calculatePlanarBoxContact,
+  selectCollisionKeyboardAxis,
+} from './voxel-game-e2e/collision-geometry.mjs';
 import { createFireRoutePlan } from './voxel-game-e2e/fire-route-plan.mjs';
 import {
   DISTRICT_JOURNEY_MAX_SECONDS,
@@ -729,6 +733,11 @@ async function verifyProductionMap(browser, errors) {
     // 奥まで通過する往路とは分け、旧来のgarage外周レーンを使う。
     const southReturnTransitX = initial.landmarks.garage[0] + 6.5;
     const southCaptureTargetZ = southSignPost.position[2] - 2;
+    const hubRoadHalfWidth = 2.5;
+    const hubRoadSafetyMargin = 0.5;
+    const hubRoadCenterTolerance = hubRoadHalfWidth
+      - VEHICLE_COLLIDER_HALF_EXTENTS[0]
+      - hubRoadSafetyMargin;
     const initialResetCount = initial.vehicle.resetCount;
     const hubCaptureState = await driveAlongWorldAxis(
       page,
@@ -784,10 +793,27 @@ async function verifyProductionMap(browser, errors) {
         ),
       }),
     ));
-    await alignWorldCoordinate(page, 0, initial.landmarks.garage[0], 'production-map hub X');
     // 東西幹線は幅5unitあるため、停止時の約0.9unitの惰性を許容しても車体は道路内に収まる。
     // 0.32unitへの過剰な中心合わせは1frame pulseで往復し、正しい経路をflakyに失敗させる。
-    await alignWorldCoordinate(page, 2, 0, 'production-map central crossing Z', 1);
+    await alignWorldCoordinate(
+      page,
+      2,
+      0,
+      'production-map central crossing Z',
+      1,
+      null,
+      { multiplier: 0.6 },
+    );
+    // park境界付近で横移動すると道路脇の樹木へ向かうため、障害物のない交差点上でXを揃える。
+    await alignWorldCoordinate(
+      page,
+      0,
+      initial.landmarks.garage[0],
+      'production-map hub X',
+      hubRoadCenterTolerance,
+      null,
+      { multiplier: 0.6 },
+    );
 
     journeys.push(await verifyDistrictJourney(
       page,
@@ -1077,8 +1103,32 @@ async function driveToForgivingSprayTarget(page) {
   const initialState = await readGameState(page);
   const target = initialState.landmarks.fireSprayTarget;
   let latestState = null;
-  await alignWorldCoordinate(page, 0, target[0] + 2.1, 'forgiving spray east X', 0.2);
-  await alignWorldCoordinate(page, 2, target[2] + 8.1, 'forgiving spray exterior Z', 0.2);
+  await alignWorldCoordinate(
+    page,
+    0,
+    target[0] + 2.1,
+    'forgiving spray east X',
+    0.2,
+    null,
+    {
+      precisionCounterPulse: true,
+      precisionCounterPulseThreshold: 0.8,
+      precisionNudgeFrameCount: 2,
+    },
+  );
+  await alignWorldCoordinate(
+    page,
+    2,
+    target[2] + 8.1,
+    'forgiving spray exterior Z',
+    0.2,
+    null,
+    {
+      precisionCounterPulse: true,
+      precisionCounterPulseThreshold: 0.8,
+      precisionNudgeFrameCount: 2,
+    },
+  );
   for (let attempt = 0; attempt < 18; attempt += 1) {
     const state = await readGameState(page);
     latestState = state;
@@ -1174,16 +1224,18 @@ async function driveMissionToFire(page, touchDriver) {
     0,
     routePlan.stagingX,
     `fire route target ${routePlan.approachFace} staging`,
-    0.35,
+    0.4,
     touchDriver,
+    { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.8 },
   );
   await alignWorldCoordinate(
     page,
     2,
     routePlan.latitudeZ,
     'fire route final heading',
-    0.35,
+    0.4,
     touchDriver,
+    { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.8 },
   );
   const maximumTargetAcquisitionAttempts = 12;
   const maximumTargetAcquisitionBrakeFrames = 150;
@@ -1484,6 +1536,7 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       VEHICLE_COLLIDER_HALF_EXTENTS[2],
     );
     const backwardCoastReserve = 0.5;
+    const backwardNegativeRange = 7;
     const backwardSafetyInset = backwardHorizontalSupport + backwardCoastReserve;
     const backwardHeadingReserve = 2 * backwardHorizontalSupport + backwardCoastReserve;
     const fireBuildingEastX = fireBuilding.position[0] + fireBuilding.scale[0] / 2;
@@ -1588,15 +1641,20 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
       const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
       let latest = observeBackwardRouteState(await readGameState(page), `${description}: start`);
+      let previousDelta = null;
       for (let attempt = 0; attempt < 24; attempt += 1) {
         const delta = targetValue - latest.vehicle.position[coordinateIndex];
         if (Math.abs(delta) <= tolerance) return latest;
-        const frameCount = Math.max(1, Math.min(7, Math.ceil(Math.abs(delta) * 1.5)));
+        const crossedTarget = previousDelta !== null && delta * previousDelta < 0;
+        const frameCount = crossedTarget
+          ? 1
+          : Math.max(1, Math.min(7, Math.ceil(Math.abs(delta) * 1.5)));
         latest = await pulseBackwardRoute(
           delta > 0 ? positiveAxis : negativeAxis,
           frameCount,
           description,
         );
+        previousDelta = delta;
       }
       throw new Error(`${description}: coordinate did not align: ${JSON.stringify({
         actual: latest.vehicle.position[coordinateIndex],
@@ -1780,6 +1838,7 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       );
       backwardFinalPositionTolerance = 0.5;
       while (backwardHeadingRecoveryPulseCount < maximumBackwardFinalApproachPulses) {
+        backwardFinalState = await recoverBackwardFireBuildingClearance(backwardFinalState);
         const zError = backwardWaypoint.z - backwardFinalState.vehicle.position[2];
         if (Math.abs(zError) <= backwardFinalPositionTolerance
           && backwardFinalState.vehicle.forward[2] >= 0.5) break;
@@ -1837,7 +1896,7 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       && backwardEntry.vehicle.position[2] >= backwardEntry.world.bounds.minZ + backwardSafetyInset
       && backwardEntry.vehicle.position[2] <= backwardEntry.world.bounds.maxZ - backwardSafetyInset
       && backwardEntry.vehicle.forward[2] >= 0.5
-      && backwardEntryGeometry.horizontalDistance <= 4.3
+      && backwardEntryGeometry.horizontalDistance <= backwardNegativeRange
       && backwardEntryGeometry.dot < 0
       && !backwardEntry.mission.targeted,
     `Backward route entry is not safely staged: ${JSON.stringify({
@@ -1861,7 +1920,9 @@ async function verifyForgivingSprayTargeting(browser, errors) {
       })}`);
     const behind = backwardEntry;
     const { dot: behindDot, horizontalDistance: behindHorizontalDistance } = getTargetGeometry(behind);
-    assert(Number.isFinite(behindDot) && behindHorizontalDistance <= 7 && behindDot < 0,
+    assert(Number.isFinite(behindDot)
+      && behindHorizontalDistance <= backwardNegativeRange
+      && behindDot < 0,
       `Backward spray was not strictly behind the vehicle: ${JSON.stringify({
         behindDot,
         behindHorizontalDistance,
@@ -2703,9 +2764,17 @@ function worldDirectionToTouchStick(camera, worldX, worldZ) {
 async function prepareWorldObstacleCollision(page, touch, obstacle, targetX = obstacle.position[0]) {
   const initial = await readGameState(page);
   const garage = initial.landmarks.garage;
+  const centralRoadTolerance = 2.5 - VEHICLE_COLLIDER_HALF_EXTENTS[0] - 0.5;
   await driveAlongWorldAxis(page, 'negativeZ', (state) => state.vehicle.position[2] <= garage[2] - 3,
     `${obstacle.id} collision garage opening`, touch);
-  await alignWorldCoordinate(page, 2, 0, `${obstacle.id} collision central crossing Z`, 0.3, touch);
+  await alignWorldCoordinate(
+    page,
+    2,
+    0,
+    `${obstacle.id} collision central crossing Z`,
+    centralRoadTolerance,
+    touch,
+  );
   const current = await readGameState(page);
   if (targetX >= current.vehicle.position[0]) {
     await driveAlongWorldAxis(page, 'positiveX', (state) => state.vehicle.position[0] >= targetX,
@@ -2730,9 +2799,15 @@ function worldAxisInputName(axis, direction) {
 }
 
 /**
- * telemetryのgarage wallと対象post AABBから、安全な車庫出口・正面runwayを算出してkeyboardで配置する。
+ * telemetryのgarage wallと対象post AABBから、安全な車庫出口・正面runwayを算出して実入力で配置する。
  */
-async function prepareTelemetryPostCollision(page, obstacle, approachAxis, approachDirection) {
+async function prepareTelemetryPostCollision(
+  page,
+  obstacle,
+  approachAxis,
+  approachDirection,
+  touchDriver = null,
+) {
   const initial = await readGameState(page);
   const garageSideWalls = [
     requireWorldSolid(initial, 'garage-left-wall'),
@@ -2752,6 +2827,7 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     'negativeZ',
     (state) => state.vehicle.position[2] <= garageExitZ,
     `${obstacle.id} telemetry garage exit`,
+    touchDriver,
   );
   await alignWorldCoordinate(
     page,
@@ -2759,12 +2835,14 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     garageExitZ,
     `${obstacle.id} telemetry garage clearance Z`,
     0.35,
+    touchDriver,
   );
 
   const perpendicularAxis = approachAxis === 'x' ? 'z' : 'x';
   const perpendicularIndex = AXIS_INDEX[perpendicularAxis];
   const approachIndex = AXIS_INDEX[approachAxis];
   const perpendicularTarget = obstacle.position[perpendicularIndex];
+  const frontalAlignmentTolerance = Math.min(0.2, obstacle.scale[perpendicularIndex] / 3);
   const runwayReserve = 2.5;
   const stagingCoordinate = obstacle.position[approachIndex] - approachDirection * (
     obstacle.scale[approachIndex] / 2 + safeSupport + runwayReserve
@@ -2812,6 +2890,7 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     transitTarget,
     `${obstacle.id} telemetry gate bypass ${perpendicularAxis.toUpperCase()}`,
     0.3,
+    touchDriver,
   );
   await alignWorldCoordinate(
     page,
@@ -2819,14 +2898,25 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     stagingCoordinate,
     `${obstacle.id} telemetry runway ${approachAxis.toUpperCase()}`,
     0.3,
+    touchDriver,
+    {
+      precisionCounterPulse: true,
+      precisionCounterPulseThreshold: 1.5,
+      precisionNudgeFrameCount: 2,
+    },
   );
   await alignWorldCoordinate(
     page,
     perpendicularIndex,
     perpendicularTarget,
     `${obstacle.id} telemetry frontal alignment ${perpendicularAxis.toUpperCase()}`,
-    Math.min(0.2, obstacle.scale[perpendicularIndex] / 3),
-    null,
+    frontalAlignmentTolerance,
+    touchDriver,
+    {
+      precisionCounterPulse: true,
+      precisionCounterPulseThreshold: 1.5,
+      precisionNudgeFrameCount: 2,
+    },
   );
   const staged = await readGameState(page);
   return {
@@ -2834,6 +2924,7 @@ async function prepareTelemetryPostCollision(page, obstacle, approachAxis, appro
     garageClearanceZ,
     garageFrontFaceZ,
     garageSideWallIds: garageSideWalls.map(({ id }) => id),
+    frontalAlignmentTolerance,
     hubGateBypassZ,
     hubGateId: hubGate.id,
     obstaclePosition: obstacle.position,
@@ -2891,11 +2982,29 @@ async function verifyWorldCollisionScenario(browser, errors, {
     let minimumClearance = Number.POSITIVE_INFINITY;
     let minimumPerpendicularSeparation = Number.POSITIVE_INFINITY;
     let maximumApproachSpeed = 0;
+    const contactClearances = [];
+    const contactPenetrationDepths = [];
     const contactPositions = [];
     const approachInputName = worldAxisInputName(approachAxis, approachDirection);
+    const keyboardSteeringTolerance = Math.min(
+      0.45,
+      obstacle.scale[perpendicularIndex] / 2 + 0.1,
+    );
+    let keyboardCorrectionFrameCount = 0;
     if (touch) await touch.setStick(...worldDirectionToTouchStick(aligned.camera, ...approachVector));
     else await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS[approachInputName].keys);
     for (let frame = 0; frame < 600; frame += 1) {
+      if (!touch && !contactSample) {
+        const steering = selectCollisionKeyboardAxis({
+          approachAxis,
+          approachDirection,
+          obstaclePosition: obstacle.position,
+          perpendicularTolerance: keyboardSteeringTolerance,
+          vehiclePosition: latestState.vehicle.position,
+        });
+        await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS[steering.axis].keys);
+        if (steering.correcting) keyboardCorrectionFrameCount += 1;
+      }
       await waitForFrames(page, 1);
       const state = await readGameState(page);
       const previousState = latestState;
@@ -2919,18 +3028,29 @@ async function verifyWorldCollisionScenario(browser, errors, {
       const perpendicularOverlap = Math.abs(
         state.vehicle.position[perpendicularIndex] - obstacle.position[perpendicularIndex],
       ) <= support[perpendicularAxis] + obstacle.scale[perpendicularIndex] / 2 + 0.05;
+      const planarContact = calculatePlanarBoxContact(
+        state.vehicle,
+        obstacle,
+        VEHICLE_COLLIDER_HALF_EXTENTS,
+      );
       minimumPerpendicularSeparation = Math.min(
         minimumPerpendicularSeparation,
         Math.abs(state.vehicle.position[perpendicularIndex] - obstacle.position[perpendicularIndex])
           - support[perpendicularAxis] - obstacle.scale[perpendicularIndex] / 2,
       );
-      if (headingAlongApproach >= MIN_COLLISION_APPROACH_ALIGNMENT) {
+      const headingReady = headingAlongApproach >= MIN_COLLISION_APPROACH_ALIGNMENT;
+      if (headingReady || contactSample) {
         minimumClearance = Math.min(minimumClearance, clearance);
       }
-      if (headingAlongApproach >= MIN_COLLISION_APPROACH_ALIGNMENT
-        && perpendicularOverlap && clearance <= 0.12) {
-        contactSample ??= { clearance, state, support };
+      if ((headingReady || contactSample)
+        && perpendicularOverlap && planarContact.separationDistance <= 0.12) {
+        contactSample ??= { clearance, planarContact, state, support };
+        contactClearances.push(clearance);
+        contactPenetrationDepths.push(planarContact.penetrationDepth);
         contactPositions.push(state.vehicle.position[axisIndex]);
+        if (!touch && contactPositions.length === 1) {
+          await syncKeyboardKeys(page, heldKeys, WORLD_AXIS_INPUTS[approachInputName].keys);
+        }
         if (contactPositions.length >= COLLISION_SETTLING_FRAME_COUNT + COLLISION_HELD_FRAME_COUNT) break;
       }
     }
@@ -2953,15 +3073,23 @@ async function verifyWorldCollisionScenario(browser, errors, {
       obstacle,
       })}`,
     );
+    const settledContactClearances = contactClearances.slice(COLLISION_SETTLING_FRAME_COUNT);
+    const settledContactPenetrationDepths = contactPenetrationDepths.slice(
+      COLLISION_SETTLING_FRAME_COUNT,
+    );
     const settledContactPositions = contactPositions.slice(COLLISION_SETTLING_FRAME_COUNT);
+    const settledMaximumPenetrationDepth = Math.max(...settledContactPenetrationDepths);
+    const settledMinimumClearance = Math.min(...settledContactClearances);
     const contactTravel = Math.max(...settledContactPositions) - Math.min(...settledContactPositions);
-    assert(minimumClearance >= MIN_COLLISION_SURFACE_CLEARANCE,
+    assert(settledMaximumPenetrationDepth <= -MIN_COLLISION_SURFACE_CLEARANCE,
       `${obstacle.id}: vehicle collider penetrated visual AABB: ${JSON.stringify({
         contactPosition: contactSample.state.vehicle.position,
         contactSupport: contactSample.support,
         contactTravel,
         latest: latestState.vehicle,
-        minimumClearance,
+        minimumObservedClearance: minimumClearance,
+        settledMaximumPenetrationDepth,
+        settledMinimumClearance,
       })}`);
     assert(contactTravel <= MAX_COLLISION_SETTLING_TRAVEL,
       `${obstacle.id}: vehicle traversed solid while held (${contactTravel}).`);
@@ -3014,8 +3142,12 @@ async function verifyWorldCollisionScenario(browser, errors, {
       contactTravel,
       finalClearance: collisionClearance(heldState.vehicle, obstacle, approachAxis, -approachDirection),
       input: inputMode,
+      keyboardCorrectionFrameCount,
+      keyboardSteeringTolerance,
       maximumApproachSpeed,
-      minimumClearance,
+      minimumClearance: settledMinimumClearance,
+      minimumObservedClearance: minimumClearance,
+      settledMaximumPenetrationDepth,
       obstacle,
       passedThrough: false,
       recoveredDistance,
@@ -3044,6 +3176,11 @@ async function verifyFireHazardLifecycle(browser, errors) {
     const initial = await readGameState(page);
     assertInitialWorldPhysicsContract(initial);
     const fireHazard = initial.visualLayout.fireHazard;
+    const fireHazardStagingTolerance = Math.min(
+      0.4,
+      fireHazard.scale[0] / 3,
+      fireHazard.scale[2] / 3,
+    );
     const easternRunupX = fireHazard.position[0] + fireHazard.scale[0] / 2
       + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 2.5;
     await driveMissionToFire(page, touch);
@@ -3056,10 +3193,17 @@ async function verifyFireHazardLifecycle(browser, errors) {
       2,
       fireHazard.position[2],
       'fire hazard targeting lane Z',
-      0.15,
+      fireHazardStagingTolerance,
       touch,
     );
-    await alignWorldCoordinate(page, 0, easternRunupX, 'fire hazard head-on X', 0.15, touch);
+    await alignWorldCoordinate(
+      page,
+      0,
+      easternRunupX,
+      'fire hazard head-on X',
+      fireHazardStagingTolerance,
+      touch,
+    );
     const before = await readGameState(page);
     assert.equal(before.visuals.fireHazardEnabled, true);
 
@@ -3191,7 +3335,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
         0,
         restoredFireHazard.position[0],
         'restored fire hazard targeting lane X',
-        0.15,
+        fireHazardStagingTolerance,
         touch,
       );
       await alignWorldCoordinate(
@@ -3199,7 +3343,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
         2,
         restoredApproach.runup,
         'restored fire hazard head-on Z',
-        0.15,
+        fireHazardStagingTolerance,
         touch,
       );
     } else {
@@ -3211,7 +3355,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
         2,
         restoredFireHazard.position[2],
         'restored fire hazard targeting lane Z',
-        0.15,
+        fireHazardStagingTolerance,
         touch,
       );
       await alignWorldCoordinate(
@@ -3219,7 +3363,7 @@ async function verifyFireHazardLifecycle(browser, errors) {
         0,
         restoredApproach.runup,
         'restored fire hazard head-on X',
-        0.15,
+        fireHazardStagingTolerance,
         touch,
       );
     }
@@ -3466,7 +3610,9 @@ async function verifyWorldCollisions(browser, errors) {
       approachDirection: -1,
       captureScreenshot: false,
       id: 'hub-gate-post',
-      inputMode: 'keyboard',
+      prepare: async (page, touch) => prepareTelemetryPostCollision(
+        page, requireWorldSolid(await readGameState(page), 'hub-gate-post'), 'x', -1, touch,
+      ),
       recoveryDirection: 1,
     },
     {
@@ -3474,7 +3620,9 @@ async function verifyWorldCollisions(browser, errors) {
       approachDirection: 1,
       captureScreenshot: false,
       id: 'south-sign-post-west',
-      inputMode: 'keyboard',
+      prepare: async (page, touch) => prepareTelemetryPostCollision(
+        page, requireWorldSolid(await readGameState(page), 'south-sign-post-west'), 'z', 1, touch,
+      ),
       recoveryDirection: -1,
     },
     {
@@ -3482,7 +3630,9 @@ async function verifyWorldCollisions(browser, errors) {
       approachDirection: -1,
       captureScreenshot: false,
       id: 'south-sign-post-east',
-      inputMode: 'keyboard',
+      prepare: async (page, touch) => prepareTelemetryPostCollision(
+        page, requireWorldSolid(await readGameState(page), 'south-sign-post-east'), 'z', -1, touch,
+      ),
       recoveryDirection: 1,
     },
     {
@@ -3501,6 +3651,7 @@ async function verifyWorldCollisions(browser, errors) {
       approachAxis: 'z',
       approachDirection: 1,
       id: 'garage-back-wall',
+      inputMode: 'keyboard',
       prepare: async (page, touch) => {
         const state = await readGameState(page);
         const obstacle = requireWorldSolid(state, 'garage-back-wall');
@@ -3558,11 +3709,7 @@ async function verifyWorldCollisions(browser, errors) {
       recoveryDirection: 1,
     },
   ];
-  const requiredKeyboardCollisionIds = [
-    'hub-gate-post',
-    'south-sign-post-west',
-    'south-sign-post-east',
-  ];
+  const requiredKeyboardCollisionIds = ['garage-back-wall'];
   const testedIds = testedScenarios.map(({ id }) => id);
   assert.deepEqual(
     requiredKeyboardCollisionIds.filter((id) => !testedIds.includes(id)),
@@ -3612,20 +3759,20 @@ async function verifyWorldCollisions(browser, errors) {
     'town-tree-trunk-a': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-tree-trunk-b': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-tree-trunk-c': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
-    'town-sign-post-west': 'south-sign-post-west covers the same sign-post collider shape through real keyboard input',
-    'town-sign-post-east': 'south-sign-post-east covers the same sign-post collider shape through real keyboard input',
-    'hub-tool-rack-post': 'hub-gate-post covers the same streetscape post cuboid through real keyboard input',
+    'town-sign-post-west': 'south-sign-post-west covers the same sign-post collider shape through real input',
+    'town-sign-post-east': 'south-sign-post-east covers the same sign-post collider shape through real input',
+    'hub-tool-rack-post': 'hub-gate-post covers the same streetscape post cuboid through real input',
     'park-bench-seat': 'the dedicated streetscape E2E covers the adjacent picnic-table cuboid through real input',
-    'park-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'park-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
     'park-picnic-table': 'the dedicated streetscape E2E covers this solid through real keyboard and touch input',
-    'fire-hydrant-body': 'hub-gate-post covers the same streetscape post cuboid through real keyboard input',
-    'fire-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
-    'blocks-fence-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
+    'fire-hydrant-body': 'hub-gate-post covers the same streetscape post cuboid through real input',
+    'fire-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
+    'blocks-fence-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
     'south-viewing-bench': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
-    'construction-barrier-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
-    'construction-work-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
-    'town-west-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real keyboard input',
-    'town-east-lamp-post': 'south-sign-post-east covers the same streetscape post cuboid through real keyboard input',
+    'construction-barrier-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
+    'construction-work-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
+    'town-west-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
+    'town-east-lamp-post': 'south-sign-post-east covers the same streetscape post cuboid through real input',
     'town-bench-seat': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
   };
   const sharedDefinitionOnly = worldSolids

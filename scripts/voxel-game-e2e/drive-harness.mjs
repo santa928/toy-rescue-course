@@ -244,7 +244,7 @@ export function createDriveHarness(options = {}) {
     if (brakeAfterPulse) await brakeVehicle(page);
   }
 
-  /** 短いcardinal pulseを反復し、world X/Zを指定値へ揃える。 */
+  /** 短いcardinal pulseを反復し、目標を跨いだ後は1frameへ縮めてworld X/Zを揃える。 */
   async function alignWorldCoordinate(page, alignOptions) {
     const {
       attempts = alignAttemptLimit,
@@ -253,6 +253,7 @@ export function createDriveHarness(options = {}) {
       multiplier = pulseDistanceMultiplier,
       precisionCounterPulse = false,
       precisionCounterPulseThreshold = 0.6,
+      precisionNudgeFrameCount = 1,
       target,
       tolerance = 0.4,
       touchDriver = null,
@@ -264,10 +265,13 @@ export function createDriveHarness(options = {}) {
       `${description}: tolerance must be finite and non-negative.`);
     assert(Number.isFinite(precisionCounterPulseThreshold) && precisionCounterPulseThreshold > 0,
       `${description}: precision counter-pulse threshold must be finite and positive.`);
+    assert(Number.isInteger(precisionNudgeFrameCount) && precisionNudgeFrameCount > 0,
+      `${description}: precision nudge frame count must be a positive integer.`);
     const positiveAxis = coordinateIndex === 0 ? 'positiveX' : 'positiveZ';
     const negativeAxis = coordinateIndex === 0 ? 'negativeX' : 'negativeZ';
     const initialResetCount = (await readState(page)).vehicle.resetCount;
     let latest = null;
+    let previousDelta = null;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       latest = await readState(page);
       const actual = latest.vehicle.position[coordinateIndex];
@@ -277,12 +281,13 @@ export function createDriveHarness(options = {}) {
       assert.equal(latest.vehicle.resetCount, initialResetCount,
         `${description}: vehicle reset unexpectedly.`);
       const correctionAxis = delta > 0 ? positiveAxis : negativeAxis;
+      const crossedTarget = previousDelta !== null && delta * previousDelta < 0;
       if (precisionCounterPulse && Math.abs(delta) <= precisionCounterPulseThreshold) {
         await pulseWorldAxis(page, {
           axis: correctionAxis,
           brakeAfterPulse: false,
           description: `${description} precision nudge`,
-          frameCount: 1,
+          frameCount: precisionNudgeFrameCount,
           touchDriver,
         });
         await pulseWorldAxis(page, {
@@ -295,10 +300,11 @@ export function createDriveHarness(options = {}) {
         await pulseWorldAxis(page, {
           axis: correctionAxis,
           description,
-          frameCount: calculatePulseFrameCount(delta, multiplier),
+          frameCount: crossedTarget ? 1 : calculatePulseFrameCount(delta, multiplier),
           touchDriver,
         });
       }
+      previousDelta = delta;
     }
     throw new Error(`${description}: coordinate did not align: ${JSON.stringify({
       actual: latest?.vehicle.position[coordinateIndex],
