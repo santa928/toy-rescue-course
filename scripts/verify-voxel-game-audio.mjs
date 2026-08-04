@@ -122,6 +122,50 @@ async function setPrimaryAction(page, touch, pressed) {
   });
 }
 
+/**
+ * 140msのpress attackをNode往復で取り逃さないよう、押下前からpage内rAFで観測する。
+ * observerは正値を一度だけ保存し、2秒で必ず停止する。
+ */
+async function armActionAttackObserver(page) {
+  await page.evaluate(() => {
+    const previous = window.__voxelAudioAttackObserver;
+    if (previous?.frameId) cancelAnimationFrame(previous.frameId);
+    const observer = {
+      captured: null,
+      frameId: 0,
+      running: true,
+      startedAtMs: performance.now(),
+    };
+    const capture = () => {
+      const rendered = window.render_game_to_text?.();
+      if (rendered) {
+        const { audio, vehicle } = JSON.parse(rendered);
+        if (audio.actionAttackGain > 0) {
+          observer.captured = { audio, vehicle };
+          observer.running = false;
+          return;
+        }
+      }
+      if (performance.now() - observer.startedAtMs >= 2_000) {
+        observer.running = false;
+        return;
+      }
+      observer.frameId = requestAnimationFrame(capture);
+    };
+    observer.frameId = requestAnimationFrame(capture);
+    window.__voxelAudioAttackObserver = observer;
+  });
+}
+
+/** page内observerの完了を待ち、捕捉した最初のattack snapshotを返す。 */
+async function readObservedActionAttack(page) {
+  await page.waitForFunction(() => (
+    window.__voxelAudioAttackObserver?.captured !== null
+    || window.__voxelAudioAttackObserver?.running === false
+  ), undefined, { polling: 'raf', timeout: 2_500 });
+  return page.evaluate(() => window.__voxelAudioAttackObserver?.captured ?? null);
+}
+
 /** 指定viewportでactual AudioContext、5車種mix、HUD配置を検証する。 */
 async function verifyViewport(browser, viewport, errors) {
   const context = await browser.newContext({
@@ -196,16 +240,9 @@ async function verifyViewport(browser, viewport, errors) {
         else await vehicleButton.click();
         await waitForFrames(page, 4);
       }
+      await armActionAttackObserver(page);
       await setPrimaryAction(page, viewport.touch, true);
-      let active = null;
-      for (let frame = 0; frame < 8; frame += 1) {
-        await waitForFrames(page, 1);
-        const sample = await readGameState(page);
-        if (sample.audio.actionAttackGain > 0) {
-          active = sample;
-          break;
-        }
-      }
+      const active = await readObservedActionAttack(page);
       assert(active, `${viewport.name}: ${vehicleId} press attack frame was not observed.`);
       assert.equal(active.audio.activeVehicleId, vehicleId);
       assert.equal(active.audio.actionKind, actionKind);
