@@ -1,7 +1,9 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { WebGLRenderer, type WebGLRendererParameters } from 'three';
 import { GameFailure, GameLoading } from './ui/GameStatus';
+
 import {
   advanceVehicleMissionManualClock,
   VehicleMissionCoordinator,
@@ -95,6 +97,17 @@ import {
 } from './scene/actionVfx/VehicleActionEffects';
 
 const INITIAL_VEHICLE_ID: VehicleId = 'fire-truck';
+
+/** R3F標準のrenderer設定を保ち、初期化失敗をDOM側で識別できる例外にする。 */
+function createGameRenderer(parameters: WebGLRendererParameters): WebGLRenderer {
+  try {
+    return new WebGLRenderer(parameters);
+  } catch (cause) {
+    const error = new Error('WebGL renderer initialization failed', { cause });
+    error.name = 'WebGLInitializationError';
+    throw error;
+  }
+}
 const WORLD_DECORATION_BOX_COUNT = flattenDecorationBoxes(
   PRODUCTION_WORLD_MAP.decorationClusters,
 ).length;
@@ -314,7 +327,9 @@ export function VoxelGameApp(): ReactElement {
     const handleInitializationFailure = (event: PromiseRejectionEvent): void => {
       const cause: unknown = event.reason;
       const error = new Error('Game initialization failed', { cause });
-      if (cause instanceof Error && /WebGL|GL context/i.test(cause.message)) error.name = 'WebGLInitializationError';
+      if (cause instanceof Error && (cause.name === 'WebGLInitializationError' || /WebGL|GL context/i.test(cause.message))) {
+        error.name = 'WebGLInitializationError';
+      }
       setSceneError(error);
     };
     window.addEventListener('unhandledrejection', handleInitializationFailure);
@@ -701,7 +716,7 @@ export function VoxelGameApp(): ReactElement {
   return (
     <main className="voxel-game-shell">
       <section className="voxel-game-canvas" aria-label="純ボクセル働く車の箱庭">
-        <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<GameFailure reason="webgl" />}
+        <Canvas dpr={[1, 1.5]} gl={createGameRenderer} fallback={<GameFailure reason="webgl" />}
           onCreated={({ gl }) => {
             canvasRef.current = gl.domElement;
             gl.domElement.addEventListener('webglcontextlost', handleContextLoss);

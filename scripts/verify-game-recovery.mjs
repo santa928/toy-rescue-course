@@ -16,6 +16,9 @@ async function ready(page) {
 /** DOMエラーと操作系の破棄を確認し、実画面を保存する。 */
 async function failure(page, name) {
   await page.getByRole('alert').waitFor({ timeout: 30000 });
+  if (name.startsWith('webgl')) {
+    assert.equal(await page.getByRole('alert').innerText(), '3Dのがめんを ひらけませんでした');
+  }
   assert.equal(await page.locator('.primary-action-button').count(), 0);
   assert.equal(await page.evaluate(() => typeof window.render_game_to_text), 'undefined');
   assert(await page.getByRole('button', { name: 'もういちど ひらく' }).isVisible());
@@ -38,10 +41,21 @@ try {
         return /webgl/.test(type) ? null : getContext.call(this, type, ...args);
       };
     });
+    if (kind === 'context') await page.addInitScript(() => {
+      const NativeAudioContext = window.AudioContext;
+      window.recoveryAudioContexts = [];
+      window.AudioContext = class extends NativeAudioContext {
+        constructor(...args) {
+          super(...args);
+          window.recoveryAudioContexts.push(this);
+        }
+      };
+    });
     await page.goto(url);
     if (kind === 'context') {
       await ready(page);
       await page.locator('.audio-toggle-button').click();
+      await page.waitForFunction(() => window.recoveryAudioContexts.some(context => context.state === 'running'));
       await page.keyboard.down('Space');
       await page.evaluate(() => {
         const gl = document.querySelector('canvas').getContext('webgl2');
@@ -49,6 +63,11 @@ try {
       });
     }
     await failure(page, kind);
+    if (kind === 'context') {
+      await page.waitForFunction(() => window.recoveryAudioContexts.length > 0
+        && window.recoveryAudioContexts.every(context => context.state === 'closed'));
+      report.at(-1).audioContextsClosed = true;
+    }
     if (kind === 'module' || kind === 'scene') await page.unrouteAll();
     await page.getByRole('button', { name: 'もういちど ひらく' }).click();
     assert.equal(page.url(), url);

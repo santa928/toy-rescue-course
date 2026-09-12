@@ -66,9 +66,13 @@ try {
         await hold(page, vehicle, 1, id);
       } else if (vehicle === 'police') {
         const targets = initial.mission.targetPositions;
-        await move(page, 0, targets[0][0], `${id} side road`);
+        // シャワー側は車庫の道具棚から車幅を離して南側道路へ出る。
+        await move(page, 0, id === 'patrol-showers' ? 14 : targets[0][0], `${id} side road`);
         await move(page, 2, 17, `${id} gate staging`);
         for (const [index, target] of targets.entries()) {
+          if (id === 'patrol-showers' && index === 2) {
+            await move(page, 2, 30, `${id} clear shower posts`);
+          }
           await move(page, 0, target[0], `${id} gate ${index + 1} longitude`);
           await page.screenshot({ path: `${output}/${id}-before-${index + 1}.png` });
           await page.keyboard.down('Space');
