@@ -12,7 +12,7 @@ const cases = [
   ['excavator', 5376, 'soil-south'], ['excavator', 10752, 'soil-west'],
   ['police', 5376, 'patrol-pools'], ['police', 10752, 'patrol-showers'],
   ['bulldozer', 5376, 'debris-south'],
-].filter(([, , id]) => !process.env.JOB_FILTER || id === process.env.JOB_FILTER);
+].filter(([, , id]) => !process.env.JOB_FILTER || process.env.JOB_FILTER.split(',').includes(id));
 const harness = createDriveHarness({ alignAttemptLimit: 45, brakeFrameLimit: 220, defaultMaxBursts: 480 });
 const { readGameState: state, driveToCoordinate, driveAlongWorldAxis, brakeVehicle, pulseWorldAxis } = harness;
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
@@ -80,10 +80,10 @@ try {
       } else {
         const targets = [...initial.mission.targetPositions].sort((a, b) => b[0] - a[0] || a[2] - b[2]);
         await move(page, 0, -13, `${id} west staging`);
-        if (id === 'soil-west') await move(page, 0, -27, `${id} west lane`);
+        if (id === 'soil-west') await move(page, 0, -37, `${id} west lane`);
         for (const [index, target] of targets.entries()) {
           console.log('[jobs] target', id, index + 1, target);
-          if (id === 'soil-west') await move(page, 0, -27, `${id} clear lane`);
+          if (id === 'soil-west') await move(page, 0, -37, `${id} clear lane`);
           await move(page, 2, target[2], `${id} target latitude`, 0.3);
           if (vehicle === 'bulldozer') {
             await move(page, 0, target[0] + 4, `${id} blade staging`);
@@ -93,9 +93,10 @@ try {
                 predicate: s => s.bulldozer.clearedCount >= index + 1 });
             } finally { await page.keyboard.up('Space'); }
           } else {
-            await move(page, 0, target[0] + 2.6, `${id} bucket staging`, 0.35);
-            if ((await state(page)).vehicle.forward[0] > -0.8) {
-              await pulseWorldAxis(page, { axis: 'negativeX', frameCount: 4, description: `${id} face target` });
+            const direction = id === 'soil-west' ? 1 : -1;
+            await move(page, 0, target[0] - direction * 2.6, `${id} bucket staging`, 0.35);
+            if ((await state(page)).vehicle.forward[0] * direction < 0.8) {
+              await pulseWorldAxis(page, { axis: direction > 0 ? 'positiveX' : 'negativeX', frameCount: 4, description: `${id} face target` });
             }
             await hold(page, vehicle, index + 1, id);
           }
