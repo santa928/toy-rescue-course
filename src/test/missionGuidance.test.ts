@@ -8,19 +8,19 @@ const BLOCK_IDS = ['block-a'] as const;
 describe('buildMissionGuidance', () => {
   it.each([
     {
-      instructionLabel: 'ブレードをおしながら がれきにぶつかる',
+      instructionLabel: '「ブレード」をおしながら がれきにぶつかる',
       targetLabel: 'つぎの がれき',
       targetPosition: [-29.5, 0.8, 12.5],
       vehicleId: 'bulldozer',
     },
     {
-      instructionLabel: 'つちのまえで とまり バケットをおす',
+      instructionLabel: 'つちのまえで とまって「バケット」をおしつづける',
       targetLabel: 'つぎの つち',
       targetPosition: [-29.5, 0.65, 12.5],
       vehicleId: 'excavator',
     },
     {
-      instructionLabel: 'あおいゲートを サイレンでとおる',
+      instructionLabel: '「サイレン」をおしながら あおいゲートをとおる',
       targetLabel: 'つぎの ゲート',
       targetPosition: [0, 0.7, 17],
       vehicleId: 'police',

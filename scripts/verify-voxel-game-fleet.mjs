@@ -15,6 +15,7 @@ const allViewports = [
   { height: 720, name: 'desktop', touch: false, width: 1_280 },
   { height: 768, name: 'tablet', touch: true, width: 1_024 },
   { height: 390, name: 'mobile-landscape', touch: true, width: 844 },
+  { height: 844, name: 'mobile-portrait', touch: true, width: 390 },
 ];
 const viewportFilter = process.env.VOXEL_GAME_FLEET_VIEWPORT || null;
 const viewports = viewportFilter === null
@@ -376,7 +377,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(selected.mission.progress.target, 3);
     assert.deepEqual(selected.mission.guidance, {
       completionLabel: 'クリア 0/3',
-      instructionLabel: 'つちのまえで とまり バケットをおす',
+      instructionLabel: 'つちのまえで とまって「バケット」をおしつづける',
       targetLabel: 'つぎの つち',
       targetPosition: [-29.5, 0.65, 12.5],
     });
@@ -443,7 +444,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
           digReady.excavator.contactPoint[0] - target.position[0],
           digReady.excavator.contactPoint[2] - target.position[2],
         ) <= 2.55,
-        `${viewport.name}: excavator stopped outside the actual soil contact radius.`,
+        `${viewport.name}: excavator stopped outside the actual soil contact radius: ${JSON.stringify({ vehicle: digReady.vehicle, contact: digReady.excavator.contactPoint, target })}`,
       );
       completed = await digTarget(page, viewport, index + 1);
       assert.equal(
@@ -535,7 +536,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(ambulanceSelected.mission.progress.target, 1);
     assert.deepEqual(ambulanceSelected.mission.guidance, {
       completionLabel: 'クリア 0/1',
-      instructionLabel: 'ひとのそばで とまり てあてをおす',
+      instructionLabel: 'ひとのそばで とまって「てあて」をおしつづける',
       targetLabel: 'けがをした ひと',
       targetPosition: [-4, 0.7, -24],
     });
@@ -717,7 +718,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     assert.equal(policeSelected.mission.progress.target, 3);
     assert.deepEqual(policeSelected.mission.guidance, {
       completionLabel: 'クリア 0/3',
-      instructionLabel: 'あおいゲートを サイレンでとおる',
+      instructionLabel: '「サイレン」をおしながら あおいゲートをとおる',
       targetLabel: 'つぎの ゲート',
       targetPosition: [0, 0.7, 17],
     });

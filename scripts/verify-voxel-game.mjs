@@ -2135,7 +2135,7 @@ async function verifyCompleteMission(
       assert.equal(initial.mission.jobCycle, cycleIndex,
         `${name}: cycle ${cycleIndex} did not start with the expected job cycle.`);
       assert.equal(initial.mission.guidance.instructionLabel,
-        '火のちかくで ほうすいをなが押し',
+        'ひのちかくで ひにむかって「みず」をおしつづける',
         `${name}: cycle ${cycleIndex} fire instruction is unclear.`);
       assert.equal(initial.mission.guidance.targetLabel, '火',
         `${name}: cycle ${cycleIndex} fire map target is missing.`);

@@ -9,6 +9,7 @@ import {
   type WorldSurfaceTileDefinition,
 } from './productionWorldMap';
 import { flattenDecorationBoxes } from './worldStreetscape';
+import { createGarageCutawayBoxes } from './garageCutaway';
 import {
   WORLD_GROUND_BOX,
   WORLD_SOLID_BOXES,
@@ -78,7 +79,7 @@ export function groupWorldBoxesByColor(
 
 const ROAD_MARKING_BOXES = PRODUCTION_WORLD_MAP.roads.flatMap(buildRoadMarkingBoxes);
 const WORLD_RENDER_BOXES = [
-  ...PRODUCTION_WORLD_MAP.visualBoxes,
+  ...createGarageCutawayBoxes(PRODUCTION_WORLD_MAP.visualBoxes),
   ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),
 ] as const;
 const WORLD_VISUAL_BATCHES = groupWorldBoxesByColor(WORLD_RENDER_BOXES);

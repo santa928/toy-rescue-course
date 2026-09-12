@@ -2,6 +2,7 @@ import type { WorldPoint } from '../scene/productionWorldMap';
 import { GARAGE_POSITION } from '../scene/worldLayout';
 import type { VehicleMissionCoordinatorSnapshot } from './VehicleMissionCoordinator';
 import type { VehicleId } from './vehicleDefinitions';
+import { getVehicleDefinition } from './vehicleDefinitions';
 
 /** HUDとおしごとマップが共有する、幼児向けの具体的な任務案内。 */
 export interface VehicleMissionGuidance {
@@ -11,13 +12,17 @@ export interface VehicleMissionGuidance {
   readonly targetPosition: WorldPoint;
 }
 
-const ACTIVE_INSTRUCTIONS: Readonly<Record<VehicleId, string>> = {
-  ambulance: 'ひとのそばで とまり てあてをおす',
-  bulldozer: 'ブレードをおしながら がれきにぶつかる',
-  excavator: 'つちのまえで とまり バケットをおす',
-  'fire-truck': '火のちかくで ほうすいをなが押し',
-  police: 'あおいゲートを サイレンでとおる',
-};
+/** ボタンと同じregistryの道具名を使い、実際の停止・保持・移動条件を案内する。 */
+function getActiveInstruction(vehicleId: VehicleId): string {
+  const action = `「${getVehicleDefinition(vehicleId).action.label}」`;
+  switch (vehicleId) {
+    case 'ambulance': return `ひとのそばで とまって${action}をおしつづける`;
+    case 'bulldozer': return `${action}をおしながら がれきにぶつかる`;
+    case 'excavator': return `つちのまえで とまって${action}をおしつづける`;
+    case 'fire-truck': return `ひのちかくで ひにむかって${action}をおしつづける`;
+    case 'police': return `${action}をおしながら あおいゲートをとおる`;
+  }
+}
 
 const ACTIVE_TARGET_LABELS: Readonly<Record<VehicleId, string>> = {
   ambulance: 'けがをした ひと',
@@ -90,7 +95,7 @@ export function buildMissionGuidance(
 
   return {
     completionLabel,
-    instructionLabel: ACTIVE_INSTRUCTIONS[selectedVehicleId],
+    instructionLabel: getActiveInstruction(selectedVehicleId),
     targetLabel: ACTIVE_TARGET_LABELS[selectedVehicleId],
     targetPosition: resolveActiveTargetPosition(snapshot),
   };

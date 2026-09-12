@@ -1,3 +1,5 @@
+import { isNativeActivationTarget, isNativeKeyboardEvent } from './keyboardFocus';
+
 /** fullscreen制御に必要なDocument APIの最小契約。 */
 export interface FullscreenDocumentTarget {
   readonly documentElement: {
@@ -52,7 +54,8 @@ export function bindFullscreenControls({
   /** 対応する初回keydownだけでbrowser fullscreen APIを呼ぶ。 */
   const handleKeyDown = (event: Event): void => {
     const keyboardEvent = event as KeyboardEvent;
-    if (keyboardEvent.code !== 'KeyF' || keyboardEvent.repeat || !isFullscreenAvailable(documentTarget)) return;
+    if (keyboardEvent.code !== 'KeyF' || keyboardEvent.repeat || isNativeKeyboardEvent(keyboardEvent) || isNativeActivationTarget(keyboardEvent)
+      || !isFullscreenAvailable(documentTarget)) return;
     keyboardEvent.preventDefault();
     void toggleFullscreen(documentTarget);
   };

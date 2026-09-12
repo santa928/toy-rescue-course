@@ -19,6 +19,7 @@ function createControls(): VoxelGameControls {
     reset: vi.fn(),
     setPrimaryAction: vi.fn(),
     setTouchStick: vi.fn(),
+    subscribeReset: () => () => undefined,
   };
 }
 
@@ -96,28 +97,28 @@ const audioOff = {
 
 const policeGuidance = {
   completionLabel: 'クリア 0/3',
-  instructionLabel: 'あおいゲートを サイレンでとおる',
+  instructionLabel: '「サイレン」をおしながら あおいゲートをとおる',
   targetLabel: 'つぎの ゲート',
   targetPosition: [0, 0.7, 17] as const,
 };
 
 const bulldozerGuidance = {
   completionLabel: 'クリア 0/3',
-  instructionLabel: 'ブレードをおしながら がれきにぶつかる',
+  instructionLabel: '「ブレード」をおしながら がれきにぶつかる',
   targetLabel: 'つぎの がれき',
   targetPosition: [-29.5, 0.8, 12.5] as const,
 };
 
 const excavatorGuidance = {
   completionLabel: 'クリア 0/3',
-  instructionLabel: 'つちのまえで とまり バケットをおす',
+  instructionLabel: 'つちのまえで とまって「バケット」をおしつづける',
   targetLabel: 'つぎの つち',
   targetPosition: [-29.5, 0.65, 12.5] as const,
 };
 
 const ambulanceGuidance = {
   completionLabel: 'クリア 0/1',
-  instructionLabel: 'ひとのそばで とまり てあてをおす',
+  instructionLabel: 'ひとのそばで とまって「てあて」をおしつづける',
   targetLabel: 'けがをした ひと',
   targetPosition: [-4, 0.7, -24] as const,
 };
@@ -160,9 +161,9 @@ describe('VoxelGameHud', () => {
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="ブレードを動かす"');
     expect(html).toContain('きたのがれきをかたづけよう');
-    expect(html).toContain('ブレードをおしながら がれきにぶつかる');
+    expect(html).toContain('「ブレード」をおしながら がれきにぶつかる');
     expect(html).toContain('1しゅうめ・クリア 0/3');
-    expect(html).toContain('aria-label="きたのがれきをかたづけよう。ブレードをおしながら がれきにぶつかる。1しゅうめ・クリア 0/3"');
+    expect(html).toContain('aria-label="きたのがれきをかたづけよう。「ブレード」をおしながら がれきにぶつかる。1しゅうめ・クリア 0/3"');
     expect(html).toContain('class="touch-drive-surface"');
     expect(html).toContain('aria-label="画面をスライドして運転"');
     expect(html).toContain('class="touch-joystick__label">どこでも');
@@ -187,10 +188,10 @@ describe('VoxelGameHud', () => {
 
     expect(html).toContain('aria-label="サイレンを鳴らす"');
     expect(html).toContain('まんなかを みまわろう');
-    expect(html).toContain('あおいゲートを サイレンでとおる');
+    expect(html).toContain('「サイレン」をおしながら あおいゲートをとおる');
     expect(html).toContain('1しゅうめ・クリア 0/3');
     expect(html).toContain('data-vehicle="police"');
-    expect(html).toContain('あおいゲートを サイレンでとおる');
+    expect(html).toContain('「サイレン」をおしながら あおいゲートをとおる');
     expect(html).toContain('クリア 0/3');
     expect(html).toContain('aria-label="おしごとマップ。つぎの ゲート"');
     expect(html).toContain('class="mission-map__target"');
@@ -215,7 +216,7 @@ describe('VoxelGameHud', () => {
 
     expect(html).toContain('aria-label="手当てをする"');
     expect(html).toContain('いけのそばで てあてしよう');
-    expect(html).toContain('ひとのそばで とまり てあてをおす');
+    expect(html).toContain('ひとのそばで とまって「てあて」をおしつづける');
     expect(html).toContain('1しゅうめ・クリア 0/1');
     expect(html).toContain('data-vehicle="ambulance"');
   });
@@ -239,7 +240,7 @@ describe('VoxelGameHud', () => {
 
     expect(html).toContain('aria-label="バケットを動かす"');
     expect(html).toContain('きたのつちをほろう');
-    expect(html).toContain('つちのまえで とまり バケットをおす');
+    expect(html).toContain('つちのまえで とまって「バケット」をおしつづける');
     expect(html).toContain('1しゅうめ・クリア 0/3');
     expect(html).toContain('data-vehicle="excavator"');
   });

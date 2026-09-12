@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { GameFailure, GameLoading } from './ui/GameStatus';
 import {
   advanceVehicleMissionManualClock,
   VehicleMissionCoordinator,
@@ -169,7 +170,10 @@ function getActionTargetRuntime(
 
 /** 運転可能な箱庭Canvas、入力、段階的な自動検証hookを構成する。 */
 export function VoxelGameApp(): ReactElement {
-  const controls = useVoxelGameControls();
+  const [sceneReady, setSceneReady] = useState(false);
+  const [sceneError, setSceneError] = useState<Error | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const controls = useVoxelGameControls(sceneReady);
   const breakablePoolHandleRef = useRef<BreakablePoolHandle>(null);
   const breakableTelemetryRef = useRef<BreakableTelemetry>({
     activeFragments: [],
@@ -303,6 +307,46 @@ export function VoxelGameApp(): ReactElement {
     telemetryRef,
   });
   const physicalGpuProbeEnabled = isPhysicalGpuProbeEnabled(window.location.search);
+
+  useEffect(() => {
+    if (sceneReady) return;
+    /** R3Fの非同期configureでrejectした初期化失敗もDOM側へ通知する。 */
+    const handleInitializationFailure = (event: PromiseRejectionEvent): void => {
+      const cause: unknown = event.reason;
+      const error = new Error('Game initialization failed', { cause });
+      if (cause instanceof Error && /WebGL|GL context/i.test(cause.message)) error.name = 'WebGLInitializationError';
+      setSceneError(error);
+    };
+    window.addEventListener('unhandledrejection', handleInitializationFailure);
+    return () => window.removeEventListener('unhandledrejection', handleInitializationFailure);
+  }, [sceneReady]);
+
+  /** context lossで操作可能なまま止まった画面を残さない。 */
+  const handleContextLoss = useCallback((event: Event): void => {
+    if (event.target !== canvasRef.current || !canvasRef.current?.isConnected) return;
+    event.preventDefault();
+    const error = new Error('WebGL context was lost');
+    error.name = 'WebGLContextLostError';
+    setSceneError(error);
+  }, []);
+
+  useEffect(() => () => {
+    canvasRef.current?.removeEventListener('webglcontextlost', handleContextLoss);
+  }, [handleContextLoss]);
+
+  useEffect(() => {
+    let frame = 0;
+    /** physicsの車体handleと複数描画frameの両方がそろってから入力を開放する。 */
+    const checkReady = (): void => {
+      if (controllerRef.current && renderTelemetryRef.current.renderedFrames >= 3
+        && renderTelemetryRef.current.rendererCalls > 0) {
+        controls.reset();
+        setSceneReady(true);
+      } else frame = requestAnimationFrame(checkReady);
+    };
+    frame = requestAnimationFrame(checkReady);
+    return () => cancelAnimationFrame(frame);
+  }, [controls.reset]);
 
   /** 実際の車庫・速度条件を再確認し、成功時だけ車体と入力を選択車両へ同期する。 */
   const handleSelectVehicle = useCallback((vehicleId: VehicleId): boolean => {
@@ -652,11 +696,17 @@ export function VoxelGameApp(): ReactElement {
   }, [colorEffectRuntime, controls.commandRef, coordinator, handleSelectVehicle]);
 
   const missionGuidance = buildMissionGuidance(coordinatorSnapshot);
+  if (sceneError) throw sceneError;
 
   return (
     <main className="voxel-game-shell">
       <section className="voxel-game-canvas" aria-label="純ボクセル働く車の箱庭">
-        <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}>
+        <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<GameFailure reason="webgl" />}
+          onCreated={({ gl }) => {
+            canvasRef.current = gl.domElement;
+            gl.domElement.addEventListener('webglcontextlost', handleContextLoss);
+          }}>
+          <Suspense fallback={null}>
           <VoxelGameScene
             actionTargetJob={getActionTargetMissionJob(coordinatorSnapshot)}
             actionTargetMissionSnapshotRef={actionTargetMissionSnapshotRef}
@@ -679,6 +729,7 @@ export function VoxelGameApp(): ReactElement {
             manualClockRef={manualClockRef}
             missionTelemetryRef={missionTelemetryRef}
             onVehicleSwitchAvailabilityChange={handleVehicleSwitchAvailabilityChange}
+            onVehicleReset={controls.reset}
             paintColor={colorEffectSnapshot.active
               && colorEffectSnapshot.vehicleId === coordinatorSnapshot.selectedVehicleId
               ? colorEffectSnapshot.colorHex
@@ -688,9 +739,13 @@ export function VoxelGameApp(): ReactElement {
             vehicleActionVfxTelemetryRef={vehicleActionVfxTelemetryRef}
             vehicleId={coordinatorSnapshot.selectedVehicleId}
           />
+          </Suspense>
         </Canvas>
       </section>
-      <VoxelGameHud
+      {sceneReady ? <VoxelGameHud
+        actionHold={coordinatorSnapshot.selectedVehicleId === 'ambulance' || coordinatorSnapshot.selectedVehicleId === 'excavator'
+          ? { telemetryRef: actionTargetMissionTelemetryRef, requiredMilliseconds: getActionTargetMissionJob(coordinatorSnapshot).interaction.holdDurationMs }
+          : undefined}
         audio={audioState}
         canSwitchVehicle={vehicleSwitchAvailable}
         colorEffect={colorEffectSnapshot}
@@ -704,7 +759,7 @@ export function VoxelGameApp(): ReactElement {
         onToggleFullscreen={handleToggleFullscreen}
         selectedVehicleId={coordinatorSnapshot.selectedVehicleId}
         telemetryRef={telemetryRef}
-      />
+      /> : <GameLoading />}
       <PhysicalGpuProbe
         enabled={physicalGpuProbeEnabled}
         renderTelemetryRef={renderTelemetryRef}

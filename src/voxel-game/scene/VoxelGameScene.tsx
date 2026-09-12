@@ -86,6 +86,7 @@ interface VoxelGameSceneProps {
   readonly manualClockRef: React.MutableRefObject<boolean>;
   readonly missionTelemetryRef: MissionTelemetryRef;
   readonly onVehicleSwitchAvailabilityChange: (available: boolean) => void;
+  readonly onVehicleReset: () => void;
   readonly paintColor: string | null;
   readonly renderTelemetryRef: VoxelGameRenderTelemetryRef;
   readonly telemetryRef: VehicleTelemetryRef;
@@ -285,6 +286,7 @@ export function VoxelGameScene({
   missionTelemetryRef,
   renderTelemetryRef,
   onVehicleSwitchAvailabilityChange,
+  onVehicleReset,
   paintColor,
   telemetryRef,
   vehicleActionVfxTelemetryRef,
@@ -366,6 +368,7 @@ export function VoxelGameScene({
         </RigidBody>
         <VehicleController
           commandRef={commandRef}
+          onReset={onVehicleReset}
           key={vehicleId}
           paintColor={paintColor}
           ref={controllerRef}
