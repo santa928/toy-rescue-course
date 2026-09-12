@@ -11,6 +11,7 @@ const report = [];
 /** ゲーム操作が可能な状態を待つ。 */
 async function ready(page) {
   await page.locator('.primary-action-button').waitFor({ timeout: 30000 });
+  assert.equal(await page.getByRole('alert').count(), 0, 'ready game must not expose a fallback error');
 }
 
 /** DOMエラーと操作系の破棄を確認し、実画面を保存する。 */

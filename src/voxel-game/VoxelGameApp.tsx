@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { WebGLRenderer, type WebGLRendererParameters } from 'three';
-import { GameFailure, GameLoading } from './ui/GameStatus';
+import { GameLoading } from './ui/GameStatus';
 
 import {
   advanceVehicleMissionManualClock,
@@ -716,7 +716,7 @@ export function VoxelGameApp(): ReactElement {
   return (
     <main className="voxel-game-shell">
       <section className="voxel-game-canvas" aria-label="純ボクセル働く車の箱庭">
-        <Canvas dpr={[1, 1.5]} gl={createGameRenderer} fallback={<GameFailure reason="webgl" />}
+        <Canvas dpr={[1, 1.5]} gl={createGameRenderer}
           onCreated={({ gl }) => {
             canvasRef.current = gl.domElement;
             gl.domElement.addEventListener('webglcontextlost', handleContextLoss);
