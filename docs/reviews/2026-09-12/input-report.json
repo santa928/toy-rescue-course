@@ -1,0 +1,15 @@
+{
+  "layouts": [],
+  "input": [
+    "vehicle/audio native Space and Enter",
+    "primary keyboard holding and mixed input release orders",
+    "alias keys and focus-change keyup",
+    "native fullscreen Enter/Space",
+    "editable text and modifier/IME event exclusion",
+    "reset clears key ownership and blocks autorepeat revival",
+    "real pointer capture ownership released by reset; blur clears mixed input",
+    "portrait/landscape reflow in the same running scene"
+  ],
+  "faults": [],
+  "errors": []
+}

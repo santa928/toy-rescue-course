@@ -1,0 +1,37 @@
+[
+  {
+    "name": "module",
+    "message": "あそびばを ひらけませんでした",
+    "controlsRemoved": true
+  },
+  {
+    "name": "scene",
+    "message": "あそびばを ひらけませんでした",
+    "controlsRemoved": true
+  },
+  {
+    "name": "webgl",
+    "message": "3Dのがめんを ひらけませんでした",
+    "controlsRemoved": true
+  },
+  {
+    "name": "webgl-retry",
+    "message": "3Dのがめんを ひらけませんでした",
+    "controlsRemoved": true
+  },
+  {
+    "name": "context",
+    "message": "がめんが とまってしまいました",
+    "controlsRemoved": true,
+    "audioContextsClosed": true
+  },
+  {
+    "name": "slow",
+    "delayedMessage": true,
+    "recovered": true
+  },
+  {
+    "name": "no-javascript",
+    "readableFallback": true
+  }
+]

@@ -1,0 +1,214 @@
+{
+  "generatedAt": "2026-09-12T05:57:29.868Z",
+  "note": "Docker renderer measurements are diagnostic only and are not physical GPU certification.",
+  "results": {
+    "mobile-portrait": {
+      "completedPhase": "celebrating",
+      "completedSecondJob": "debris-west",
+      "layout": {
+        "action": {
+          "bottom": 820,
+          "left": 280,
+          "right": 368,
+          "top": 714.484375
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 280,
+          "right": 376,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 826,
+          "left": 18,
+          "right": 130,
+          "top": 714
+        },
+        "mission": {
+          "bottom": 111.90625,
+          "left": 14,
+          "right": 270,
+          "top": 12
+        },
+        "selector": {
+          "bottom": 282.53125,
+          "left": 14,
+          "right": 376,
+          "top": 127.03125
+        }
+      },
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+      "returnedVehicle": "fire-truck",
+      "returnedWaterCubeCount": 10,
+      "restartedMission": {
+        "direction": [
+          0.6187871258451787,
+          0,
+          0.7855587138389231
+        ],
+        "distance": 35.23482812173698,
+        "nozzleOrigin": [
+          0.7195776674837093,
+          2.198873722553253,
+          7.469424842517869
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            2.575939045019245,
+            2.198873722553253,
+            9.826100984034639
+          ],
+          "end": [
+            4.432300422554782,
+            2.198873722553253,
+            12.182777125551407
+          ],
+          "start": [
+            0.7195776674837093,
+            2.198873722553253,
+            7.469424842517869
+          ]
+        },
+        "destinationDistrict": "blocks",
+        "id": "debris-clearance",
+        "guidance": {
+          "completionLabel": "クリア 0/3",
+          "instructionLabel": "「ブレード」をおしながら がれきにぶつかる",
+          "targetLabel": "つぎの がれき",
+          "targetPosition": [
+            -32,
+            0.8,
+            -6
+          ]
+        },
+        "jobCycle": 2,
+        "jobId": "debris-west",
+        "jobLabel": "にしのみちをかたづけよう",
+        "jobSeed": 1,
+        "targetPositions": [
+          [
+            -32,
+            0.8,
+            -6
+          ],
+          [
+            -32,
+            0.8,
+            2
+          ],
+          [
+            -32,
+            0.8,
+            10
+          ]
+        ],
+        "objectiveLabel": "にしのみちをかたづけよう",
+        "phase": "assigned",
+        "progress": {
+          "current": 0,
+          "target": 3
+        },
+        "routeVisible": true,
+        "vehicleId": "bulldozer"
+      },
+      "restartedThirdMission": {
+        "direction": [
+          0.7147244388360147,
+          0,
+          0.6994061599175002
+        ],
+        "distance": 34.431540151742375,
+        "nozzleOrigin": [
+          1.5022325333602446,
+          2.198873722553253,
+          7.1362551431854335
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            3.6464058498682888,
+            2.198873722553253,
+            9.234473622937934
+          ],
+          "end": [
+            5.790579166376332,
+            2.198873722553253,
+            11.332692102690434
+          ],
+          "start": [
+            1.5022325333602446,
+            2.198873722553253,
+            7.1362551431854335
+          ]
+        },
+        "destinationDistrict": "blocks",
+        "id": "debris-clearance",
+        "guidance": {
+          "completionLabel": "クリア 0/3",
+          "instructionLabel": "「ブレード」をおしながら がれきにぶつかる",
+          "targetLabel": "つぎの がれき",
+          "targetPosition": [
+            -29.5,
+            0.8,
+            -6.5
+          ]
+        },
+        "jobCycle": 3,
+        "jobId": "debris-south",
+        "jobLabel": "みなみのがれきをかたづけよう",
+        "jobSeed": 1,
+        "targetPositions": [
+          [
+            -29.5,
+            0.8,
+            -6.5
+          ],
+          [
+            -24,
+            0.8,
+            -7
+          ],
+          [
+            -18.5,
+            0.8,
+            -6
+          ]
+        ],
+        "objectiveLabel": "みなみのがれきをかたづけよう",
+        "phase": "assigned",
+        "progress": {
+          "current": 0,
+          "target": 3
+        },
+        "routeVisible": true,
+        "vehicleId": "bulldozer"
+      },
+      "selectedVehicle": "bulldozer"
+    }
+  },
+  "screenshots": [
+    "mobile-portrait-bulldozer.png",
+    "mobile-portrait-worksite.png",
+    "mobile-portrait-blade-action.png",
+    "mobile-portrait-debris-impact.png",
+    "mobile-portrait-next-target.png",
+    "mobile-portrait-cycle-2-worksite.png"
+  ],
+  "viewports": [
+    {
+      "height": 844,
+      "name": "mobile-portrait",
+      "touch": true,
+      "width": 390
+    }
+  ]
+}

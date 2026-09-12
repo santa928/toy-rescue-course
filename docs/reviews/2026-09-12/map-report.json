@@ -1,0 +1,98 @@
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "generatedAt": "2026-09-12T06:52:03.506Z",
+  "results": [
+    {
+      "construction": {
+        "collisionPosition": [
+          -33.17833709716797,
+          -0.0011265873908996582,
+          -37.36366653442383
+        ],
+        "durationSeconds": 51.144,
+        "projection": [
+          1233.8073474550308,
+          386.5664478277015
+        ],
+        "routeDistanceUnits": 55
+      },
+      "exits": {
+        "construction": "blocks",
+        "town": "south"
+      },
+      "hud": {
+        "action": {
+          "bottom": 696,
+          "height": 116,
+          "left": 1142,
+          "right": 1258,
+          "top": 580,
+          "width": 116
+        },
+        "audio": {
+          "bottom": 112,
+          "height": 44,
+          "left": 1154,
+          "right": 1266,
+          "top": 68,
+          "width": 112
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "height": 44,
+          "left": 1154,
+          "right": 1266,
+          "top": 12,
+          "width": 112
+        },
+        "joystick": {
+          "bottom": 702,
+          "height": 154,
+          "left": 18,
+          "right": 172,
+          "top": 548,
+          "width": 154
+        },
+        "mission": {
+          "bottom": 102.09375,
+          "height": 90.09375,
+          "left": 499,
+          "right": 1019,
+          "top": 12,
+          "width": 520
+        },
+        "selector": {
+          "bottom": 167.5,
+          "height": 155.5,
+          "left": 14,
+          "right": 364,
+          "top": 12,
+          "width": 350
+        }
+      },
+      "rendererCalls": 34,
+      "town": {
+        "collisionPosition": [
+          20.18730926513672,
+          -0.0011268854141235352,
+          24.42621612548828
+        ],
+        "durationSeconds": 13.546,
+        "projection": [
+          900.851431807476,
+          373.0639693345387
+        ],
+        "routeDistanceUnits": 55
+      },
+      "timingMode": "docker-software-wall-clock-reference",
+      "viewport": {
+        "height": 720,
+        "name": "desktop",
+        "touch": false,
+        "width": 1280
+      },
+      "worldSolidCount": 40
+    }
+  ],
+  "status": "completed"
+}

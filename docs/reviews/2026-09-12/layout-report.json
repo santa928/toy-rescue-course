@@ -1,0 +1,2251 @@
+{
+  "layouts": [
+    {
+      "viewport": [
+        1469,
+        745
+      ],
+      "id": "fire-truck",
+      "boxes": {
+        "vehicle": {
+          "x": 516.2794363043861,
+          "y": 273.2764450736355,
+          "width": 308.67733131651244,
+          "height": 289.4927374066518
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 593.5,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1343,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1343,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1343,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 573,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1331,
+          "y": 605,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 37,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1469,
+        745
+      ],
+      "id": "bulldozer",
+      "boxes": {
+        "vehicle": {
+          "x": 507.5914981713054,
+          "y": 272.0312552641304,
+          "width": 326.05320758267374,
+          "height": 293.1779635525574
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 593.5,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1343,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1343,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1343,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 573,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1331,
+          "y": 605,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 137,
+        "rendererCalls": 33
+      }
+    },
+    {
+      "viewport": [
+        1469,
+        745
+      ],
+      "id": "excavator",
+      "boxes": {
+        "vehicle": {
+          "x": 509.3801913163514,
+          "y": 254.18206259761826,
+          "width": 337.8074768215476,
+          "height": 316.16844259924324
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 593.5,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1343,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1343,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1343,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 573,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1331,
+          "y": 605,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 236,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1469,
+        745
+      ],
+      "id": "ambulance",
+      "boxes": {
+        "vehicle": {
+          "x": 528.2892331354093,
+          "y": 279.9072151863757,
+          "width": 284.6577376544659,
+          "height": 276.169227494532
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 593.5,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1343,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1343,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1343,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 573,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1331,
+          "y": 605,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 337,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1469,
+        745
+      ],
+      "id": "police",
+      "boxes": {
+        "vehicle": {
+          "x": 528.2892331354093,
+          "y": 288.2588235832866,
+          "width": 284.6577376544659,
+          "height": 266.6439978271161
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 593.5,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1343,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1343,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1343,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 573,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1331,
+          "y": 605,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 439,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1280,
+        720
+      ],
+      "id": "fire-truck",
+      "boxes": {
+        "vehicle": {
+          "x": 431.2481425384146,
+          "y": 265.0818078551386,
+          "width": 295.28365786135265,
+          "height": 276.93149367706536
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 499,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1154,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1154,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1154,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 548,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1142,
+          "y": 580,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 30,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1280,
+        720
+      ],
+      "id": "bulldozer",
+      "boxes": {
+        "vehicle": {
+          "x": 422.9371786582109,
+          "y": 263.89475478564776,
+          "width": 311.90558562176,
+          "height": 280.4568159019536
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 499,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1154,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1154,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1154,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 548,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1142,
+          "y": 580,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 132,
+        "rendererCalls": 33
+      }
+    },
+    {
+      "viewport": [
+        1280,
+        720
+      ],
+      "id": "excavator",
+      "boxes": {
+        "vehicle": {
+          "x": 424.6482594570763,
+          "y": 246.80372073909527,
+          "width": 323.1498308714473,
+          "height": 302.4497258443075
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 499,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1154,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1154,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1154,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 548,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1142,
+          "y": 580,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 236,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1280,
+        720
+      ],
+      "id": "ambulance",
+      "boxes": {
+        "vehicle": {
+          "x": 442.7368279022254,
+          "y": 271.4207919808577,
+          "width": 272.30628713373096,
+          "height": 264.18609794093135
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 499,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1154,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1154,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1154,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 548,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1142,
+          "y": 580,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 340,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1280,
+        720
+      ],
+      "id": "police",
+      "boxes": {
+        "vehicle": {
+          "x": 442.7368279022254,
+          "y": 279.40594630304236,
+          "width": 272.30628713373096,
+          "height": 255.07417305105332
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 350,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 499,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 1154,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 1154,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 1154,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 548,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 1142,
+          "y": 580,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 442,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1024,
+        768
+      ],
+      "id": "fire-truck",
+      "boxes": {
+        "vehicle": {
+          "x": 324.9366472097481,
+          "y": 298.9434382078515,
+          "width": 264.6048362653679,
+          "height": 248.15939043788978
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 327.671875,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 359.828125,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 898,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 898,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 898,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 596,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 886,
+          "y": 628,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 40,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1024,
+        768
+      ],
+      "id": "bulldozer",
+      "boxes": {
+        "vehicle": {
+          "x": 317.48916009631887,
+          "y": 297.88685744029266,
+          "width": 279.4998104922264,
+          "height": 251.31844541863376
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 327.671875,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 359.828125,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 898,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 898,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 898,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 596,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 886,
+          "y": 628,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 141,
+        "rendererCalls": 33
+      }
+    },
+    {
+      "viewport": [
+        1024,
+        768
+      ],
+      "id": "excavator",
+      "boxes": {
+        "vehicle": {
+          "x": 319.02246626673076,
+          "y": 282.5643731298386,
+          "width": 289.57582246921885,
+          "height": 271.02637770463934
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 327.671875,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 359.828125,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 898,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 898,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 898,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 596,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 886,
+          "y": 628,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 245,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1024,
+        768
+      ],
+      "id": "ambulance",
+      "boxes": {
+        "vehicle": {
+          "x": 335.2317029253708,
+          "y": 304.6201764373732,
+          "width": 244.01472483412243,
+          "height": 236.7381916613541
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 327.671875,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 359.828125,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 898,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 898,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 898,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 596,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 886,
+          "y": 628,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 348,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        1024,
+        768
+      ],
+      "id": "police",
+      "boxes": {
+        "vehicle": {
+          "x": 335.2317029253708,
+          "y": 311.76657897928374,
+          "width": 244.01472483412243,
+          "height": 228.5729602665283
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 327.671875,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 359.828125,
+          "y": 12,
+          "width": 520,
+          "height": 90.09375
+        },
+        "audio": {
+          "x": 898,
+          "y": 68,
+          "width": 112,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 898,
+          "y": 12,
+          "width": 112,
+          "height": 44
+        },
+        "map": {
+          "x": 898,
+          "y": 124,
+          "width": 112,
+          "height": 126.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 596,
+          "width": 154,
+          "height": 154
+        },
+        "action": {
+          "x": 886,
+          "y": 628,
+          "width": 116,
+          "height": 116
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 451,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        844,
+        390
+      ],
+      "id": "fire-truck",
+      "boxes": {
+        "vehicle": {
+          "x": 303.0521071931551,
+          "y": 140.91512103434036,
+          "width": 168.2541621904785,
+          "height": 157.79700370235383
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 270.078125,
+          "height": 122
+        },
+        "mission": {
+          "x": 296.078125,
+          "y": 12,
+          "width": 421.921875,
+          "height": 82.3125
+        },
+        "audio": {
+          "x": 730,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 730,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 730,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 260,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 722,
+          "y": 265.65625,
+          "width": 100,
+          "height": 100.34375
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 49,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        844,
+        390
+      ],
+      "id": "bulldozer",
+      "boxes": {
+        "vehicle": {
+          "x": 298.3164768003766,
+          "y": 140.2599770506372,
+          "width": 177.7254229760353,
+          "height": 159.8057506194574
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 270.078125,
+          "height": 122
+        },
+        "mission": {
+          "x": 296.078125,
+          "y": 12,
+          "width": 421.921875,
+          "height": 82.3125
+        },
+        "audio": {
+          "x": 730,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 730,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 730,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 260,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 722,
+          "y": 265.65625,
+          "width": 100,
+          "height": 100.34375
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 154,
+        "rendererCalls": 33
+      }
+    },
+    {
+      "viewport": [
+        844,
+        390
+      ],
+      "id": "excavator",
+      "boxes": {
+        "vehicle": {
+          "x": 299.29145952830163,
+          "y": 130.49436950760813,
+          "width": 184.1324523309707,
+          "height": 172.33742495349347
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 270.078125,
+          "height": 122
+        },
+        "mission": {
+          "x": 296.078125,
+          "y": 12,
+          "width": 421.921875,
+          "height": 82.3125
+        },
+        "audio": {
+          "x": 730,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 730,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 730,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 260,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 722,
+          "y": 265.65625,
+          "width": 100,
+          "height": 100.34375
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 260,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        844,
+        390
+      ],
+      "id": "ambulance",
+      "boxes": {
+        "vehicle": {
+          "x": 309.59841979493694,
+          "y": 144.5224650894357,
+          "width": 155.1615369869147,
+          "height": 150.53461100205666
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 270.078125,
+          "height": 122
+        },
+        "mission": {
+          "x": 296.078125,
+          "y": 12,
+          "width": 421.921875,
+          "height": 82.3125
+        },
+        "audio": {
+          "x": 730,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 730,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 730,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 260,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 722,
+          "y": 265.65625,
+          "width": 100,
+          "height": 100.34375
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 365,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        844,
+        390
+      ],
+      "id": "police",
+      "boxes": {
+        "vehicle": {
+          "x": 309.59841979493694,
+          "y": 149.06548445924705,
+          "width": 155.1615369869147,
+          "height": 145.34258886512941
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 270.078125,
+          "height": 122
+        },
+        "mission": {
+          "x": 296.078125,
+          "y": 12,
+          "width": 421.921875,
+          "height": 82.3125
+        },
+        "audio": {
+          "x": 730,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 730,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 730,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 260,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 722,
+          "y": 265.65625,
+          "width": 100,
+          "height": 100.34375
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 470,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        667,
+        375
+      ],
+      "id": "fire-truck",
+      "boxes": {
+        "vehicle": {
+          "x": 252.12744153624044,
+          "y": 150.5003956204154,
+          "width": 115.10310377543505,
+          "height": 107.94933484048207
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 230,
+          "height": 122
+        },
+        "mission": {
+          "x": 256,
+          "y": 12,
+          "width": 285,
+          "height": 97.90625
+        },
+        "audio": {
+          "x": 553,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 553,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 553,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 245,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 545,
+          "y": 251,
+          "width": 100,
+          "height": 100
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 45,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        667,
+        375
+      ],
+      "id": "bulldozer",
+      "boxes": {
+        "vehicle": {
+          "x": 248.88778464189872,
+          "y": 150.03844096360453,
+          "width": 121.58241756411846,
+          "height": 109.32352375710568
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 230,
+          "height": 122
+        },
+        "mission": {
+          "x": 256,
+          "y": 12,
+          "width": 285,
+          "height": 82.3125
+        },
+        "audio": {
+          "x": 553,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 553,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 553,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 245,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 545,
+          "y": 251,
+          "width": 100,
+          "height": 100
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 146,
+        "rendererCalls": 33
+      }
+    },
+    {
+      "viewport": [
+        667,
+        375
+      ],
+      "id": "excavator",
+      "boxes": {
+        "vehicle": {
+          "x": 249.55477282602791,
+          "y": 143.37629621755534,
+          "width": 125.9654827741102,
+          "height": 117.89647430151805
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 230,
+          "height": 122
+        },
+        "mission": {
+          "x": 256,
+          "y": 12,
+          "width": 285,
+          "height": 97.90625
+        },
+        "audio": {
+          "x": 553,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 553,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 553,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 245,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 545,
+          "y": 251,
+          "width": 100,
+          "height": 100
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 250,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        667,
+        375
+      ],
+      "id": "ambulance",
+      "boxes": {
+        "vehicle": {
+          "x": 256.6057907725363,
+          "y": 152.96818893810627,
+          "width": 106.14640530284328,
+          "height": 102.98111337268904
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 230,
+          "height": 122
+        },
+        "mission": {
+          "x": 256,
+          "y": 12,
+          "width": 285,
+          "height": 97.90625
+        },
+        "audio": {
+          "x": 553,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 553,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 553,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 245,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 545,
+          "y": 251,
+          "width": 100,
+          "height": 100
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 357,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        667,
+        375
+      ],
+      "id": "police",
+      "boxes": {
+        "vehicle": {
+          "x": 256.6057907725363,
+          "y": 156.07528358533273,
+          "width": 106.14640530284328,
+          "height": 99.42923771593982
+        },
+        "selector": {
+          "x": 14,
+          "y": 12,
+          "width": 230,
+          "height": 122
+        },
+        "mission": {
+          "x": 256,
+          "y": 12,
+          "width": 285,
+          "height": 97.90625
+        },
+        "audio": {
+          "x": 553,
+          "y": 66,
+          "width": 100,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 553,
+          "y": 12,
+          "width": 100,
+          "height": 44
+        },
+        "map": {
+          "x": 553,
+          "y": 120,
+          "width": 100,
+          "height": 113.796875
+        },
+        "stick": {
+          "x": 18,
+          "y": 245,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 545,
+          "y": 251,
+          "width": 100,
+          "height": 100
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 462,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "id": "fire-truck",
+      "boxes": {
+        "vehicle": {
+          "x": 59.831939992221685,
+          "y": 360.53991026629586,
+          "width": 191.19791158008917,
+          "height": 179.31477693449295
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 362,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 256,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 280,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 280,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 272,
+          "y": 573.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 714,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 280,
+          "y": 714.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 50,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "id": "bulldozer",
+      "boxes": {
+        "vehicle": {
+          "x": 54.45054181860984,
+          "y": 359.78326951429244,
+          "width": 201.9607079273128,
+          "height": 181.597443885747
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 362,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 256,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 280,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 280,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 272,
+          "y": 573.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 714,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 280,
+          "y": 714.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 156,
+        "rendererCalls": 33
+      }
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "id": "excavator",
+      "boxes": {
+        "vehicle": {
+          "x": 55.55847673670642,
+          "y": 348.6994659261249,
+          "width": 209.2414231033758,
+          "height": 195.8379829016971
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 362,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 256,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 280,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 280,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 272,
+          "y": 573.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 714,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 280,
+          "y": 714.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 261,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "id": "ambulance",
+      "boxes": {
+        "vehicle": {
+          "x": 67.27093158515557,
+          "y": 364.63916487435876,
+          "width": 176.3199283942214,
+          "height": 171.0620579568826
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 362,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 256,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 280,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 280,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 272,
+          "y": 573.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 714,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 280,
+          "y": 714.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 366,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "id": "police",
+      "boxes": {
+        "vehicle": {
+          "x": 67.27093158515557,
+          "y": 369.80168688550805,
+          "width": 176.3199283942214,
+          "height": 165.16203280128332
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 362,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 256,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 280,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 280,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 272,
+          "y": 573.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 714,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 280,
+          "y": 714.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 471,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "id": "fire-truck",
+      "boxes": {
+        "vehicle": {
+          "x": 55.22948306974309,
+          "y": 343.2676094765808,
+          "width": 176.49037992008232,
+          "height": 165.52133255491668
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 332,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 226,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 250,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 250,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 242,
+          "y": 529.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 670,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 250,
+          "y": 670.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 47,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "id": "bulldozer",
+      "boxes": {
+        "vehicle": {
+          "x": 50.262038601793705,
+          "y": 342.56917185934685,
+          "width": 186.42526885598105,
+          "height": 167.6284097406895
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 332,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 226,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 250,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 250,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 242,
+          "y": 529.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 670,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 250,
+          "y": 670.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 152,
+        "rendererCalls": 33
+      }
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "id": "excavator",
+      "boxes": {
+        "vehicle": {
+          "x": 51.284747756959774,
+          "y": 332.33918586262763,
+          "width": 193.14592901850074,
+          "height": 180.77352267848966
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 332,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 226,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 250,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 250,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 242,
+          "y": 529.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 670,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 250,
+          "y": 670.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 259,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "id": "ambulance",
+      "boxes": {
+        "vehicle": {
+          "x": 62.0962445401436,
+          "y": 347.05153680710043,
+          "width": 162.75685697928125,
+          "height": 157.90343811404534
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 332,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 226,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 250,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 250,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 242,
+          "y": 529.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 670,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 250,
+          "y": 670.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 366,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "id": "police",
+      "boxes": {
+        "vehicle": {
+          "x": 62.0962445401436,
+          "y": 351.81815905590435,
+          "width": 162.75685697928125,
+          "height": 152.4572610473386
+        },
+        "selector": {
+          "x": 14,
+          "y": 126,
+          "width": 332,
+          "height": 155.5
+        },
+        "mission": {
+          "x": 14,
+          "y": 12,
+          "width": 226,
+          "height": 99.90625
+        },
+        "audio": {
+          "x": 250,
+          "y": 68,
+          "width": 96,
+          "height": 44
+        },
+        "fullscreen": {
+          "x": 250,
+          "y": 12,
+          "width": 96,
+          "height": 44
+        },
+        "map": {
+          "x": 242,
+          "y": 529.078125,
+          "width": 104,
+          "height": 118.921875
+        },
+        "stick": {
+          "x": 18,
+          "y": 670,
+          "width": 112,
+          "height": 112
+        },
+        "action": {
+          "x": 250,
+          "y": 670.484375,
+          "width": 88,
+          "height": 105.515625
+        }
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 474,
+        "rendererCalls": 34
+      }
+    }
+  ],
+  "input": [
+    "vehicle/audio native Space and Enter",
+    "primary keyboard holding and mixed input release orders",
+    "alias keys and focus-change keyup"
+  ],
+  "faults": [],
+  "errors": []
+}

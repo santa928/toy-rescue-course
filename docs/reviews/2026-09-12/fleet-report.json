@@ -1,0 +1,321 @@
+{
+  "generatedAt": "2026-09-12T06:06:07.882Z",
+  "note": "Docker renderer measurements are diagnostic only and are not physical GPU certification.",
+  "results": [
+    {
+      "ambulance": {
+        "completedJobId": "patient-pond",
+        "layout": {
+          "boxes": {
+            "action": {
+              "bottom": 696,
+              "height": 116,
+              "left": 1142,
+              "right": 1258,
+              "top": 580,
+              "width": 116
+            },
+            "fullscreen": {
+              "bottom": 56,
+              "height": 44,
+              "left": 1154,
+              "right": 1266,
+              "top": 12,
+              "width": 112
+            },
+            "joystick": {
+              "bottom": 702,
+              "height": 154,
+              "left": 18,
+              "right": 172,
+              "top": 548,
+              "width": 154
+            },
+            "map": {
+              "bottom": 250.921875,
+              "height": 126.921875,
+              "left": 1154,
+              "right": 1266,
+              "top": 124,
+              "width": 112
+            },
+            "mission": {
+              "bottom": 102.09375,
+              "height": 90.09375,
+              "left": 499,
+              "right": 1019,
+              "top": 12,
+              "width": 520
+            },
+            "selector": {
+              "bottom": 167.5,
+              "height": 155.5,
+              "left": 14,
+              "right": 364,
+              "top": 12,
+              "width": 350
+            }
+          },
+          "buttonBoxes": [
+            {
+              "bottom": 84.75,
+              "left": 14,
+              "right": 125.328125,
+              "top": 12
+            },
+            {
+              "bottom": 84.75,
+              "left": 133.328125,
+              "right": 244.65625,
+              "top": 12
+            },
+            {
+              "bottom": 84.75,
+              "left": 252.65625,
+              "right": 364,
+              "top": 12
+            },
+            {
+              "bottom": 167.5,
+              "left": 14,
+              "right": 125.328125,
+              "top": 94.75
+            },
+            {
+              "bottom": 165.5,
+              "left": 133.328125,
+              "right": 244.65625,
+              "top": 92.75
+            }
+          ],
+          "mapBoard": {
+            "bottom": 240.921875,
+            "height": 92,
+            "left": 1164,
+            "right": 1256,
+            "top": 148.921875,
+            "width": 92
+          }
+        },
+        "nextJobId": "patient-picnic"
+      },
+      "completedJobId": "soil-north",
+      "layout": {
+        "boxes": {
+          "action": {
+            "bottom": 696,
+            "height": 116,
+            "left": 1142,
+            "right": 1258,
+            "top": 580,
+            "width": 116
+          },
+          "fullscreen": {
+            "bottom": 56,
+            "height": 44,
+            "left": 1154,
+            "right": 1266,
+            "top": 12,
+            "width": 112
+          },
+          "joystick": {
+            "bottom": 702,
+            "height": 154,
+            "left": 18,
+            "right": 172,
+            "top": 548,
+            "width": 154
+          },
+          "map": {
+            "bottom": 250.921875,
+            "height": 126.921875,
+            "left": 1154,
+            "right": 1266,
+            "top": 124,
+            "width": 112
+          },
+          "mission": {
+            "bottom": 102.09375,
+            "height": 90.09375,
+            "left": 499,
+            "right": 1019,
+            "top": 12,
+            "width": 520
+          },
+          "selector": {
+            "bottom": 167.5,
+            "height": 155.5,
+            "left": 14,
+            "right": 364,
+            "top": 12,
+            "width": 350
+          }
+        },
+        "buttonBoxes": [
+          {
+            "bottom": 84.75,
+            "left": 14,
+            "right": 125.328125,
+            "top": 12
+          },
+          {
+            "bottom": 84.75,
+            "left": 133.328125,
+            "right": 244.65625,
+            "top": 12
+          },
+          {
+            "bottom": 86.75,
+            "left": 252.65625,
+            "right": 364,
+            "top": 14
+          },
+          {
+            "bottom": 165.5,
+            "left": 14,
+            "right": 125.328125,
+            "top": 92.75
+          },
+          {
+            "bottom": 165.5,
+            "left": 133.328125,
+            "right": 244.65625,
+            "top": 92.75
+          }
+        ],
+        "mapBoard": {
+          "bottom": 240.921875,
+          "height": 92,
+          "left": 1164,
+          "right": 1256,
+          "top": 148.921875,
+          "width": 92
+        }
+      },
+      "nextJobId": "soil-west",
+      "police": {
+        "completedJobId": "patrol-main",
+        "layout": {
+          "boxes": {
+            "action": {
+              "bottom": 696,
+              "height": 116,
+              "left": 1142,
+              "right": 1258,
+              "top": 580,
+              "width": 116
+            },
+            "fullscreen": {
+              "bottom": 56,
+              "height": 44,
+              "left": 1154,
+              "right": 1266,
+              "top": 12,
+              "width": 112
+            },
+            "joystick": {
+              "bottom": 702,
+              "height": 154,
+              "left": 18,
+              "right": 172,
+              "top": 548,
+              "width": 154
+            },
+            "map": {
+              "bottom": 250.921875,
+              "height": 126.921875,
+              "left": 1154,
+              "right": 1266,
+              "top": 124,
+              "width": 112
+            },
+            "mission": {
+              "bottom": 102.09375,
+              "height": 90.09375,
+              "left": 499,
+              "right": 1019,
+              "top": 12,
+              "width": 520
+            },
+            "selector": {
+              "bottom": 167.5,
+              "height": 155.5,
+              "left": 14,
+              "right": 364,
+              "top": 12,
+              "width": 350
+            }
+          },
+          "buttonBoxes": [
+            {
+              "bottom": 84.75,
+              "left": 14,
+              "right": 125.328125,
+              "top": 12
+            },
+            {
+              "bottom": 84.75,
+              "left": 133.328125,
+              "right": 244.65625,
+              "top": 12
+            },
+            {
+              "bottom": 84.75,
+              "left": 252.65625,
+              "right": 364,
+              "top": 12
+            },
+            {
+              "bottom": 165.5,
+              "left": 14,
+              "right": 125.328125,
+              "top": 92.75
+            },
+            {
+              "bottom": 167.5,
+              "left": 133.328125,
+              "right": 244.65625,
+              "top": 94.75
+            }
+          ],
+          "mapBoard": {
+            "bottom": 240.921875,
+            "height": 92,
+            "left": 1164,
+            "right": 1256,
+            "top": 148.921875,
+            "width": 92
+          }
+        },
+        "nextJobId": "patrol-showers"
+      },
+      "rendererCalls": 34,
+      "vehicleDrawCalls": 7,
+      "viewport": "desktop"
+    }
+  ],
+  "screenshots": [
+    "desktop-excavator-garage.png",
+    "desktop-excavator-worksite.png",
+    "desktop-excavator-digging.png",
+    "desktop-excavator-impact.png",
+    "desktop-ambulance-garage.png",
+    "desktop-ambulance-patient-before.png",
+    "desktop-ambulance-caring.png",
+    "desktop-ambulance-recovery.png",
+    "desktop-ambulance-worksite.png",
+    "desktop-police-garage.png",
+    "desktop-police-checkpoint-before.png",
+    "desktop-police-gate-chase.png",
+    "desktop-police-completion-arch.png",
+    "desktop-police-worksite.png"
+  ],
+  "viewports": [
+    {
+      "height": 720,
+      "name": "desktop",
+      "touch": false,
+      "width": 1280
+    }
+  ]
+}
