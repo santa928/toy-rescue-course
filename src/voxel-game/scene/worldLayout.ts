@@ -23,10 +23,23 @@ export const VEHICLE_GARAGE_POSITION = [
 /** 車庫へ戻ったとみなして次の仕事を再開するXZ半径。 */
 export const GARAGE_RESTART_RADIUS = 3;
 
-/** 高低差を無視し、車両が車庫の仕事再開領域内にいるか判定する。 */
+/** 描画する車庫床から帰庫範囲を取得し、造形の移動にも判定を追従させる。 */
+const GARAGE_BAY_FLOOR = PRODUCTION_WORLD_MAP.visualBoxes.find(({ id }) => id === 'garage-bay-floor');
+if (!GARAGE_BAY_FLOOR) throw new Error('Missing production garage bay floor');
+const GARAGE_BAY_BOUNDS = {
+  minX: GARAGE_BAY_FLOOR.position[0] - GARAGE_BAY_FLOOR.scale[0] / 2,
+  maxX: GARAGE_BAY_FLOOR.position[0] + GARAGE_BAY_FLOOR.scale[0] / 2,
+  minZ: GARAGE_BAY_FLOOR.position[2] - GARAGE_BAY_FLOOR.scale[2] / 2,
+  maxZ: GARAGE_BAY_FLOOR.position[2] + GARAGE_BAY_FLOOR.scale[2] / 2,
+};
+
+/** 高低差を無視し、車庫内または従来の前庭駐車位置で帰庫・乗換を許可する。 */
 export function isInsideGarageRestartArea(
   vehiclePosition: readonly [number, number, number],
 ): boolean {
+  const [x, , z] = vehiclePosition;
+  if (x >= GARAGE_BAY_BOUNDS.minX && x <= GARAGE_BAY_BOUNDS.maxX
+    && z >= GARAGE_BAY_BOUNDS.minZ && z <= GARAGE_BAY_BOUNDS.maxZ) return true;
   return Math.hypot(
     vehiclePosition[0] - GARAGE_POSITION[0],
     vehiclePosition[2] - GARAGE_POSITION[2],

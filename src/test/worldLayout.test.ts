@@ -129,11 +129,25 @@ describe('voxel world layout', () => {
     );
   });
 
-  it('車庫中心からXZ半径3以内だけを仕事の再開領域として扱う', () => {
+  it('前庭の駐車位置からXZ半径3以内を従来どおり帰庫領域として扱う', () => {
     expect(isInsideGarageRestartArea(GARAGE_POSITION)).toBe(true);
     expect(isInsideGarageRestartArea([3, -99, 6])).toBe(true);
     expect(isInsideGarageRestartArea([0, 99, 9.001])).toBe(false);
     expect(isInsideGarageRestartArea([12, 0.8, -5])).toBe(false);
+  });
+
+  it('移動した車庫の床内も帰庫領域とし、壁の外側は含めない', () => {
+    expect(isInsideGarageRestartArea([-8.8, 0, 6])).toBe(true);
+    const floor = PRODUCTION_WORLD_MAP.visualBoxes.find(({ id }) => id === 'garage-bay-floor')!;
+    const [x, , z] = floor.position;
+    const halfX = floor.scale[0] / 2;
+    const halfZ = floor.scale[2] / 2;
+    for (const side of [-1, 1]) {
+      expect(isInsideGarageRestartArea([x + side * halfX, 0, z])).toBe(true);
+      expect(isInsideGarageRestartArea([x, 0, z + side * halfZ])).toBe(true);
+      expect(isInsideGarageRestartArea([x + side * (halfX + 0.01), 0, z])).toBe(false);
+      expect(isInsideGarageRestartArea([x, 0, z + side * (halfZ + 0.01)])).toBe(false);
+    }
   });
 
   it('積み木4個を積み木広場内へ車体外形ぶん離して置く', () => {
