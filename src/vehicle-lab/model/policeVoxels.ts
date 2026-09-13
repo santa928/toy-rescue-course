@@ -66,12 +66,15 @@ function shellBox(
   }
 }
 
-/** 角を落とした5 voxel車輪を車体側面へ置く。 */
+/** 5×5の角を落としたタイヤと中心のハブを側面へ置く。 */
 function addWheel(voxels: MutableVoxelMap, x: number, zCenter: number): void {
-  for (const [dy, dz] of [[-1, 0], [0, -1], [0, 0], [0, 1], [1, 0]] as const) {
-    setVoxel(voxels, x, 1 + dy, zCenter + dz, 'wheel');
+  for (let dy = -2; dy <= 2; dy += 1) {
+    for (let dz = -2; dz <= 2; dz += 1) {
+      if (Math.abs(dy) === 2 && Math.abs(dz) === 2) continue;
+      setVoxel(voxels, x, 2 + dy, zCenter + dz, 'wheel');
+    }
   }
-  setVoxel(voxels, x, 1, zCenter, 'darkGray');
+  setVoxel(voxels, x, 2, zCenter, 'darkGray');
 }
 
 /** 低い白黒車体、青緑窓、屋根の赤青灯を持つ純voxelパトカーを生成する。 */
@@ -79,15 +82,19 @@ function buildPoliceVoxels(): readonly VoxelCell<PolicePaletteId>[] {
   const voxels: MutableVoxelMap = new Map();
 
   fillBox(voxels, [-4, 1, -6], [4, 1, 6], 'darkGray');
-  shellBox(voxels, [-4, 2, -5], [4, 5, 5], 'white');
+  shellBox(voxels, [-4, 2, -5], [4, 3, 5], 'white');
+  shellBox(voxels, [-3, 4, -2], [3, 5, 2], 'white');
   for (const x of [-5, 5]) {
     addWheel(voxels, x, -4);
     addWheel(voxels, x, 4);
   }
 
-  fillBox(voxels, [-3, 4, -5], [3, 5, -5], 'window');
-  fillBox(voxels, [-4, 4, -3], [-4, 5, 1], 'window');
-  fillBox(voxels, [4, 4, -3], [4, 5, 1], 'window');
+  fillBox(voxels, [-2, 4, -2], [2, 4, -2], 'window');
+  fillBox(voxels, [-3, 4, -1], [-3, 4, 1], 'window');
+  fillBox(voxels, [3, 4, -1], [3, 4, 1], 'window');
+
+  fillBox(voxels, [-2, 4, 2], [2, 4, 2], 'window');
+  fillBox(voxels, [-3, 2, -6], [3, 2, -6], 'white');
 
   fillBox(voxels, [-4, 3, -5], [-4, 3, 5], 'black');
   fillBox(voxels, [4, 3, -5], [4, 3, 5], 'black');

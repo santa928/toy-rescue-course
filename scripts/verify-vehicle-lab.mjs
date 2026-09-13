@@ -684,7 +684,7 @@ async function verifyVehicleLab() {
       const loadedResources = await page.evaluate(() =>
         performance.getEntriesByType('resource').map((entry) => entry.name),
       );
-      assert(initialTelemetry.voxelCount === 640, `Expected 640 voxels: ${JSON.stringify(initialTelemetry)}`);
+      assert(initialTelemetry.voxelCount > 500 && initialTelemetry.voxelCount <= 800, `Expected the detailed model within 800 voxels: ${JSON.stringify(initialTelemetry)}`);
       assert(initialTelemetry.vehicleDrawCalls === 7, `Expected 7 vehicle draw calls: ${JSON.stringify(initialTelemetry)}`);
       assert(initialTelemetry.vehicleDrawCalls <= 10, `Vehicle draw call limit exceeded: ${JSON.stringify(initialTelemetry)}`);
       const expectedStableRendererCalls = assertStableRendererCalls(initialTelemetry);

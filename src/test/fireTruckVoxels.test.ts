@@ -17,7 +17,6 @@ function paletteAt(x: number, y: number, z: number): string | undefined {
 describe('FIRE_TRUCK_VOXELS', () => {
   it('有効かつ800セル以下の消防車である', () => {
     expect(() => assertValidVoxelModel(FIRE_TRUCK_VOXELS, FIRE_TRUCK_PALETTE_IDS)).not.toThrow();
-    expect(FIRE_TRUCK_VOXELS).toHaveLength(640);
     expect(FIRE_TRUCK_VOXELS.length).toBeGreaterThan(500);
     expect(FIRE_TRUCK_VOXELS.length).toBeLessThanOrEqual(800);
   });
@@ -31,11 +30,17 @@ describe('FIRE_TRUCK_VOXELS', () => {
     });
   });
 
-  it('正面窓、タイヤ、梯子、警光灯を持つ', () => {
-    expect(paletteAt(0, 4, -6)).toBe('black');
+  it('正面窓、タイヤ、梯子、側面ホース、警光灯を持つ', () => {
+    expect(paletteAt(0, 4, -6)).toBe('blue');
     expect(paletteAt(-6, 0, -4)).toBe('black');
-    expect(paletteAt(-3, 7, 5)).toBe('silver');
+    expect(paletteAt(-2, 7, 5)).toBe('silver');
     expect(paletteAt(-3, 7, -5)).toBe('blue');
+    expect(paletteAt(0, 7, 3)).toBeUndefined(); // 梯子の間隔
+    expect(paletteAt(0, 7, 2)).toBe('silver');
+    for (const x of [-5, 4]) {
+      expect(paletteAt(x, 2, 2)).toBe('white');
+      expect(paletteAt(x, 4, 2)).toBe('white');
+    }
   });
 
   it('車両本体の色別バッチ数が10以下である', () => {

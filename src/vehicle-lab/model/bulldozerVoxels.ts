@@ -79,7 +79,7 @@ function buildBulldozerVoxels(): readonly VoxelCell<BulldozerPaletteId>[] {
   }
 
   fillBox(voxels, [-3, 2, -4], [4, 3, 5], 'yellow');
-  fillBox(voxels, [-3, 4, -4], [4, 5, -1], 'yellow');
+  fillBox(voxels, [-2, 4, -4], [3, 4, -1], 'yellow');
   shellBox(voxels, [-3, 4, 0], [4, 7, 4], 'yellow');
   fillBox(voxels, [-2, 5, 0], [3, 6, 0], 'window');
   fillBox(voxels, [-3, 5, 1], [-3, 6, 3], 'window');
@@ -88,6 +88,12 @@ function buildBulldozerVoxels(): readonly VoxelCell<BulldozerPaletteId>[] {
   fillBox(voxels, [0, 7, 1], [1, 7, 2], 'beacon');
   fillBox(voxels, [3, 6, -1], [3, 7, -1], 'darkGray');
 
+  // ボンネットの吸気口と履帯の端を刻み、箱と黒板の輪郭を分ける。
+  for (const x of [-1, 1, 3]) setVoxel(voxels, x, 4, -4, 'darkGray');
+  for (const x of [-5, -4, 5, 6]) for (const z of [-3, 5]) {
+    voxels.delete(`${x},0,${z}`);
+    voxels.delete(`${x},2,${z}`);
+  }
   fillBox(voxels, [-6, 0, -7], [7, 2, -7], 'blade');
   fillBox(voxels, [-5, 0, -6], [6, 1, -6], 'blade');
   fillBox(voxels, [-4, 1, -5], [-4, 3, -4], 'silver');

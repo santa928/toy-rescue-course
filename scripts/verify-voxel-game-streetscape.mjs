@@ -244,34 +244,6 @@ async function driveToBlocks(page, viewport, touchDriver) {
 
 /** 車庫から南地区中央へ実入力で移動する。 */
 async function driveToSouth(page, viewport, touchDriver) {
-  await driveAlongWorldAxis(page, {
-    axis: 'negativeZ',
-    brakeAfterArrival: false,
-    description: `${viewport.name}: streetscape south garage exit`,
-    predicate: (state) => state.vehicle.position[2] <= 0,
-    touchDriver,
-  });
-  await driveToCoordinate(page, {
-    coordinateIndex: 2,
-    description: `${viewport.name}: streetscape south gate clearance`,
-    target: -3,
-    tolerance: 0.4,
-    touchDriver,
-  });
-  await driveToCoordinate(page, {
-    coordinateIndex: 0,
-    description: `${viewport.name}: streetscape south garage bypass`,
-    target: -8,
-    tolerance: 0.4,
-    touchDriver,
-  });
-  await driveToCoordinate(page, {
-    coordinateIndex: 2,
-    description: `${viewport.name}: streetscape south bypass latitude`,
-    target: 12,
-    tolerance: 0.4,
-    touchDriver,
-  });
   await driveToCoordinate(page, {
     coordinateIndex: 0,
     description: `${viewport.name}: streetscape south center lane`,
@@ -376,7 +348,7 @@ function assertWorldBudgets(state, viewport, districtId) {
     `${viewport.name}: expected ${districtId}, received ${state.world.currentDistrict}: ${JSON.stringify(state.vehicle)}.`);
   assert.equal(state.world.surfaceTileCount, 19);
   assert.equal(state.world.decorationClusterCount, 21);
-  assert.equal(state.world.decorationBoxCount, 54);
+  assert.equal(state.world.decorationBoxCount, 70);
   assert.equal(state.world.staticColliderCount, 40);
   assert.equal(state.visualLayout.worldSolids.length, 40);
   assert(state.renderer.rendererCalls > 0 && state.renderer.rendererCalls <= 34,
@@ -388,18 +360,18 @@ async function verifyNonSolidPassThrough(page, viewport, touchDriver) {
   await driveToCoordinate(page, {
     coordinateIndex: 2,
     description: `${viewport.name}: non-solid guide latitude`,
-    target: -5.6,
+    target: 4.8,
     tolerance: 0.3,
     touchDriver,
   });
   const crossed = await driveToCoordinate(page, {
     coordinateIndex: 0,
     description: `${viewport.name}: non-solid guide pass-through`,
-    target: -8,
+    target: -5.2,
     tolerance: 0.35,
     touchDriver,
   });
-  assert(crossed.vehicle.position[0] <= -7.65,
+  assert(crossed.vehicle.position[0] <= -4.85,
     `Non-solid entry guide blocked the vehicle: ${JSON.stringify(crossed.vehicle)}.`);
   return crossed.vehicle.position;
 }

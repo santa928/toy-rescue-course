@@ -67,60 +67,41 @@ function shellBox(
   }
 }
 
-/** 3×3の角を落とした純ボクセルタイヤを車体側面へ置く。 */
+/** 5×5の角を落とした純ボクセルタイヤを車体側面へ置く。 */
 function addWheel(voxels: MutableVoxelMap, x: number, zCenter: number): void {
-  const wheelPattern = [
-    [-1, 0],
-    [0, -1],
-    [0, 0],
-    [0, 1],
-    [1, 0],
-  ] as const;
-
-  for (const [dy, dz] of wheelPattern) {
-    setVoxel(voxels, x, 1 + dy, zCenter + dz, 'black');
+  for (let dy = -2; dy <= 2; dy += 1) {
+    for (let dz = -2; dz <= 2; dz += 1) {
+      if (Math.abs(dy) === 2 && Math.abs(dz) === 2) continue;
+      setVoxel(voxels, x, 2 + dy, zCenter + dz, 'black');
+    }
   }
-  setVoxel(voxels, x, 1, zCenter, 'darkGray');
+  setVoxel(voxels, x, 2, zCenter, 'silver');
 }
 
-/** 選定した純ボクセル案の消防車データを決定的に生成する。 */
+/** 運転席・低い機器室・開いた梯子の輪郭で消防車を識別できる造形。 */
 function buildFireTruckVoxels(): readonly VoxelCell<FireTruckPaletteId>[] {
   const voxels: MutableVoxelMap = new Map();
-
-  fillBox(voxels, [-5, 1, -6], [4, 1, 6], 'darkGray');
-  shellBox(voxels, [-5, 2, -6], [4, 6, -2], 'red');
-  shellBox(voxels, [-5, 2, -1], [4, 6, 6], 'red');
-
-  fillBox(voxels, [-3, 4, -6], [2, 5, -6], 'black');
-  fillBox(voxels, [-5, 4, -5], [-5, 5, -3], 'black');
-  fillBox(voxels, [4, 4, -5], [4, 5, -3], 'black');
-
-  fillBox(voxels, [-5, 3, -6], [-5, 3, 6], 'white');
-  fillBox(voxels, [4, 3, -6], [4, 3, 6], 'white');
-  fillBox(voxels, [-5, 3, 1], [-5, 5, 4], 'silver');
-  fillBox(voxels, [4, 3, 1], [4, 5, 4], 'silver');
-
-  fillBox(voxels, [-5, 1, -7], [4, 1, -7], 'white');
-  fillBox(voxels, [-2, 2, -7], [1, 2, -7], 'darkGray');
+  fillBox(voxels, [-4, 1, -6], [3, 1, 6], 'darkGray');
+  shellBox(voxels, [-4, 2, -6], [3, 6, -2], 'red');
+  shellBox(voxels, [-5, 2, 0], [4, 4, 6], 'red');
+  fillBox(voxels, [-3, 4, -6], [2, 5, -6], 'blue');
+  fillBox(voxels, [-4, 4, -5], [-4, 5, -3], 'blue');
+  fillBox(voxels, [3, 4, -5], [3, 5, -3], 'blue');
+  for (const x of [-5, 4]) {
+    fillBox(voxels, [x, 3, 0], [x, 3, 6], 'white');
+    fillBox(voxels, [x, 2, 4], [x, 4, 5], 'silver');
+    for (const [y, z] of [[2, 2], [3, 1], [4, 2], [3, 3]]) setVoxel(voxels, x, y, z, 'white');
+  }
+  fillBox(voxels, [-4, 1, -7], [3, 1, -7], 'white');
+  fillBox(voxels, [-2, 2, -7], [1, 2, -7], 'silver');
   setVoxel(voxels, -4, 2, -7, 'amber');
   setVoxel(voxels, 3, 2, -7, 'amber');
-
-  for (const x of [-6, 5]) {
-    addWheel(voxels, x, -4);
-    addWheel(voxels, x, 4);
-  }
-
-  for (let z = -1; z <= 6; z += 1) {
-    setVoxel(voxels, -3, 7, z, 'silver');
-    setVoxel(voxels, 3, 7, z, 'silver');
-  }
-  for (const z of [-1, 1, 3, 5]) {
-    fillBox(voxels, [-3, 7, z], [3, 7, z], 'silver');
-  }
-  fillBox(voxels, [-2, 7, -5], [-2, 7, -5], 'blue');
-  fillBox(voxels, [1, 7, -5], [1, 7, -5], 'blue');
-  fillBox(voxels, [-3, 7, -5], [-3, 7, -5], 'blue');
-  fillBox(voxels, [2, 7, -5], [2, 7, -5], 'blue');
+  for (const x of [-6, 5]) for (const z of [-4, 4]) addWheel(voxels, x, z);
+  for (const z of [0, 5]) fillBox(voxels, [-2, 5, z], [2, 6, z], 'darkGray');
+  for (const x of [-2, 2]) fillBox(voxels, [x, 7, -1], [x, 7, 6], 'silver');
+  for (const z of [-1, 2, 5]) fillBox(voxels, [-2, 7, z], [2, 7, z], 'silver');
+  fillBox(voxels, [-3, 7, -5], [-2, 7, -5], 'blue');
+  fillBox(voxels, [1, 7, -5], [2, 7, -5], 'blue');
 
   return [...voxels.values()].sort(
     (left, right) => left.y - right.y || left.z - right.z || left.x - right.x,

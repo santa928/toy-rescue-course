@@ -88,14 +88,20 @@ function buildExcavatorVoxels(): readonly VoxelCell<ExcavatorPaletteId>[] {
   setVoxel(voxels, -1, 7, 3, 'beacon');
   setVoxel(voxels, 0, 7, 3, 'beacon');
 
-  fillBox(voxels, [0, 4, -4], [1, 5, -1], 'arm');
-  fillBox(voxels, [0, 6, -6], [1, 6, -4], 'arm');
-  fillBox(voxels, [0, 4, -8], [1, 5, -6], 'arm');
-  fillBox(voxels, [-1, 3, -8], [2, 4, -8], 'arm');
-  fillBox(voxels, [-2, 1, -9], [3, 2, -9], 'bucket');
-  fillBox(voxels, [-2, 1, -8], [3, 1, -8], 'bucket');
-  setVoxel(voxels, -2, 0, -9, 'bucket');
-  setVoxel(voxels, 3, 0, -9, 'bucket');
+  // キャブ横から立ち上がるブーム、肘、下向きのディッパーを接続する。
+  fillBox(voxels, [2, 4, -2], [3, 6, 0], 'arm');
+  fillBox(voxels, [2, 6, -4], [3, 8, -2], 'arm');
+  fillBox(voxels, [2, 8, -6], [3, 10, -4], 'arm');
+  fillBox(voxels, [2, 4, -7], [3, 8, -6], 'arm');
+  fillBox(voxels, [1, 2, -8], [3, 4, -7], 'arm');
+  fillBox(voxels, [-2, 1, -9], [3, 1, -7], 'bucket');
+  fillBox(voxels, [-2, 2, -7], [3, 3, -7], 'bucket');
+  for (const x of [-2, 3]) fillBox(voxels, [x, 2, -9], [x, 2, -8], 'bucket');
+  for (const x of [-2, 0, 3]) setVoxel(voxels, x, 0, -9, 'bucket');
+  for (const x of [-5, -4, 5, 6]) for (const z of [-4, 5]) {
+    voxels.delete(`${x},0,${z}`);
+    voxels.delete(`${x},2,${z}`);
+  }
 
   return [...voxels.values()].sort(
     (left, right) => left.y - right.y || left.z - right.z || left.x - right.x,

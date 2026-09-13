@@ -42,8 +42,8 @@ describe('AMBULANCE_VOXELS', () => {
 
   it('左右車輪、青緑窓、赤帯、赤十字、赤色灯を実データに持つ', () => {
     expect(paletteAt(-5, 0, -4)).toBe('wheel');
-    expect(paletteAt(-5, 1, -4)).toBe('darkGray');
-    expect(paletteAt(-3, 5, -5)).toBe('window');
+    expect(paletteAt(-5, 2, -4)).toBe('darkGray');
+    expect(paletteAt(-3, 4, -5)).toBe('window');
     expect(paletteAt(-4, 3, 0)).toBe('red');
     expect(paletteAt(-4, 5, 2)).toBe('cross');
     expect(paletteAt(-1, 7, 1)).toBe('beacon');

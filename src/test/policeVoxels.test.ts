@@ -42,8 +42,8 @@ describe('POLICE_VOXELS', () => {
 
   it('左右車輪、青緑窓、黒帯、赤青灯を実データに持つ', () => {
     expect(paletteAt(-5, 0, -4)).toBe('wheel');
-    expect(paletteAt(-5, 1, -4)).toBe('darkGray');
-    expect(paletteAt(-3, 4, -5)).toBe('window');
+    expect(paletteAt(-5, 2, -4)).toBe('darkGray');
+    expect(paletteAt(-2, 4, -2)).toBe('window');
     expect(paletteAt(-4, 3, 0)).toBe('black');
     expect(paletteAt(-1, 6, 0)).toBe('redBeacon');
     expect(paletteAt(1, 6, 0)).toBe('blueBeacon');

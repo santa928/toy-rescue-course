@@ -1,3 +1,4 @@
+import { addTownDetails, createPaintLaneFlags, createRescueDepot } from './toyTownArchitecture';
 import { validateWorldStreetscape } from './worldStreetscape';
 
 /** 96×96の本番箱庭を描画・物理・ゲームプレイで共有する純粋な座標定義。 */
@@ -143,8 +144,12 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
   decorationClusters: [
     {
       boxes: [
-        { color: '#86552f', id: 'hub-tool-rack-post', position: [8.2, 1, 7.2], scale: [0.6, 1.8, 0.6], solid: true },
-        { color: '#f2c94c', id: 'hub-tool-rack-shelf', position: [8.2, 1.55, 7.2], scale: [2.2, 0.25, 0.65], solid: false },
+        { color: '#86552f', id: 'hub-tool-rack-post', position: [8.2, 0.85, 7.2], scale: [1.8, 1.5, 0.6], solid: true },
+        { color: '#f2c94c', id: 'hub-tool-rack-shelf', position: [8.2, 1.7, 7.2], scale: [2.2, 0.2, 0.85], solid: false },
+        { color: '#f1efe6', id: 'hub-tool-rack-door-left', position: [7.75, 0.95, 7.55], scale: [0.72, 1.1, 0.1], solid: false },
+        { color: '#f1efe6', id: 'hub-tool-rack-door-right', position: [8.65, 0.95, 7.55], scale: [0.72, 1.1, 0.1], solid: false },
+        { color: '#86552f', id: 'hub-tool-rack-handle-left', position: [8, 1, 7.65], scale: [0.12, 0.25, 0.1], solid: false },
+        { color: '#86552f', id: 'hub-tool-rack-handle-right', position: [8.4, 1, 7.65], scale: [0.12, 0.25, 0.1], solid: false },
         { color: '#a86f3f', id: 'hub-parcel-a', position: [6.1, 0.45, 8.7], scale: [1.2, 0.9, 1.2], solid: false },
         { color: '#a86f3f', id: 'hub-parcel-b', position: [8.1, 0.35, 8.6], scale: [1, 0.7, 1], solid: false },
       ],
@@ -154,8 +159,8 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     },
     {
       boxes: [
-        { color: '#e24b3f', id: 'hub-entry-guide-red', position: [-6.4, 0.3, -5.6], scale: [2.2, 0.5, 0.5], solid: false },
-        { color: '#f1efe6', id: 'hub-entry-guide-white', position: [-6.4, 0.3, -6.35], scale: [2.2, 0.5, 0.5], solid: false },
+        { color: '#f2c94c', id: 'hub-entry-guide-red', position: [-4.6, 0.075, 4.8], scale: [1.4, 0.01, 0.15], solid: false },
+        { color: '#f2c94c', id: 'hub-entry-guide-white', position: [-4.6, 0.075, 7.2], scale: [1.4, 0.01, 0.15], solid: false },
       ],
       districtId: 'hub',
       id: 'hub-entry-guides',
@@ -250,9 +255,7 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     },
     {
       boxes: [
-        { color: '#e24b3f', id: 'south-entry-flag-red', position: [-1.5, 1.2, 15], scale: [1.4, 1.1, 0.2], solid: false },
-        { color: '#f2c94c', id: 'south-entry-flag-yellow', position: [0, 1.2, 15], scale: [1.4, 1.1, 0.2], solid: false },
-        { color: '#3b82f6', id: 'south-entry-flag-blue', position: [1.5, 1.2, 15], scale: [1.4, 1.1, 0.2], solid: false },
+        ...createPaintLaneFlags(),
       ],
       districtId: 'south',
       id: 'south-entry-flags',
@@ -531,8 +534,8 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#eee7d2', districtId: 'town', id: 'town-green-east', position: [40, 0.055, 35], scale: [4, 0.02, 14] },
     { color: '#eee7d2', districtId: 'town', id: 'town-entry-pattern', position: [31, 0.06, 17], scale: [8, 0.04, 0.65] },
   ],
-  visualBoxes: [
-    { color: '#67c7df', id: 'park-pond', position: [2, 0.4, -24], scale: [6, 0.18, 4], solid: false },
+  visualBoxes: addTownDetails([
+    { color: '#67c7df', id: 'park-pond', position: [2, 0.12, -24], scale: [6, 0.08, 3], solid: false },
     { color: '#86552f', id: 'tree-trunk-1', position: [-7, 1.25, -28], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#86552f', id: 'tree-trunk-2', position: [-7, 1.25, -20], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#86552f', id: 'tree-trunk-3', position: [7, 1.25, -20], scale: [0.7, 2.2, 0.7], solid: true },
@@ -541,18 +544,13 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#3f7f3a', id: 'tree-crown-3', position: [7, 2.85, -20], scale: [2.2, 1.4, 2.2], solid: false },
     { color: '#e24b3f', id: 'playground-plank', position: [3, 0.75, -26], scale: [3.4, 0.28, 0.7], solid: true },
     { color: '#f2c94c', id: 'playground-support', position: [3, 0.45, -26], scale: [0.36, 0.8, 0.36], solid: true },
-    { color: '#f1efe6', id: 'garage-back-wall', position: [0, 1.8, 9.2], scale: [8.8, 3.4, 0.8], solid: true },
-    { color: '#f1efe6', id: 'garage-left-wall', position: [-4, 1.8, 7.2], scale: [0.8, 3.4, 4.8], solid: true },
-    { color: '#f1efe6', id: 'garage-right-wall', position: [4, 1.8, 7.2], scale: [0.8, 3.4, 4.8], solid: true },
-    { color: '#c83e34', id: 'garage-roof-left', position: [-3.65, 3.65, 7.2], scale: [1.5, 0.5, 5.2], solid: false },
-    { color: '#c83e34', id: 'garage-roof-right', position: [3.65, 3.65, 7.2], scale: [1.5, 0.5, 5.2], solid: false },
-    { color: '#c83e34', id: 'garage-roof-back', position: [0, 3.65, 8.9], scale: [5.8, 0.5, 1.4], solid: false },
-    { color: '#c83e34', id: 'garage-header', position: [0, 3.35, 4.7], scale: [8.8, 0.45, 0.35], solid: false },
+    ...createRescueDepot(),
     { color: '#a86f3f', id: 'fire-building-body', position: [23.5, 1.8, -16.5], scale: [6, 3.4, 5], solid: true },
     { color: '#6f4327', id: 'fire-building-roof', position: [23.5, 3.75, -16.5], scale: [6.8, 0.5, 5.8], solid: false },
     { color: '#7ed1e6', id: 'fire-window-1', position: [22.2, 1.9, -19.05], scale: [1.5, 1.5, 0.18], solid: false },
     { color: '#7ed1e6', id: 'fire-window-2', position: [24.8, 1.9, -19.05], scale: [1.5, 1.5, 0.18], solid: false },
-    { color: '#c83e34', id: 'hub-gate-post', position: [-6, 1.1, 0], scale: [0.7, 2, 0.7], solid: true },
+    { color: '#86552f', id: 'hub-wayfinding-post', position: [9, 0.8, 4.5], scale: [0.3, 1.6, 0.3], solid: true },
+    { color: '#f2c94c', id: 'hub-wayfinding-board', position: [9, 1.7, 4.5], scale: [1.5, 0.6, 0.2], solid: false },
     { color: '#86552f', id: 'south-sign-post-west', position: [-3.5, 1.1, 18.5], scale: [0.7, 2, 0.7], solid: true },
     { color: '#86552f', id: 'south-sign-post-east', position: [3.5, 1.1, 29.5], scale: [0.7, 2, 0.7], solid: true },
     { color: '#f2c94c', id: 'south-sign-board-west', position: [-3.5, 2.15, 18.5], scale: [3, 1, 0.4], solid: false },
@@ -582,7 +580,7 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#86552f', id: 'town-sign-post-west', position: [28, 1.1, 21.5], scale: [0.7, 2, 0.7], solid: true },
     { color: '#86552f', id: 'town-sign-post-east', position: [34, 1.1, 21.5], scale: [0.7, 2, 0.7], solid: true },
     { color: '#f2c94c', id: 'town-sign-board', position: [31, 2.15, 21.5], scale: [7, 1, 0.4], solid: false },
-  ],
+  ]),
 } as const satisfies ProductionWorldMapDefinition;
 
 /** 指定map内のworld座標を地区、道路、またはworld外として解決する。 */

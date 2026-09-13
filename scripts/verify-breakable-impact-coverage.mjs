@@ -46,14 +46,14 @@ async function stageAtYellowEastRunway(page, harness, touchDriver, lateralOffset
   const block = initial.landmarks.breakableBlocks.find(({ id }) => id === targetBlockId);
   assert(block, `${targetBlockId} landmark is unavailable.`);
   const garage = initial.landmarks.garage;
-  const hubGate = requireWorldSolid(initial, 'hub-gate-post');
+  const hubGate = requireWorldSolid(initial, 'hub-wayfinding-post');
   await harness.driveAlongWorldAxis(page, {
     axis: 'negativeZ',
     description: `${lateralOffset}: garage exit`,
     predicate: (state) => state.vehicle.position[2] <= garage[2] - 3,
     touchDriver,
   });
-  const gateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2 - 1.7 - 2;
+  const gateBypassZ = 0;
   await harness.alignWorldCoordinate(page, {
     coordinateIndex: 2,
     description: `${lateralOffset}: hub gate bypass Z`,

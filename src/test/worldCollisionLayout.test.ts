@@ -86,7 +86,7 @@ describe('worldCollisionLayout', () => {
       'garage-left-wall',
       'garage-right-wall',
       'fire-building-body',
-      'hub-gate-post',
+      'hub-wayfinding-post',
       'south-sign-post-west',
       'south-sign-post-east',
       'construction-office-body',
@@ -132,14 +132,14 @@ describe('worldCollisionLayout', () => {
     ));
     expect(initialSeparations.every(([x, , z]) => x >= 0 || z >= 0)).toBe(true);
 
-    const exitCenter = [0, GARAGE_POSITION[1], 2.7] as const;
+    const exitCenter = [-3.5, GARAGE_POSITION[1], 6] as const;
     for (const sideWall of GARAGE_WALLS.slice(1)) {
-      const [, , z] = getAxisAlignedSeparation(
+      const [x] = getAxisAlignedSeparation(
         sideWall,
         exitCenter,
         VEHICLE_COLLIDER_HALF_EXTENTS,
       );
-      expect(z).toBeGreaterThan(0);
+      expect(x).toBeGreaterThan(0);
     }
   });
 

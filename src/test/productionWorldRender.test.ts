@@ -5,10 +5,10 @@ import {
   InstancedSurfaceTiles,
   VoxelWorld,
   WorldSolidColliders,
+  WORLD_ROAD_RENDER_BOXES,
 } from '../voxel-game/scene/VoxelWorld';
 import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import { flattenDecorationBoxes } from '../voxel-game/scene/worldStreetscape';
-import { createGarageCutawayBoxes } from '../voxel-game/scene/garageCutaway';
 
 interface InspectedElementProps {
   readonly args?: readonly [number, number, number];
@@ -43,7 +43,7 @@ describe('production world render', () => {
     expect(surfaceLayers[0].props.tiles).toBe(PRODUCTION_WORLD_MAP.surfaceTiles);
 
     expect(children.filter(
-      ({ props }) => props.boxes === PRODUCTION_WORLD_MAP.roads,
+      ({ props }) => props.boxes === WORLD_ROAD_RENDER_BOXES,
     )).toHaveLength(1);
 
     const roadMarkingBatch = children.find(({ props }) => props.color === '#f0c94a');
@@ -52,7 +52,7 @@ describe('production world render', () => {
       { position: [-17.75, 0.19, 0], scale: [32.5, 0.05, 0.22] },
       { position: [17.75, 0.19, 0], scale: [32.5, 0.05, 0.22] },
       { position: [0, 0.19, -17.75], scale: [0.22, 0.05, 32.5] },
-      { position: [0, 0.19, 17.75], scale: [0.22, 0.05, 32.5] },
+      { position: [0, 0.19, 22.1], scale: [0.22, 0.05, 23.8] },
     ]));
 
     const visualBatches = children.filter(({ props }) => (
@@ -63,11 +63,10 @@ describe('production world render', () => {
     ));
     const renderedVisualBoxes = visualBatches.flatMap(({ props }) => props.boxes ?? []);
     const decorationBoxes = flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters);
-    const expectedRenderBoxes = [...createGarageCutawayBoxes(PRODUCTION_WORLD_MAP.visualBoxes), ...decorationBoxes];
-    expect(visualBatches).toHaveLength(new Set(
-      expectedRenderBoxes.map(({ color }) => color),
-    ).size);
-    expect(renderedVisualBoxes).toHaveLength(104);
+    const expectedRenderBoxes = [...PRODUCTION_WORLD_MAP.visualBoxes, ...decorationBoxes];
+    expect(visualBatches).toHaveLength(1);
+    expect(visualBatches[0].props.color).toBe('#ffffff');
+    expect(renderedVisualBoxes).toHaveLength(expectedRenderBoxes.length);
     expect(new Set(renderedVisualBoxes)).toEqual(new Set(expectedRenderBoxes));
 
     expect(children.filter(

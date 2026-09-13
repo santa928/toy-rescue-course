@@ -413,11 +413,11 @@ async function openGamePage(
 
 /** garage・blockPlaza・hub gate telemetryから西地区への安全waypointを読む。 */
 function readBlockRouteAnchors(state) {
-  const hubGate = state.visualLayout.worldSolids.find(({ id }) => id === 'hub-gate-post');
+  const hubGate = state.visualLayout.worldSolids.find(({ id }) => id === 'hub-wayfinding-post');
   assert(hubGate, 'Hub gate solid telemetry is unavailable.');
   const plaza = state.landmarks.blockPlaza;
   return {
-    gateBypassZ: hubGate.position[2] - hubGate.scale[2] / 2 - 4,
+    gateBypassZ: 0,
     garage: state.landmarks.garage,
     plaza,
   };

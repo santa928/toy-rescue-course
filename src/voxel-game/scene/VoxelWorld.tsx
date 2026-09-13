@@ -4,12 +4,10 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 import {
   PRODUCTION_WORLD_MAP,
-  type WorldBoxDefinition,
   type WorldRoadDefinition,
   type WorldSurfaceTileDefinition,
 } from './productionWorldMap';
 import { flattenDecorationBoxes } from './worldStreetscape';
-import { createGarageCutawayBoxes } from './garageCutaway';
 import {
   WORLD_GROUND_BOX,
   WORLD_SOLID_BOXES,
@@ -18,6 +16,7 @@ import {
 
 /** InstancedMeshへ渡す共有直方体の変換情報。 */
 interface BoxInstance {
+  readonly color?: string;
   readonly position: readonly [number, number, number];
   readonly rotation?: readonly [number, number, number];
   readonly scale: readonly [number, number, number];
@@ -49,6 +48,13 @@ function buildRoadMarkingBoxes(road: WorldRoadDefinition): readonly BoxInstance[
     }];
   }
 
+  if (road.id === 'road-hub-north-south') {
+    return [
+      { position: [0, ROAD_MARKING_Y, -17.75], scale: [ROAD_MARKING_SHORT_AXIS, ROAD_MARKING_THICKNESS, 32.5] },
+      { position: [0, ROAD_MARKING_Y, 22.1], scale: [ROAD_MARKING_SHORT_AXIS, ROAD_MARKING_THICKNESS, 23.8] },
+    ];
+  }
+
   const segmentLength = (longAxis - HUB_INTERSECTION_CLEARANCE) / 2;
   const centerOffset = HUB_INTERSECTION_CLEARANCE / 2 + segmentLength / 2;
   return [-centerOffset, centerOffset].map((offset) => ({
@@ -61,30 +67,23 @@ function buildRoadMarkingBoxes(road: WorldRoadDefinition): readonly BoxInstance[
   }));
 }
 
-/** boxをmaterial色ごとの安定したbatchへまとめる。 */
-export function groupWorldBoxesByColor(
-  boxes: readonly WorldBoxDefinition[],
-): readonly { readonly boxes: readonly WorldBoxDefinition[]; readonly color: string }[] {
-  const groups = new Map<string, WorldBoxDefinition[]>();
-  for (const box of boxes) {
-    const group = groups.get(box.color) ?? [];
-    group.push(box);
-    groups.set(box.color, group);
-  }
-  return [...groups.entries()].map(([color, groupedBoxes]) => ({
-    boxes: groupedBoxes,
-    color,
-  }));
-}
+/** 帰庫前庭を道路の上へ積まず、路面を前庭の境界で分ける。 */
+export const WORLD_ROAD_RENDER_BOXES = PRODUCTION_WORLD_MAP.roads.flatMap<WorldRoadDefinition>(road => {
+  if (road.id !== 'road-hub-north-south') return [road];
+  return [
+    { ...road, position: [0, 0.08, -16] as const, scale: [5, 0.18, 36] as const },
+    { ...road, position: [0, 0.08, 22] as const, scale: [5, 0.18, 24] as const },
+  ];
+});
 
 const ROAD_MARKING_BOXES = PRODUCTION_WORLD_MAP.roads.flatMap(buildRoadMarkingBoxes);
 const WORLD_RENDER_BOXES = [
-  ...createGarageCutawayBoxes(PRODUCTION_WORLD_MAP.visualBoxes),
+  ...PRODUCTION_WORLD_MAP.visualBoxes,
   ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),
 ] as const;
-const WORLD_VISUAL_BATCHES = groupWorldBoxesByColor(WORLD_RENDER_BOXES);
 
-/** 同じmaterialの直方体を1 draw callへまとめる。 */
+
+/** 個別色をinstance属性へ格納し、街の固定部品を1 draw callへまとめる。 */
 function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
 
@@ -99,6 +98,7 @@ function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
     const scale = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
     const euler = new THREE.Euler();
+    const instanceColor = new THREE.Color();
     boxes.forEach((box, index) => {
       position.fromArray(box.position);
       scale.fromArray(box.scale);
@@ -107,8 +107,10 @@ function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
       quaternion.setFromEuler(euler);
       matrix.compose(position, quaternion, scale);
       mesh.setMatrixAt(index, matrix);
+      if (box.color) mesh.setColorAt(index, instanceColor.set(box.color));
     });
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
   }, [boxes]);
 
@@ -182,11 +184,9 @@ export function VoxelWorld(): ReactElement {
         <meshLambertMaterial color="#d7b07a" />
       </mesh>
       <InstancedSurfaceTiles tiles={PRODUCTION_WORLD_MAP.surfaceTiles} />
-      <InstancedBoxes boxes={PRODUCTION_WORLD_MAP.roads} color="#3f4248" />
+      <InstancedBoxes boxes={WORLD_ROAD_RENDER_BOXES} color="#3f4248" />
       <InstancedBoxes boxes={ROAD_MARKING_BOXES} color="#f0c94a" />
-      {WORLD_VISUAL_BATCHES.map(({ boxes, color }) => (
-        <InstancedBoxes boxes={boxes} color={color} key={color} />
-      ))}
+      <InstancedBoxes boxes={WORLD_RENDER_BOXES} color="#ffffff" />
       <WorldSolidColliders />
     </group>
   );
