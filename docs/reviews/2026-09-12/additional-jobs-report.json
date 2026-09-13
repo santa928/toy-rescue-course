@@ -1,0 +1,609 @@
+{
+  "sourceProductCommit": "f5a11491bd690a9a8d7991c1283e16f5fb27cb89",
+  "sourceNote": "最後の経路修正は82e9379の検証script。以後の製品差分はWebGL失敗分類のみ。",
+  "jobs": [
+    {
+      "id": "patient-playground",
+      "seed": 5376,
+      "vehicle": "ambulance",
+      "completed": {
+        "direction": [
+          -0.8101932532805579,
+          0,
+          -0.5861628547926472
+        ],
+        "distance": 25.65708664626531,
+        "nozzleOrigin": [
+          4.348531588289019,
+          2.148873710632324,
+          -31.890035355344764
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            1.917951828447345,
+            2.148873710632324,
+            -33.648523919722706
+          ],
+          "end": [
+            -0.5126279313943289,
+            2.148873710632324,
+            -35.40701248410065
+          ],
+          "start": [
+            4.348531588289019,
+            2.148873710632324,
+            -31.890035355344764
+          ]
+        },
+        "destinationDistrict": "park",
+        "id": "patient-care",
+        "guidance": {
+          "completionLabel": "クリア 1/1",
+          "instructionLabel": "しゃこへもどると つぎのおしごと",
+          "targetLabel": "ちゅうおうしゃこ",
+          "targetPosition": [
+            0,
+            0.8,
+            6
+          ]
+        },
+        "jobCycle": 1,
+        "jobId": "patient-playground",
+        "jobLabel": "ゆうぐのそばで てあてしよう",
+        "jobSeed": 5376,
+        "targetPositions": [
+          [
+            6,
+            0.7,
+            -29.5
+          ]
+        ],
+        "objectiveLabel": "できた！",
+        "phase": "celebrating",
+        "progress": {
+          "current": 1,
+          "target": 1
+        },
+        "routeVisible": false,
+        "vehicleId": "ambulance"
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 684,
+        "rendererCalls": 37
+      },
+      "resetCount": 0
+    },
+    {
+      "id": "patient-picnic",
+      "seed": 10752,
+      "vehicle": "ambulance",
+      "completed": {
+        "direction": [
+          -0.7272519276351446,
+          0,
+          -0.6863706241899974
+        ],
+        "distance": 25.587600936711958,
+        "nozzleOrigin": [
+          2.3146038919808256,
+          2.148873710632324,
+          -18.801588056728463
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            0.1328481090753919,
+            2.148873710632324,
+            -20.860699929298455
+          ],
+          "end": [
+            -2.048907673830042,
+            2.148873710632324,
+            -22.91981180186845
+          ],
+          "start": [
+            2.3146038919808256,
+            2.148873710632324,
+            -18.801588056728463
+          ]
+        },
+        "destinationDistrict": "park",
+        "id": "patient-care",
+        "guidance": {
+          "completionLabel": "クリア 1/1",
+          "instructionLabel": "しゃこへもどると つぎのおしごと",
+          "targetLabel": "ちゅうおうしゃこ",
+          "targetPosition": [
+            0,
+            0.8,
+            6
+          ]
+        },
+        "jobCycle": 1,
+        "jobId": "patient-picnic",
+        "jobLabel": "ピクニックで てあてしよう",
+        "jobSeed": 10752,
+        "targetPositions": [
+          [
+            3.5,
+            0.7,
+            -18
+          ]
+        ],
+        "objectiveLabel": "できた！",
+        "phase": "celebrating",
+        "progress": {
+          "current": 1,
+          "target": 1
+        },
+        "routeVisible": false,
+        "vehicleId": "ambulance"
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 382,
+        "rendererCalls": 37
+      },
+      "resetCount": 0
+    },
+    {
+      "id": "soil-south",
+      "seed": 5376,
+      "vehicle": "excavator",
+      "completed": {
+        "direction": [
+          -0.8436674904497543,
+          0,
+          -0.5368660592347161
+        ],
+        "distance": 47.80266123737578,
+        "nozzleOrigin": [
+          -29.232750053588802,
+          2.1488735914230346,
+          -8.0119145110872
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            -31.763752524938063,
+            2.1488735914230346,
+            -9.622512688791348
+          ],
+          "end": [
+            -34.294754996287324,
+            2.1488735914230346,
+            -11.233110866495498
+          ],
+          "start": [
+            -29.232750053588802,
+            2.1488735914230346,
+            -8.0119145110872
+          ]
+        },
+        "destinationDistrict": "blocks",
+        "id": "soil-digging",
+        "guidance": {
+          "completionLabel": "クリア 3/3",
+          "instructionLabel": "しゃこへもどると つぎのおしごと",
+          "targetLabel": "ちゅうおうしゃこ",
+          "targetPosition": [
+            0,
+            0.8,
+            6
+          ]
+        },
+        "jobCycle": 1,
+        "jobId": "soil-south",
+        "jobLabel": "みなみのつちをほろう",
+        "jobSeed": 5376,
+        "targetPositions": [
+          [
+            -29.5,
+            0.65,
+            -6.5
+          ],
+          [
+            -24,
+            0.65,
+            -7
+          ],
+          [
+            -18.5,
+            0.65,
+            -6
+          ]
+        ],
+        "objectiveLabel": "できた！",
+        "phase": "celebrating",
+        "progress": {
+          "current": 3,
+          "target": 3
+        },
+        "routeVisible": false,
+        "vehicleId": "excavator"
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 854,
+        "rendererCalls": 38
+      },
+      "resetCount": 0
+    },
+    {
+      "id": "soil-west",
+      "seed": 10752,
+      "vehicle": "excavator",
+      "completed": {
+        "direction": [
+          0.9253418421303002,
+          0,
+          0.3791338486641659
+        ],
+        "distance": 60.447737333446085,
+        "nozzleOrigin": [
+          -31.65900123532185,
+          2.148872935771942,
+          11.654238808293046
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            -28.88297570893095,
+            2.148872935771942,
+            12.791640354285544
+          ],
+          "end": [
+            -26.106950182540047,
+            2.148872935771942,
+            13.92904190027804
+          ],
+          "start": [
+            -31.65900123532185,
+            2.148872935771942,
+            11.654238808293046
+          ]
+        },
+        "destinationDistrict": "blocks",
+        "id": "soil-digging",
+        "guidance": {
+          "completionLabel": "クリア 3/3",
+          "instructionLabel": "しゃこへもどると つぎのおしごと",
+          "targetLabel": "ちゅうおうしゃこ",
+          "targetPosition": [
+            0,
+            0.8,
+            6
+          ]
+        },
+        "jobCycle": 1,
+        "jobId": "soil-west",
+        "jobLabel": "にしのつちをほろう",
+        "jobSeed": 10752,
+        "targetPositions": [
+          [
+            -32,
+            0.65,
+            -6
+          ],
+          [
+            -32,
+            0.65,
+            2
+          ],
+          [
+            -32,
+            0.65,
+            10
+          ]
+        ],
+        "objectiveLabel": "できた！",
+        "phase": "celebrating",
+        "progress": {
+          "current": 3,
+          "target": 3
+        },
+        "routeVisible": false,
+        "vehicleId": "excavator"
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 1305,
+        "rendererCalls": 37
+      },
+      "resetCount": 0
+    },
+    {
+      "id": "patrol-pools",
+      "seed": 5376,
+      "vehicle": "police",
+      "completed": {
+        "direction": [
+          0.06538358254747591,
+          0,
+          0.9978602042036036
+        ],
+        "distance": 50.870333144429594,
+        "nozzleOrigin": [
+          -6.65171869824351,
+          2.148873710632324,
+          33.71191486789808
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            -6.455567950601083,
+            2.148873710632324,
+            36.705495480508894
+          ],
+          "end": [
+            -6.259417202958654,
+            2.148873710632324,
+            39.6990760931197
+          ],
+          "start": [
+            -6.65171869824351,
+            2.148873710632324,
+            33.71191486789808
+          ]
+        },
+        "destinationDistrict": "south",
+        "id": "patrol",
+        "guidance": {
+          "completionLabel": "クリア 3/3",
+          "instructionLabel": "しゃこへもどると つぎのおしごと",
+          "targetLabel": "ちゅうおうしゃこ",
+          "targetPosition": [
+            0,
+            0.8,
+            6
+          ]
+        },
+        "jobCycle": 1,
+        "jobId": "patrol-pools",
+        "jobLabel": "プールがわを みまわろう",
+        "jobSeed": 5376,
+        "targetPositions": [
+          [
+            -10,
+            0.7,
+            20.75
+          ],
+          [
+            -10,
+            0.7,
+            26.3
+          ],
+          [
+            -6,
+            0.7,
+            32
+          ]
+        ],
+        "objectiveLabel": "できた！",
+        "phase": "celebrating",
+        "progress": {
+          "current": 3,
+          "target": 3
+        },
+        "routeVisible": false,
+        "vehicleId": "police"
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 601,
+        "rendererCalls": 35
+      },
+      "resetCount": 0
+    },
+    {
+      "id": "patrol-showers",
+      "seed": 10752,
+      "vehicle": "police",
+      "completed": {
+        "direction": [
+          -0.6019789431001309,
+          0,
+          0.7985119611277275
+        ],
+        "distance": 45.495598279523854,
+        "nozzleOrigin": [
+          5.097662789527629,
+          2.148873710632324,
+          32.65840226445913
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            3.291725960227236,
+            2.148873710632324,
+            35.05393814784231
+          ],
+          "end": [
+            1.4857891309268432,
+            2.148873710632324,
+            37.44947403122549
+          ],
+          "start": [
+            5.097662789527629,
+            2.148873710632324,
+            32.65840226445913
+          ]
+        },
+        "destinationDistrict": "south",
+        "id": "patrol",
+        "guidance": {
+          "completionLabel": "クリア 3/3",
+          "instructionLabel": "しゃこへもどると つぎのおしごと",
+          "targetLabel": "ちゅうおうしゃこ",
+          "targetPosition": [
+            0,
+            0.8,
+            6
+          ]
+        },
+        "jobCycle": 1,
+        "jobId": "patrol-showers",
+        "jobLabel": "シャワーがわを みまわろう",
+        "jobSeed": 10752,
+        "targetPositions": [
+          [
+            10,
+            0.7,
+            20.75
+          ],
+          [
+            10,
+            0.7,
+            26.3
+          ],
+          [
+            6,
+            0.7,
+            32
+          ]
+        ],
+        "objectiveLabel": "できた！",
+        "phase": "celebrating",
+        "progress": {
+          "current": 3,
+          "target": 3
+        },
+        "routeVisible": false,
+        "vehicleId": "police"
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 869,
+        "rendererCalls": 36
+      },
+      "resetCount": 0
+    },
+    {
+      "id": "debris-south",
+      "seed": 5376,
+      "vehicle": "bulldozer",
+      "completed": {
+        "direction": [
+          -0.9271589813045097,
+          0,
+          -0.37466815101684864
+        ],
+        "distance": 47.066069494622326,
+        "nozzleOrigin": [
+          -28.489662470976455,
+          2.198872947692871,
+          -7.9259549645472465
+        ],
+        "sprayActive": false,
+        "sprayElapsedSeconds": 0,
+        "sprayOnFire": false,
+        "splashElapsedSeconds": 0,
+        "targeted": false,
+        "waterPath": {
+          "control": [
+            -31.271139414889983,
+            2.198872947692871,
+            -9.049959417597792
+          ],
+          "end": [
+            -34.05261635880351,
+            2.198872947692871,
+            -10.173963870648338
+          ],
+          "start": [
+            -28.489662470976455,
+            2.198872947692871,
+            -7.9259549645472465
+          ]
+        },
+        "destinationDistrict": "blocks",
+        "id": "debris-clearance",
+        "guidance": {
+          "completionLabel": "クリア 3/3",
+          "instructionLabel": "しゃこへもどると つぎのおしごと",
+          "targetLabel": "ちゅうおうしゃこ",
+          "targetPosition": [
+            0,
+            0.8,
+            6
+          ]
+        },
+        "jobCycle": 1,
+        "jobId": "debris-south",
+        "jobLabel": "みなみのがれきをかたづけよう",
+        "jobSeed": 5376,
+        "targetPositions": [
+          [
+            -29.5,
+            0.8,
+            -6.5
+          ],
+          [
+            -24,
+            0.8,
+            -7
+          ],
+          [
+            -18.5,
+            0.8,
+            -6
+          ]
+        ],
+        "objectiveLabel": "できた！",
+        "phase": "celebrating",
+        "progress": {
+          "current": 3,
+          "target": 3
+        },
+        "routeVisible": false,
+        "vehicleId": "bulldozer"
+      },
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 649,
+        "rendererCalls": 36
+      },
+      "resetCount": 0
+    }
+  ]
+}

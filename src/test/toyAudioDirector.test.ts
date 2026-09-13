@@ -38,6 +38,13 @@ class FakeToyAudioBackend implements ToyAudioBackend {
   }
 }
 
+/** 非同期backend操作の開始と完了順をtest側で制御する。 */
+function createDeferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+  let resolve = (): void => undefined;
+  const promise = new Promise<void>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}
+
 /** 標準の毎frame入力を返す。 */
 function frameInput() {
   return {
@@ -86,6 +93,90 @@ describe('ToyAudioDirector', () => {
     await director.dispose();
     expect(backend.state).toBe('closed');
     expect(backendFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it('初回resume中にhiddenになっても完了後はsuspendedへ収束する', async () => {
+    const backend = new FakeToyAudioBackend();
+    const resumeGate = createDeferred();
+    const resume = vi.spyOn(backend, 'resume').mockImplementation(async () => {
+      await resumeGate.promise;
+      backend.state = 'running';
+    });
+    const director = new ToyAudioDirector({ available: true, backendFactory: () => backend });
+
+    const enabling = director.setEnabled(true);
+    expect(resume).toHaveBeenCalledOnce();
+    const hiding = director.setVisible(false);
+    resumeGate.resolve();
+
+    await expect(enabling).resolves.toBe(true);
+    await hiding;
+    expect(director.getTelemetry()).toMatchObject({ contextState: 'suspended', enabled: true });
+  });
+
+  it('suspend中にvisibleへ戻っても古い完了で停止状態へ戻らない', async () => {
+    const backend = new FakeToyAudioBackend();
+    const director = new ToyAudioDirector({ available: true, backendFactory: () => backend });
+    await director.setEnabled(true);
+    const suspendGate = createDeferred();
+    const suspendStarted = createDeferred();
+    vi.spyOn(backend, 'suspend').mockImplementation(async () => {
+      suspendStarted.resolve();
+      await suspendGate.promise;
+      backend.state = 'suspended';
+    });
+
+    const hiding = director.setVisible(false);
+    await suspendStarted.promise;
+    const cueCountBeforeHiddenUpdate = director.getTelemetry().cueCount;
+    director.update(frameInput());
+    director.playCue('target-complete');
+    expect(backend.frames.at(-1)).toMatchObject({
+      actionAttackGain: 0,
+      actionGainA: 0,
+      actionGainB: 0,
+      bgmGain: 0,
+      engineGain: 0,
+      noiseGain: 0,
+      targetActionGain: 0,
+    });
+    expect(director.getTelemetry().cueCount).toBe(cueCountBeforeHiddenUpdate);
+    const showing = director.setVisible(true);
+    suspendGate.resolve();
+    await Promise.all([hiding, showing]);
+
+    expect(director.getTelemetry()).toMatchObject({ contextState: 'running', enabled: true });
+  });
+
+  it('初回resumeがpendingでもdisposeは直ちにcloseを開始し最終状態を上書きさせない', async () => {
+    const backend = new FakeToyAudioBackend();
+    const resumeGate = createDeferred();
+    vi.spyOn(backend, 'resume').mockImplementation(async () => {
+      await resumeGate.promise;
+      if (backend.state !== 'closed') backend.state = 'running';
+    });
+    const close = vi.spyOn(backend, 'close');
+    const director = new ToyAudioDirector({ available: true, backendFactory: () => backend });
+
+    const enabling = director.setEnabled(true);
+    const disposing = director.dispose();
+    expect(close).toHaveBeenCalledOnce();
+    expect(backend.state).toBe('closed');
+    resumeGate.resolve();
+
+    await expect(enabling).resolves.toBe(false);
+    await disposing;
+    expect(director.getTelemetry()).toMatchObject({ contextState: 'closed', enabled: false });
+  });
+
+  it('backend生成前のeffect cleanup相当disposeでは後続のuser activationを妨げない', async () => {
+    const backend = new FakeToyAudioBackend();
+    const director = new ToyAudioDirector({ available: true, backendFactory: () => backend });
+
+    await director.dispose();
+
+    await expect(director.setEnabled(true)).resolves.toBe(true);
+    expect(director.getTelemetry()).toMatchObject({ contextState: 'running', enabled: true });
   });
 
   it('有効中だけcueと対応振動を1回ずつ送る', async () => {

@@ -110,6 +110,8 @@ export function FullscreenDrivePad({ controls }: FullscreenDrivePadProps): React
     releaseActivePointer(true);
   }, [releaseActivePointer]);
 
+  useEffect(() => controls.subscribeReset(() => releaseActivePointer(true)), [controls.subscribeReset, releaseActivePointer]);
+
   /** browserがcaptureを失った場合もstickを停止する。 */
   const handleLostPointerCapture = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
     if (activePointerRef.current !== event.pointerId) return;

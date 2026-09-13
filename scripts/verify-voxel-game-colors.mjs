@@ -268,7 +268,7 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(initial.visuals.colorPoolCubeCount, 24);
     assert.equal(initial.visuals.colorShowerCubeCount, 54);
     assert.equal(initial.visuals.colorStationCubeCount, 78);
-    assert.equal(initial.visuals.colorStationDrawCalls, 5);
+    assert.equal(initial.visuals.colorStationDrawCalls, 1);
     const sourceById = new Map(initial.landmarks.colorPlaySources.map((source) => [source.id, source]));
     const redPool = sourceById.get('pool-red');
     const bluePool = sourceById.get('pool-blue');

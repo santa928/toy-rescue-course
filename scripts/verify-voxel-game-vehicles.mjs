@@ -12,6 +12,7 @@ const allViewports = [
   { height: 720, name: 'desktop', touch: false, width: 1_280 },
   { height: 768, name: 'tablet', touch: true, width: 1_024 },
   { height: 390, name: 'mobile-landscape', touch: true, width: 844 },
+  { height: 844, name: 'mobile-portrait', touch: true, width: 390 },
 ];
 const viewportFilter = process.env.VOXEL_GAME_VEHICLE_VIEWPORT ?? null;
 const viewports = viewportFilter === null
@@ -306,7 +307,7 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(selected.mission.jobSeed, 1);
     assert.equal(
       selected.mission.guidance.instructionLabel,
-      'ブレードをおしながら がれきにぶつかる',
+      '「ブレード」をおしながら がれきにぶつかる',
       `${viewport.name}: bulldozer instruction does not explain the required action.`,
     );
     assert.equal(selected.mission.guidance.targetLabel, 'つぎの がれき');

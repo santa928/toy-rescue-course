@@ -1,0 +1,2192 @@
+{
+  "generatedAt": "2026-09-12T06:43:07.752Z",
+  "note": "Docker renderer values are diagnostic; physical GPU certification is separate.",
+  "results": {
+    "desktop": {
+      "activeLayout": {
+        "action": {
+          "bottom": 696,
+          "left": 1142,
+          "right": 1258,
+          "top": 580
+        },
+        "colorEffect": {
+          "bottom": 146.09375,
+          "left": 500,
+          "right": 651.984375,
+          "top": 112.09375
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 1154,
+          "right": 1266,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 702,
+          "left": 18,
+          "right": 172,
+          "top": 548
+        },
+        "mission": {
+          "bottom": 102.09375,
+          "left": 316,
+          "right": 836,
+          "top": 12
+        }
+      },
+      "blueActivationCount": 4,
+      "bulldozerColor": {
+        "active": true,
+        "activationCount": 7,
+        "colorHex": "#ef4444",
+        "colorId": "red",
+        "contactSourceId": "pool-red",
+        "remainingMilliseconds": 12000,
+        "remainingSeconds": 12,
+        "sourceId": "pool-red",
+        "sourceKind": "pool",
+        "vehicleId": "bulldozer"
+      },
+      "garageLayout": {
+        "action": {
+          "bottom": 696,
+          "left": 1142,
+          "right": 1258,
+          "top": 580
+        },
+        "colorEffect": {
+          "bottom": 146.09375,
+          "left": 675.28125,
+          "right": 842.703125,
+          "top": 112.09375
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 1154,
+          "right": 1266,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 702,
+          "left": 18,
+          "right": 172,
+          "top": 548
+        },
+        "mission": {
+          "bottom": 102.09375,
+          "left": 499,
+          "right": 1019,
+          "top": 12
+        },
+        "selector": {
+          "bottom": 167.5,
+          "left": 14,
+          "right": 364,
+          "top": 12
+        }
+      },
+      "rendererCalls": 34,
+      "sourceCount": 6,
+      "yellowActivationCount": 6,
+      "yellowLayout": {
+        "action": {
+          "bottom": 696,
+          "left": 1142,
+          "right": 1258,
+          "top": 580
+        },
+        "colorEffect": {
+          "bottom": 146.09375,
+          "left": 492.28125,
+          "right": 659.703125,
+          "top": 112.09375
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 1154,
+          "right": 1266,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 702,
+          "left": 18,
+          "right": 172,
+          "top": 548
+        },
+        "mission": {
+          "bottom": 102.09375,
+          "left": 316,
+          "right": 836,
+          "top": 12
+        }
+      }
+    },
+    "tablet": {
+      "activeLayout": {
+        "action": {
+          "bottom": 744,
+          "left": 886,
+          "right": 1002,
+          "top": 628
+        },
+        "colorEffect": {
+          "bottom": 146.09375,
+          "left": 372,
+          "right": 523.984375,
+          "top": 112.09375
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 898,
+          "right": 1010,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 750,
+          "left": 18,
+          "right": 172,
+          "top": 596
+        },
+        "mission": {
+          "bottom": 102.09375,
+          "left": 188,
+          "right": 708,
+          "top": 12
+        }
+      },
+      "blueActivationCount": 3,
+      "bulldozerColor": null,
+      "garageLayout": {
+        "action": {
+          "bottom": 744,
+          "left": 886,
+          "right": 1002,
+          "top": 628
+        },
+        "colorEffect": {
+          "bottom": 146.09375,
+          "left": 536.109375,
+          "right": 703.53125,
+          "top": 112.09375
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 898,
+          "right": 1010,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 750,
+          "left": 18,
+          "right": 172,
+          "top": 596
+        },
+        "mission": {
+          "bottom": 102.09375,
+          "left": 359.828125,
+          "right": 879.828125,
+          "top": 12
+        },
+        "selector": {
+          "bottom": 167.5,
+          "left": 14,
+          "right": 341.671875,
+          "top": 12
+        }
+      },
+      "rendererCalls": 34,
+      "sourceCount": 6,
+      "yellowActivationCount": 5,
+      "yellowLayout": {
+        "action": {
+          "bottom": 744,
+          "left": 886,
+          "right": 1002,
+          "top": 628
+        },
+        "colorEffect": {
+          "bottom": 146.09375,
+          "left": 364.28125,
+          "right": 531.703125,
+          "top": 112.09375
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 898,
+          "right": 1010,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 750,
+          "left": 18,
+          "right": 172,
+          "top": 596
+        },
+        "mission": {
+          "bottom": 102.09375,
+          "left": 188,
+          "right": 708,
+          "top": 12
+        }
+      }
+    },
+    "mobile-landscape": {
+      "activeLayout": {
+        "action": {
+          "bottom": 366,
+          "left": 722,
+          "right": 822,
+          "top": 265.65625
+        },
+        "colorEffect": {
+          "bottom": 133.3125,
+          "left": 304.59375,
+          "right": 427.40625,
+          "top": 104.3125
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 730,
+          "right": 830,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 372,
+          "left": 18,
+          "right": 130,
+          "top": 260
+        },
+        "mission": {
+          "bottom": 94.3125,
+          "left": 106,
+          "right": 626,
+          "top": 12
+        }
+      },
+      "blueActivationCount": 3,
+      "bulldozerColor": null,
+      "garageLayout": {
+        "action": {
+          "bottom": 366,
+          "left": 722,
+          "right": 822,
+          "top": 265.65625
+        },
+        "colorEffect": {
+          "bottom": 133.3125,
+          "left": 439.453125,
+          "right": 574.625,
+          "top": 104.3125
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 730,
+          "right": 830,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 372,
+          "left": 18,
+          "right": 130,
+          "top": 260
+        },
+        "mission": {
+          "bottom": 94.3125,
+          "left": 296.078125,
+          "right": 718,
+          "top": 12
+        },
+        "selector": {
+          "bottom": 134,
+          "left": 14,
+          "right": 284.078125,
+          "top": 12
+        }
+      },
+      "rendererCalls": 34,
+      "sourceCount": 6,
+      "yellowActivationCount": 5,
+      "yellowLayout": {
+        "action": {
+          "bottom": 366,
+          "left": 722,
+          "right": 822,
+          "top": 265.65625
+        },
+        "colorEffect": {
+          "bottom": 133.3125,
+          "left": 298.40625,
+          "right": 433.578125,
+          "top": 104.3125
+        },
+        "fullscreen": {
+          "bottom": 56,
+          "left": 730,
+          "right": 830,
+          "top": 12
+        },
+        "joystick": {
+          "bottom": 372,
+          "left": 18,
+          "right": 130,
+          "top": 260
+        },
+        "mission": {
+          "bottom": 94.3125,
+          "left": 106,
+          "right": 626,
+          "top": 12
+        }
+      }
+    }
+  },
+  "screenshotProofs": {
+    "desktop-blue-pool.png": {
+      "controls": {
+        "fullscreen": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 56,
+            "height": 44,
+            "left": 1154,
+            "right": 1266,
+            "top": 12,
+            "width": 112
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "全画面",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 41.75,
+              "height": 16,
+              "left": 1205.546875,
+              "right": 1244.453125,
+              "top": 25.75,
+              "width": 38.90625
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 11.331696262884465,
+            "renderedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "joystick": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 702,
+            "height": 154,
+            "left": 18,
+            "right": 172,
+            "top": 548,
+            "width": 154
+          },
+          "display": "block",
+          "filter": "none",
+          "label": "どこでも",
+          "labelStyle": {
+            "backgroundColor": "rgb(32, 36, 42)",
+            "box": {
+              "bottom": 690.046875,
+              "height": 13,
+              "left": 72.0625,
+              "right": 117.9375,
+              "top": 677.046875,
+              "width": 45.875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 14.982563049331755,
+            "renderedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "mission": {
+          "backgroundColor": "rgb(255, 250, 240)",
+          "borderColor": "rgb(129, 39, 31)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 102.09375,
+            "height": 90.09375,
+            "left": 316,
+            "right": 836,
+            "top": 12,
+            "width": 520
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "よこの火をけそう",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 46,
+              "height": 21,
+              "left": 382,
+              "right": 515.1875,
+              "top": 25,
+              "width": 133.1875
+            },
+            "color": "rgb(129, 39, 31)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 8.997204101552374,
+            "renderedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "renderedColor": [
+              129,
+              39,
+              31
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "spray": {
+          "backgroundColor": "rgb(95, 203, 234)",
+          "borderColor": "rgb(25, 121, 148)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 696,
+            "height": 116,
+            "left": 1142,
+            "right": 1258,
+            "top": 580,
+            "width": 116
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "みず",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 657.796875,
+              "height": 18,
+              "left": 1184.109375,
+              "right": 1215.875,
+              "top": 639.796875,
+              "width": 31.765625
+            },
+            "color": "rgb(16, 58, 71)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 6.528221727985187,
+            "renderedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "renderedColor": [
+              16,
+              58,
+              71
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        }
+      },
+      "pixels": {
+        "fullscreen": {
+          "backgroundMatchRatio": 0.627435064935065,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.3941176470588235,
+            "foregroundMatchRatio": 0.011764705882352941,
+            "height": 17,
+            "width": 40,
+            "expectedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "joystick": {
+          "backgroundMatchRatio": 0.3408669252825097,
+          "edgeMatchRatios": {
+            "bottom": 0.5833333333333334,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.2096273291925466,
+            "foregroundMatchRatio": 0.003105590062111801,
+            "height": 14,
+            "width": 46,
+            "expectedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "mission": {
+          "backgroundMatchRatio": 0.8233305156382079,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.1886993603411514,
+            "foregroundMatchRatio": 0.03447050461975835,
+            "height": 21,
+            "width": 134,
+            "expectedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "expectedForegroundColor": [
+              129,
+              39,
+              31
+            ]
+          }
+        },
+        "spray": {
+          "backgroundMatchRatio": 0.5476367419738407,
+          "edgeMatchRatios": {
+            "bottom": 0.4444444444444444,
+            "left": 0.4351851851851852,
+            "right": 0.4351851851851852,
+            "top": 0.43287037037037035
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.22039473684210525,
+            "foregroundMatchRatio": 0.027960526315789474,
+            "height": 19,
+            "width": 32,
+            "expectedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "expectedForegroundColor": [
+              16,
+              58,
+              71
+            ]
+          }
+        }
+      },
+      "stableSamples": 2
+    },
+    "desktop-yellow-shower.png": {
+      "controls": {
+        "fullscreen": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 56,
+            "height": 44,
+            "left": 1154,
+            "right": 1266,
+            "top": 12,
+            "width": 112
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "全画面",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 41.75,
+              "height": 16,
+              "left": 1205.546875,
+              "right": 1244.453125,
+              "top": 25.75,
+              "width": 38.90625
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 11.331696262884465,
+            "renderedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "joystick": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 702,
+            "height": 154,
+            "left": 18,
+            "right": 172,
+            "top": 548,
+            "width": 154
+          },
+          "display": "block",
+          "filter": "none",
+          "label": "どこでも",
+          "labelStyle": {
+            "backgroundColor": "rgb(32, 36, 42)",
+            "box": {
+              "bottom": 690.046875,
+              "height": 13,
+              "left": 72.0625,
+              "right": 117.9375,
+              "top": 677.046875,
+              "width": 45.875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 14.982563049331755,
+            "renderedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "mission": {
+          "backgroundColor": "rgb(255, 250, 240)",
+          "borderColor": "rgb(129, 39, 31)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 102.09375,
+            "height": 90.09375,
+            "left": 316,
+            "right": 836,
+            "top": 12,
+            "width": 520
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "よこの火をけそう",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 46,
+              "height": 21,
+              "left": 382,
+              "right": 515.1875,
+              "top": 25,
+              "width": 133.1875
+            },
+            "color": "rgb(129, 39, 31)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 8.997204101552374,
+            "renderedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "renderedColor": [
+              129,
+              39,
+              31
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "spray": {
+          "backgroundColor": "rgb(95, 203, 234)",
+          "borderColor": "rgb(25, 121, 148)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 696,
+            "height": 116,
+            "left": 1142,
+            "right": 1258,
+            "top": 580,
+            "width": 116
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "みず",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 657.796875,
+              "height": 18,
+              "left": 1184.109375,
+              "right": 1215.875,
+              "top": 639.796875,
+              "width": 31.765625
+            },
+            "color": "rgb(16, 58, 71)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 6.528221727985187,
+            "renderedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "renderedColor": [
+              16,
+              58,
+              71
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        }
+      },
+      "pixels": {
+        "fullscreen": {
+          "backgroundMatchRatio": 0.627435064935065,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.3941176470588235,
+            "foregroundMatchRatio": 0.011764705882352941,
+            "height": 17,
+            "width": 40,
+            "expectedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "joystick": {
+          "backgroundMatchRatio": 0.3407404284027661,
+          "edgeMatchRatios": {
+            "bottom": 0.5833333333333334,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.2096273291925466,
+            "foregroundMatchRatio": 0.003105590062111801,
+            "height": 14,
+            "width": 46,
+            "expectedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "mission": {
+          "backgroundMatchRatio": 0.8233305156382079,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.1886993603411514,
+            "foregroundMatchRatio": 0.03447050461975835,
+            "height": 21,
+            "width": 134,
+            "expectedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "expectedForegroundColor": [
+              129,
+              39,
+              31
+            ]
+          }
+        },
+        "spray": {
+          "backgroundMatchRatio": 0.5476367419738407,
+          "edgeMatchRatios": {
+            "bottom": 0.4444444444444444,
+            "left": 0.43287037037037035,
+            "right": 0.4375,
+            "top": 0.4351851851851852
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.22039473684210525,
+            "foregroundMatchRatio": 0.027960526315789474,
+            "height": 19,
+            "width": 32,
+            "expectedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "expectedForegroundColor": [
+              16,
+              58,
+              71
+            ]
+          }
+        }
+      },
+      "stableSamples": 2
+    },
+    "tablet-blue-pool.png": {
+      "controls": {
+        "fullscreen": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 56,
+            "height": 44,
+            "left": 898,
+            "right": 1010,
+            "top": 12,
+            "width": 112
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "全画面",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 41.75,
+              "height": 16,
+              "left": 949.546875,
+              "right": 988.453125,
+              "top": 25.75,
+              "width": 38.90625
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 11.331696262884465,
+            "renderedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "joystick": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 750,
+            "height": 154,
+            "left": 18,
+            "right": 172,
+            "top": 596,
+            "width": 154
+          },
+          "display": "block",
+          "filter": "none",
+          "label": "どこでも",
+          "labelStyle": {
+            "backgroundColor": "rgb(32, 36, 42)",
+            "box": {
+              "bottom": 738.046875,
+              "height": 13,
+              "left": 72.0625,
+              "right": 117.9375,
+              "top": 725.046875,
+              "width": 45.875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 14.982563049331755,
+            "renderedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "mission": {
+          "backgroundColor": "rgb(255, 250, 240)",
+          "borderColor": "rgb(129, 39, 31)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 102.09375,
+            "height": 90.09375,
+            "left": 188,
+            "right": 708,
+            "top": 12,
+            "width": 520
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "よこの火をけそう",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 46,
+              "height": 21,
+              "left": 254,
+              "right": 387.1875,
+              "top": 25,
+              "width": 133.1875
+            },
+            "color": "rgb(129, 39, 31)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 8.997204101552374,
+            "renderedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "renderedColor": [
+              129,
+              39,
+              31
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "spray": {
+          "backgroundColor": "rgb(95, 203, 234)",
+          "borderColor": "rgb(25, 121, 148)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 744,
+            "height": 116,
+            "left": 886,
+            "right": 1002,
+            "top": 628,
+            "width": 116
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "みず",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 705.796875,
+              "height": 18,
+              "left": 928.109375,
+              "right": 959.875,
+              "top": 687.796875,
+              "width": 31.765625
+            },
+            "color": "rgb(16, 58, 71)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 6.528221727985187,
+            "renderedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "renderedColor": [
+              16,
+              58,
+              71
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        }
+      },
+      "pixels": {
+        "fullscreen": {
+          "backgroundMatchRatio": 0.627435064935065,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.3941176470588235,
+            "foregroundMatchRatio": 0.011764705882352941,
+            "height": 17,
+            "width": 40,
+            "expectedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "joystick": {
+          "backgroundMatchRatio": 0.3408669252825097,
+          "edgeMatchRatios": {
+            "bottom": 0.5833333333333334,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.2096273291925466,
+            "foregroundMatchRatio": 0.003105590062111801,
+            "height": 14,
+            "width": 46,
+            "expectedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "mission": {
+          "backgroundMatchRatio": 0.8233305156382079,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.1886993603411514,
+            "foregroundMatchRatio": 0.03447050461975835,
+            "height": 21,
+            "width": 134,
+            "expectedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "expectedForegroundColor": [
+              129,
+              39,
+              31
+            ]
+          }
+        },
+        "spray": {
+          "backgroundMatchRatio": 0.5476367419738407,
+          "edgeMatchRatios": {
+            "bottom": 0.4444444444444444,
+            "left": 0.43287037037037035,
+            "right": 0.4351851851851852,
+            "top": 0.4351851851851852
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.22039473684210525,
+            "foregroundMatchRatio": 0.027960526315789474,
+            "height": 19,
+            "width": 32,
+            "expectedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "expectedForegroundColor": [
+              16,
+              58,
+              71
+            ]
+          }
+        }
+      },
+      "stableSamples": 2
+    },
+    "tablet-yellow-shower.png": {
+      "controls": {
+        "fullscreen": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 56,
+            "height": 44,
+            "left": 898,
+            "right": 1010,
+            "top": 12,
+            "width": 112
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "全画面",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 41.75,
+              "height": 16,
+              "left": 949.546875,
+              "right": 988.453125,
+              "top": 25.75,
+              "width": 38.90625
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 11.331696262884465,
+            "renderedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "joystick": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 750,
+            "height": 154,
+            "left": 18,
+            "right": 172,
+            "top": 596,
+            "width": 154
+          },
+          "display": "block",
+          "filter": "none",
+          "label": "どこでも",
+          "labelStyle": {
+            "backgroundColor": "rgb(32, 36, 42)",
+            "box": {
+              "bottom": 738.046875,
+              "height": 13,
+              "left": 72.0625,
+              "right": 117.9375,
+              "top": 725.046875,
+              "width": 45.875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 14.982563049331755,
+            "renderedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "mission": {
+          "backgroundColor": "rgb(255, 250, 240)",
+          "borderColor": "rgb(129, 39, 31)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 102.09375,
+            "height": 90.09375,
+            "left": 188,
+            "right": 708,
+            "top": 12,
+            "width": 520
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "よこの火をけそう",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 46,
+              "height": 21,
+              "left": 254,
+              "right": 387.1875,
+              "top": 25,
+              "width": 133.1875
+            },
+            "color": "rgb(129, 39, 31)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 8.997204101552374,
+            "renderedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "renderedColor": [
+              129,
+              39,
+              31
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "spray": {
+          "backgroundColor": "rgb(95, 203, 234)",
+          "borderColor": "rgb(25, 121, 148)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 744,
+            "height": 116,
+            "left": 886,
+            "right": 1002,
+            "top": 628,
+            "width": 116
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "みず",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 705.796875,
+              "height": 18,
+              "left": 928.109375,
+              "right": 959.875,
+              "top": 687.796875,
+              "width": 31.765625
+            },
+            "color": "rgb(16, 58, 71)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 6.528221727985187,
+            "renderedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "renderedColor": [
+              16,
+              58,
+              71
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        }
+      },
+      "pixels": {
+        "fullscreen": {
+          "backgroundMatchRatio": 0.627435064935065,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.3941176470588235,
+            "foregroundMatchRatio": 0.011764705882352941,
+            "height": 17,
+            "width": 40,
+            "expectedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "joystick": {
+          "backgroundMatchRatio": 0.3407404284027661,
+          "edgeMatchRatios": {
+            "bottom": 0.5833333333333334,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.2096273291925466,
+            "foregroundMatchRatio": 0.003105590062111801,
+            "height": 14,
+            "width": 46,
+            "expectedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "mission": {
+          "backgroundMatchRatio": 0.8233305156382079,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.1886993603411514,
+            "foregroundMatchRatio": 0.03447050461975835,
+            "height": 21,
+            "width": 134,
+            "expectedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "expectedForegroundColor": [
+              129,
+              39,
+              31
+            ]
+          }
+        },
+        "spray": {
+          "backgroundMatchRatio": 0.5476367419738407,
+          "edgeMatchRatios": {
+            "bottom": 0.4444444444444444,
+            "left": 0.43287037037037035,
+            "right": 0.43287037037037035,
+            "top": 0.4351851851851852
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.22039473684210525,
+            "foregroundMatchRatio": 0.027960526315789474,
+            "height": 19,
+            "width": 32,
+            "expectedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "expectedForegroundColor": [
+              16,
+              58,
+              71
+            ]
+          }
+        }
+      },
+      "stableSamples": 2
+    },
+    "mobile-landscape-blue-pool.png": {
+      "controls": {
+        "fullscreen": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 56,
+            "height": 44,
+            "left": 730,
+            "right": 830,
+            "top": 12,
+            "width": 100
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "全画面",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 40.390625,
+              "height": 14,
+              "left": 774.53125,
+              "right": 809.453125,
+              "top": 26.390625,
+              "width": 34.921875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 11.331696262884465,
+            "renderedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "joystick": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 372,
+            "height": 112,
+            "left": 18,
+            "right": 130,
+            "top": 260,
+            "width": 112
+          },
+          "display": "block",
+          "filter": "none",
+          "label": "どこでも",
+          "labelStyle": {
+            "backgroundColor": "rgb(32, 36, 42)",
+            "box": {
+              "bottom": 360.046875,
+              "height": 13,
+              "left": 51.0625,
+              "right": 96.9375,
+              "top": 347.046875,
+              "width": 45.875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 14.982563049331755,
+            "renderedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "mission": {
+          "backgroundColor": "rgb(255, 250, 240)",
+          "borderColor": "rgb(129, 39, 31)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 94.3125,
+            "height": 82.3125,
+            "left": 106,
+            "right": 626,
+            "top": 12,
+            "width": 520
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "よこの火をけそう",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 41,
+              "height": 18,
+              "left": 119,
+              "right": 236.5,
+              "top": 23,
+              "width": 117.5
+            },
+            "color": "rgb(129, 39, 31)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 8.997204101552374,
+            "renderedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "renderedColor": [
+              129,
+              39,
+              31
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "spray": {
+          "backgroundColor": "rgb(95, 203, 234)",
+          "borderColor": "rgb(25, 121, 148)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 366,
+            "height": 100.34375,
+            "left": 722,
+            "right": 822,
+            "top": 265.65625,
+            "width": 100
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "みず",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 335.65625,
+              "height": 18,
+              "left": 756.1875,
+              "right": 787.8125,
+              "top": 317.65625,
+              "width": 31.625
+            },
+            "color": "rgb(16, 58, 71)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 6.528221727985187,
+            "renderedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "renderedColor": [
+              16,
+              58,
+              71
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        }
+      },
+      "pixels": {
+        "fullscreen": {
+          "backgroundMatchRatio": 0.6459090909090909,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.40555555555555556,
+            "foregroundMatchRatio": 0.001851851851851852,
+            "height": 15,
+            "width": 36,
+            "expectedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "joystick": {
+          "backgroundMatchRatio": 0.40122767857142855,
+          "edgeMatchRatios": {
+            "bottom": 0.5833333333333334,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.2096273291925466,
+            "foregroundMatchRatio": 0.003105590062111801,
+            "height": 14,
+            "width": 46,
+            "expectedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "mission": {
+          "backgroundMatchRatio": 0.8262048192771084,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.20527306967984935,
+            "foregroundMatchRatio": 0.03531073446327684,
+            "height": 18,
+            "width": 118,
+            "expectedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "expectedForegroundColor": [
+              129,
+              39,
+              31
+            ]
+          }
+        },
+        "spray": {
+          "backgroundMatchRatio": 0.49267326732673267,
+          "edgeMatchRatios": {
+            "bottom": 0.4388888888888889,
+            "left": 0.4381720430107527,
+            "right": 0.4381720430107527,
+            "top": 0.43333333333333335
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.21546052631578946,
+            "foregroundMatchRatio": 0.03453947368421053,
+            "height": 19,
+            "width": 32,
+            "expectedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "expectedForegroundColor": [
+              16,
+              58,
+              71
+            ]
+          }
+        }
+      },
+      "stableSamples": 2
+    },
+    "mobile-landscape-yellow-shower.png": {
+      "controls": {
+        "fullscreen": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 56,
+            "height": 44,
+            "left": 730,
+            "right": 830,
+            "top": 12,
+            "width": 100
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "全画面",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 40.390625,
+              "height": 14,
+              "left": 774.53125,
+              "right": 809.453125,
+              "top": 26.390625,
+              "width": 34.921875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 11.331696262884465,
+            "renderedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "joystick": {
+          "backgroundColor": "rgb(52, 56, 62)",
+          "borderColor": "rgb(32, 36, 42)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 372,
+            "height": 112,
+            "left": 18,
+            "right": 130,
+            "top": 260,
+            "width": 112
+          },
+          "display": "block",
+          "filter": "none",
+          "label": "どこでも",
+          "labelStyle": {
+            "backgroundColor": "rgb(32, 36, 42)",
+            "box": {
+              "bottom": 360.046875,
+              "height": 13,
+              "left": 51.0625,
+              "right": 96.9375,
+              "top": 347.046875,
+              "width": 45.875
+            },
+            "color": "rgb(255, 250, 240)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 14.982563049331755,
+            "renderedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "renderedColor": [
+              255,
+              250,
+              240
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "mission": {
+          "backgroundColor": "rgb(255, 250, 240)",
+          "borderColor": "rgb(129, 39, 31)",
+          "borderWidths": {
+            "bottom": 4,
+            "left": 4,
+            "right": 4,
+            "top": 4
+          },
+          "box": {
+            "bottom": 94.3125,
+            "height": 82.3125,
+            "left": 106,
+            "right": 626,
+            "top": 12,
+            "width": 520
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "よこの火をけそう",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 41,
+              "height": 18,
+              "left": 119,
+              "right": 236.5,
+              "top": 23,
+              "width": 117.5
+            },
+            "color": "rgb(129, 39, 31)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 8.997204101552374,
+            "renderedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "renderedColor": [
+              129,
+              39,
+              31
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "spray": {
+          "backgroundColor": "rgb(95, 203, 234)",
+          "borderColor": "rgb(25, 121, 148)",
+          "borderWidths": {
+            "bottom": 6,
+            "left": 6,
+            "right": 6,
+            "top": 6
+          },
+          "box": {
+            "bottom": 366,
+            "height": 100.34375,
+            "left": 722,
+            "right": 822,
+            "top": 265.65625,
+            "width": 100
+          },
+          "display": "flex",
+          "filter": "none",
+          "label": "みず",
+          "labelStyle": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "box": {
+              "bottom": 335.65625,
+              "height": 18,
+              "left": 756.1875,
+              "right": 787.8125,
+              "top": 317.65625,
+              "width": 31.625
+            },
+            "color": "rgb(16, 58, 71)",
+            "display": "block",
+            "opacity": "1",
+            "visibility": "visible",
+            "contrastRatio": 6.528221727985187,
+            "renderedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "renderedColor": [
+              16,
+              58,
+              71
+            ]
+          },
+          "opacity": "1",
+          "visibility": "visible"
+        }
+      },
+      "pixels": {
+        "fullscreen": {
+          "backgroundMatchRatio": 0.6463636363636364,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.40555555555555556,
+            "foregroundMatchRatio": 0.001851851851851852,
+            "height": 15,
+            "width": 36,
+            "expectedBackgroundColor": [
+              52,
+              56,
+              62
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "joystick": {
+          "backgroundMatchRatio": 0.40098852040816324,
+          "edgeMatchRatios": {
+            "bottom": 0.5833333333333334,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.2096273291925466,
+            "foregroundMatchRatio": 0.003105590062111801,
+            "height": 14,
+            "width": 46,
+            "expectedBackgroundColor": [
+              32,
+              36,
+              42
+            ],
+            "expectedForegroundColor": [
+              255,
+              250,
+              240
+            ]
+          }
+        },
+        "mission": {
+          "backgroundMatchRatio": 0.8262048192771084,
+          "edgeMatchRatios": {
+            "bottom": 0.5,
+            "left": 0.5,
+            "right": 0.5,
+            "top": 0.5
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.20527306967984935,
+            "foregroundMatchRatio": 0.03531073446327684,
+            "height": 18,
+            "width": 118,
+            "expectedBackgroundColor": [
+              255,
+              250,
+              240
+            ],
+            "expectedForegroundColor": [
+              129,
+              39,
+              31
+            ]
+          }
+        },
+        "spray": {
+          "backgroundMatchRatio": 0.49267326732673267,
+          "edgeMatchRatios": {
+            "bottom": 0.4388888888888889,
+            "left": 0.4381720430107527,
+            "right": 0.43548387096774194,
+            "top": 0.43333333333333335
+          },
+          "label": {
+            "distinctFromBackgroundRatio": 0.21546052631578946,
+            "foregroundMatchRatio": 0.03453947368421053,
+            "height": 19,
+            "width": 32,
+            "expectedBackgroundColor": [
+              95,
+              203,
+              234
+            ],
+            "expectedForegroundColor": [
+              16,
+              58,
+              71
+            ]
+          }
+        }
+      },
+      "stableSamples": 2
+    }
+  },
+  "screenshots": [
+    "desktop-blue-pool.png",
+    "desktop-yellow-shower.png",
+    "tablet-blue-pool.png",
+    "tablet-yellow-shower.png",
+    "mobile-landscape-blue-pool.png",
+    "mobile-landscape-yellow-shower.png"
+  ],
+  "viewports": [
+    {
+      "height": 720,
+      "name": "desktop",
+      "touch": false,
+      "width": 1280
+    },
+    {
+      "height": 768,
+      "name": "tablet",
+      "touch": true,
+      "width": 1024
+    },
+    {
+      "height": 390,
+      "name": "mobile-landscape",
+      "touch": true,
+      "width": 844
+    }
+  ]
+}

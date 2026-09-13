@@ -1,0 +1,365 @@
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "generatedAt": "2026-09-12T06:39:27.190Z",
+  "note": "Audio is verified through actual AudioContext lifecycle and deterministic telemetry; screenshots do not prove audible output.",
+  "results": [
+    {
+      "actionSamples": [
+        {
+          "actionAttackGain": 0.018,
+          "actionGain": 0.04396718628602243,
+          "actionKind": "water",
+          "noiseGain": 0.042,
+          "vehicleId": "fire-truck"
+        },
+        {
+          "actionAttackGain": 0.032,
+          "actionGain": 0.08082422359299203,
+          "actionKind": "blade",
+          "noiseGain": 0.004,
+          "vehicleId": "bulldozer"
+        },
+        {
+          "actionAttackGain": 0.028,
+          "actionGain": 0.086,
+          "actionKind": "bucket",
+          "noiseGain": 0.006,
+          "vehicleId": "excavator"
+        },
+        {
+          "actionAttackGain": 0.025,
+          "actionGain": 0.07100000000000001,
+          "actionKind": "care",
+          "noiseGain": 0,
+          "vehicleId": "ambulance"
+        },
+        {
+          "actionAttackGain": 0.026,
+          "actionGain": 0.088,
+          "actionKind": "siren",
+          "noiseGain": 0,
+          "vehicleId": "police"
+        }
+      ],
+      "cueCount": 4,
+      "idleEngineGain": 0.006,
+      "layout": {
+        "audioChildren": [
+          {
+            "bottom": 101,
+            "left": 1172.328125,
+            "right": 1194.328125,
+            "top": 79
+          },
+          {
+            "bottom": 95.5,
+            "left": 1199.328125,
+            "right": 1247.671875,
+            "top": 84.5
+          }
+        ],
+        "boxes": {
+          "action": {
+            "bottom": 696,
+            "height": 116,
+            "left": 1142,
+            "right": 1258,
+            "top": 580,
+            "width": 116
+          },
+          "audio": {
+            "bottom": 112,
+            "height": 44,
+            "left": 1154,
+            "right": 1266,
+            "top": 68,
+            "width": 112
+          },
+          "fullscreen": {
+            "bottom": 56,
+            "height": 44,
+            "left": 1154,
+            "right": 1266,
+            "top": 12,
+            "width": 112
+          },
+          "joystick": {
+            "bottom": 702,
+            "height": 154,
+            "left": 18,
+            "right": 172,
+            "top": 548,
+            "width": 154
+          },
+          "mission": {
+            "bottom": 102.09375,
+            "height": 90.09375,
+            "left": 499,
+            "right": 1019,
+            "top": 12,
+            "width": 520
+          },
+          "selector": {
+            "bottom": 167.5,
+            "height": 155.5,
+            "left": 14,
+            "right": 364,
+            "top": 12,
+            "width": 350
+          }
+        }
+      },
+      "movingEngineGain": 0.023729655210610344,
+      "movingSpeed": 5.060007745536944,
+      "viewport": "desktop"
+    },
+    {
+      "actionSamples": [
+        {
+          "actionAttackGain": 0.018,
+          "actionGain": 0.043801107476009446,
+          "actionKind": "water",
+          "noiseGain": 0.042,
+          "vehicleId": "fire-truck"
+        },
+        {
+          "actionAttackGain": 0.032,
+          "actionGain": 0.07207211125329631,
+          "actionKind": "blade",
+          "noiseGain": 0.004,
+          "vehicleId": "bulldozer"
+        },
+        {
+          "actionAttackGain": 0.028,
+          "actionGain": 0.086,
+          "actionKind": "bucket",
+          "noiseGain": 0.006,
+          "vehicleId": "excavator"
+        },
+        {
+          "actionAttackGain": 0.025,
+          "actionGain": 0.07100000000000001,
+          "actionKind": "care",
+          "noiseGain": 0,
+          "vehicleId": "ambulance"
+        },
+        {
+          "actionAttackGain": 0.026,
+          "actionGain": 0.088,
+          "actionKind": "siren",
+          "noiseGain": 0,
+          "vehicleId": "police"
+        }
+      ],
+      "cueCount": 4,
+      "idleEngineGain": 0.006,
+      "layout": {
+        "audioChildren": [
+          {
+            "bottom": 101,
+            "left": 916.328125,
+            "right": 938.328125,
+            "top": 79
+          },
+          {
+            "bottom": 95.5,
+            "left": 943.328125,
+            "right": 991.671875,
+            "top": 84.5
+          }
+        ],
+        "boxes": {
+          "action": {
+            "bottom": 744,
+            "height": 116,
+            "left": 886,
+            "right": 1002,
+            "top": 628,
+            "width": 116
+          },
+          "audio": {
+            "bottom": 112,
+            "height": 44,
+            "left": 898,
+            "right": 1010,
+            "top": 68,
+            "width": 112
+          },
+          "fullscreen": {
+            "bottom": 56,
+            "height": 44,
+            "left": 898,
+            "right": 1010,
+            "top": 12,
+            "width": 112
+          },
+          "joystick": {
+            "bottom": 750,
+            "height": 154,
+            "left": 18,
+            "right": 172,
+            "top": 596,
+            "width": 154
+          },
+          "mission": {
+            "bottom": 102.09375,
+            "height": 90.09375,
+            "left": 359.828125,
+            "right": 879.828125,
+            "top": 12,
+            "width": 520
+          },
+          "selector": {
+            "bottom": 167.5,
+            "height": 155.5,
+            "left": 14,
+            "right": 341.671875,
+            "top": 12,
+            "width": 327.671875
+          }
+        }
+      },
+      "movingEngineGain": 0.019785167562448254,
+      "movingSpeed": 4.021815841527021,
+      "viewport": "tablet"
+    },
+    {
+      "actionSamples": [
+        {
+          "actionAttackGain": 0.018,
+          "actionGain": 0.03747361442615074,
+          "actionKind": "water",
+          "noiseGain": 0.042,
+          "vehicleId": "fire-truck"
+        },
+        {
+          "actionAttackGain": 0.032,
+          "actionGain": 0.07868088400172508,
+          "actionKind": "blade",
+          "noiseGain": 0.004,
+          "vehicleId": "bulldozer"
+        },
+        {
+          "actionAttackGain": 0.028,
+          "actionGain": 0.086,
+          "actionKind": "bucket",
+          "noiseGain": 0.006,
+          "vehicleId": "excavator"
+        },
+        {
+          "actionAttackGain": 0.025,
+          "actionGain": 0.07100000000000001,
+          "actionKind": "care",
+          "noiseGain": 0,
+          "vehicleId": "ambulance"
+        },
+        {
+          "actionAttackGain": 0.026,
+          "actionGain": 0.088,
+          "actionKind": "siren",
+          "noiseGain": 0,
+          "vehicleId": "police"
+        }
+      ],
+      "cueCount": 4,
+      "idleEngineGain": 0.006,
+      "layout": {
+        "audioChildren": [
+          {
+            "bottom": 95.55999755859375,
+            "left": 744.088134765625,
+            "right": 762.568115234375,
+            "top": 80.44000244140625
+          },
+          {
+            "bottom": 93.5,
+            "left": 769.328125,
+            "right": 817.671875,
+            "top": 82.5
+          }
+        ],
+        "boxes": {
+          "action": {
+            "bottom": 366,
+            "height": 100.34375,
+            "left": 722,
+            "right": 822,
+            "top": 265.65625,
+            "width": 100
+          },
+          "audio": {
+            "bottom": 110,
+            "height": 44,
+            "left": 730,
+            "right": 830,
+            "top": 66,
+            "width": 100
+          },
+          "fullscreen": {
+            "bottom": 56,
+            "height": 44,
+            "left": 730,
+            "right": 830,
+            "top": 12,
+            "width": 100
+          },
+          "joystick": {
+            "bottom": 372,
+            "height": 112,
+            "left": 18,
+            "right": 130,
+            "top": 260,
+            "width": 112
+          },
+          "mission": {
+            "bottom": 94.3125,
+            "height": 82.3125,
+            "left": 296.078125,
+            "right": 718,
+            "top": 12,
+            "width": 421.921875
+          },
+          "selector": {
+            "bottom": 134,
+            "height": 122,
+            "left": 14,
+            "right": 284.078125,
+            "top": 12,
+            "width": 270.078125
+          }
+        }
+      },
+      "movingEngineGain": 0.020516457805214154,
+      "movingSpeed": 4.141985845217155,
+      "viewport": "mobile-landscape"
+    }
+  ],
+  "screenshots": [
+    "desktop-audio-off.png",
+    "desktop-audio-on.png",
+    "tablet-audio-off.png",
+    "tablet-audio-on.png",
+    "mobile-landscape-audio-off.png",
+    "mobile-landscape-audio-on.png"
+  ],
+  "viewports": [
+    {
+      "height": 720,
+      "name": "desktop",
+      "touch": false,
+      "width": 1280
+    },
+    {
+      "height": 768,
+      "name": "tablet",
+      "touch": true,
+      "width": 1024
+    },
+    {
+      "height": 390,
+      "name": "mobile-landscape",
+      "touch": true,
+      "width": 844
+    }
+  ]
+}

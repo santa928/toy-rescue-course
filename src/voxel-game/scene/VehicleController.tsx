@@ -40,6 +40,7 @@ export interface VehicleControllerHandle {
 
 interface VehicleControllerProps {
   readonly commandRef: RefObject<DriveCommand>;
+  readonly onReset?: () => void;
   readonly paintColor?: string | null;
   readonly telemetryRef: VehicleTelemetryRef;
   readonly vehicleId: VehicleId;
@@ -143,6 +144,7 @@ function SelectedVehicleModel({
 export const VehicleController = forwardRef<VehicleControllerHandle, VehicleControllerProps>(
   function VehicleController({
     commandRef,
+    onReset,
     paintColor = null,
     telemetryRef,
     vehicleId,
@@ -155,6 +157,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
 
     /** 剛体とtelemetryを車庫の初期状態へ戻す。 */
     const resetVehicle = useCallback((): void => {
+      onReset?.();
       const body = bodyRef.current;
       telemetryRef.current = {
         forward: [0, 0, 1],
@@ -174,7 +177,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       body.setRotation({ w: 1, x: 0, y: 0, z: 0 }, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    }, [config.vehicleId, telemetryRef, visualPositionRef]);
+    }, [config.vehicleId, onReset, telemetryRef, visualPositionRef]);
 
     useImperativeHandle(ref, () => ({ resetVehicle }), [resetVehicle]);
 

@@ -3,16 +3,20 @@ import type { RefObject } from 'react';
 import {
   createControlState,
   setDigitalAction,
+  setPointerPrimaryAction,
+  setButtonKeyboardPrimaryAction,
   setTouchStick as applyTouchStick,
   toDriveCommand,
 } from './controlState';
 import type { DigitalAction, DriveCommand } from './controlState';
+import { isNativeActivationTarget, isNativeKeyboardEvent } from './keyboardFocus';
 
 /** ゲームUIとsceneが共有する、描画を起こさない入力制御API。 */
 export interface VoxelGameControls {
   readonly commandRef: RefObject<DriveCommand>;
   readonly reset: () => void;
-  readonly setPrimaryAction: (pressed: boolean) => void;
+  readonly setPrimaryAction: (pressed: boolean, source?: 'pointer' | 'keyboard') => void;
+  readonly subscribeReset: (listener: () => void) => () => void;
   readonly setTouchStick: (x: number, y: number) => void;
   /** HUDのaria/見た目へ同期する車種別主操作の現在状態。 */
   readonly primaryActionPressed: boolean;
@@ -31,6 +35,7 @@ export interface VoxelGameControlEventBindings {
   readonly onAction: (action: DigitalAction, pressed: boolean) => void;
   readonly onReset: () => void;
   readonly visibilityTarget: VoxelGameControlEventTarget;
+  readonly subscribeReset?: (listener: () => void) => () => void;
 }
 
 const KEY_ACTIONS: Readonly<Record<string, DigitalAction>> = {
@@ -55,44 +60,58 @@ export function bindVoxelGameControlEvents({
   onAction,
   onReset,
   visibilityTarget,
+  subscribeReset,
 }: VoxelGameControlEventBindings): () => void {
+  const heldCodes = new Map<string, DigitalAction>();
+  const unsubscribeReset = subscribeReset?.(() => heldCodes.clear());
+  /** フォーカス喪失で押下キーも忘れ、復帰後のkeydownを新たに受ける。 */
+  const resetInputs = (): void => {
+    heldCodes.clear();
+    onReset();
+  };
   /** 対応キーの押下を制御状態へ反映する。 */
   const handleKeyDown = (event: Event): void => {
     const keyboardEvent = event as KeyboardEvent;
+    if (isNativeKeyboardEvent(keyboardEvent) || isNativeActivationTarget(keyboardEvent)) return;
     const action = KEY_ACTIONS[keyboardEvent.code];
     if (!action) return;
     keyboardEvent.preventDefault();
+    if (heldCodes.has(keyboardEvent.code) || keyboardEvent.repeat) return;
+    heldCodes.set(keyboardEvent.code, action);
     onAction(action, true);
   };
   /** 対応キーの解放を制御状態へ反映する。 */
   const handleKeyUp = (event: Event): void => {
     const keyboardEvent = event as KeyboardEvent;
-    const action = KEY_ACTIONS[keyboardEvent.code];
+    const action = heldCodes.get(keyboardEvent.code);
     if (!action) return;
     keyboardEvent.preventDefault();
-    onAction(action, false);
+    heldCodes.delete(keyboardEvent.code);
+    onAction(action, [...heldCodes.values()].includes(action));
   };
   /** タブが隠れた時点で押下状態を安全に解除する。 */
   const handleVisibilityChange = (): void => {
-    if (getVisibilityState() === 'hidden') onReset();
+    if (getVisibilityState() === 'hidden') resetInputs();
   };
 
   keyboardTarget.addEventListener('keydown', handleKeyDown);
   keyboardTarget.addEventListener('keyup', handleKeyUp);
-  keyboardTarget.addEventListener('blur', onReset);
+  keyboardTarget.addEventListener('blur', resetInputs);
   visibilityTarget.addEventListener('visibilitychange', handleVisibilityChange);
   return () => {
+    unsubscribeReset?.();
     keyboardTarget.removeEventListener('keydown', handleKeyDown);
     keyboardTarget.removeEventListener('keyup', handleKeyUp);
-    keyboardTarget.removeEventListener('blur', onReset);
+    keyboardTarget.removeEventListener('blur', resetInputs);
     visibilityTarget.removeEventListener('visibilitychange', handleVisibilityChange);
-    onReset();
+    resetInputs();
   };
 }
 
 /** キーボードとタッチ操作をdevice非依存のcommand refとして公開する。 */
-export function useVoxelGameControls(): VoxelGameControls {
+export function useVoxelGameControls(enabled = true): VoxelGameControls {
   const stateRef = useRef(createControlState());
+  const resetListenersRef = useRef(new Set<() => void>());
   const commandRef = useRef<DriveCommand>(toDriveCommand(stateRef.current));
   const [primaryActionPressed, setPrimaryActionPressed] = useState(commandRef.current.primaryAction);
 
@@ -109,7 +128,14 @@ export function useVoxelGameControls(): VoxelGameControls {
   /** すべての入力を解除して、フォーカス喪失後も車両が動かないようにする。 */
   const reset = useCallback(() => {
     commit(createControlState());
+    for (const listener of resetListenersRef.current) listener();
   }, [commit]);
+
+  /** pointer captureと受理済みキーをcommandと同じresetで解除する。 */
+  const subscribeReset = useCallback((listener: () => void): (() => void) => {
+    resetListenersRef.current.add(listener);
+    return () => { resetListenersRef.current.delete(listener); };
+  }, []);
 
   /** 指定した離散操作の押下状態を更新する。 */
   const setAction = useCallback((action: DigitalAction, pressed: boolean) => {
@@ -122,19 +148,23 @@ export function useVoxelGameControls(): VoxelGameControls {
   }, [commit]);
 
   /** 車種別主操作ボタンの押下状態を更新する。 */
-  const setPrimaryAction = useCallback((pressed: boolean) => {
-    setAction('primaryAction', pressed);
-  }, [setAction]);
+  const setPrimaryAction = useCallback((pressed: boolean, source: 'pointer' | 'keyboard' = 'pointer') => {
+    commit(source === 'pointer'
+      ? setPointerPrimaryAction(stateRef.current, pressed)
+      : setButtonKeyboardPrimaryAction(stateRef.current, pressed));
+  }, [commit]);
 
   useEffect(() => {
+    if (!enabled) { reset(); return; }
     return bindVoxelGameControlEvents({
       getVisibilityState: () => document.visibilityState,
       keyboardTarget: window,
       onAction: setAction,
       onReset: reset,
       visibilityTarget: document,
+      subscribeReset,
     });
-  }, [reset, setAction]);
+  }, [enabled, reset, setAction, subscribeReset]);
 
   return useMemo(() => ({
     commandRef,
@@ -142,5 +172,6 @@ export function useVoxelGameControls(): VoxelGameControls {
     reset,
     setPrimaryAction,
     setTouchStick,
-  }), [primaryActionPressed, reset, setPrimaryAction, setTouchStick]);
+    subscribeReset,
+  }), [primaryActionPressed, reset, setPrimaryAction, setTouchStick, subscribeReset]);
 }

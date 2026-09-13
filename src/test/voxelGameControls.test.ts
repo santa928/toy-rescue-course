@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createControlState, setDigitalAction, setTouchStick, toDriveCommand } from '../voxel-game/input/controlState';
+import { createControlState, setDigitalAction, setPointerPrimaryAction, setTouchStick, toDriveCommand } from '../voxel-game/input/controlState';
 import { bindVoxelGameControlEvents } from '../voxel-game/input/useVoxelGameControls';
 
 type Listener = (event: Event) => void;
@@ -27,6 +27,51 @@ class FakeEventTarget {
 }
 
 describe('voxel game controls', () => {
+  it.each(['pointer', 'keyboard'])('%sを先に離しても、もう一方の道具長押しを維持する', (released) => {
+    let state = setDigitalAction(createControlState(), 'primaryAction', true);
+    state = setPointerPrimaryAction(state, true);
+    state = released === 'pointer'
+      ? setPointerPrimaryAction(state, false)
+      : setDigitalAction(state, 'primaryAction', false);
+    expect(toDriveCommand(state).primaryAction).toBe(true);
+    state = setPointerPrimaryAction(setDigitalAction(state, 'primaryAction', false), false);
+    expect(toDriveCommand(state).primaryAction).toBe(false);
+  });
+
+  it('同じ方向の別キーを片方離しても、残りのキーで走り続ける', () => {
+    const keyboardTarget = new FakeEventTarget();
+    let state = createControlState();
+    bindVoxelGameControlEvents({
+      getVisibilityState: () => 'visible',
+      keyboardTarget,
+      onAction: (action, pressed) => { state = setDigitalAction(state, action, pressed); },
+      onReset: () => { state = createControlState(); },
+      visibilityTarget: new FakeEventTarget(),
+    });
+    for (const [type, code] of [['keydown', 'KeyW'], ['keydown', 'ArrowUp'], ['keyup', 'KeyW']]) {
+      keyboardTarget.dispatch(type, { code, preventDefault: () => undefined } as unknown as Event);
+    }
+    expect(toDriveCommand(state).moveY).toBe(1);
+    keyboardTarget.dispatch('keyup', { code: 'ArrowUp', preventDefault: () => undefined } as unknown as Event);
+    expect(toDriveCommand(state).moveY).toBe(0);
+  });
+
+  it('ブラウザの修飾キー操作を運転入力として取り込まない', () => {
+    const keyboardTarget = new FakeEventTarget();
+    const actions: string[] = [];
+    bindVoxelGameControlEvents({
+      getVisibilityState: () => 'visible',
+      keyboardTarget,
+      onAction: (action) => actions.push(action),
+      onReset: () => undefined,
+      visibilityTarget: new FakeEventTarget(),
+    });
+    keyboardTarget.dispatch('keydown', {
+      code: 'KeyW', metaKey: true, preventDefault: () => undefined,
+    } as unknown as Event);
+    expect(actions).toEqual([]);
+  });
+
   it('W+Aを画面上・左の長さ1のcommandへ正規化する', () => {
     let state = createControlState();
     state = setDigitalAction(state, 'forward', true);

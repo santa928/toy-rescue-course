@@ -1,0 +1,102 @@
+{
+  "viewport": [
+    1280,
+    720
+  ],
+  "seed": 1,
+  "warmupMs": 2000,
+  "sampleMs": 12000,
+  "note": "同じDocker内のsoftware rendererによる交互3回比較。物理GPU性能や実機体験は認証しない。",
+  "results": [
+    {
+      "label": "base",
+      "round": 1,
+      "meanFps": 41.30308318789995,
+      "medianFps": 59.88023952095548,
+      "p10Fps": 29.94011976047937,
+      "frames": 497,
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 587,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "label": "head",
+      "round": 1,
+      "meanFps": 40.695061666749886,
+      "medianFps": 59.523809523812105,
+      "p10Fps": 29.94011976047937,
+      "frames": 489,
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 582,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "label": "head",
+      "round": 2,
+      "meanFps": 40.86116358612884,
+      "medianFps": 59.523809523812105,
+      "p10Fps": 29.94011976047937,
+      "frames": 491,
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 581,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "label": "base",
+      "round": 2,
+      "meanFps": 39.17174986513963,
+      "medianFps": 30.12048192771101,
+      "p10Fps": 29.94011976047937,
+      "frames": 472,
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 560,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "label": "base",
+      "round": 3,
+      "meanFps": 39.77963083171053,
+      "medianFps": 30.120481927710596,
+      "p10Fps": 29.94011976047937,
+      "frames": 478,
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 568,
+        "rendererCalls": 34
+      }
+    },
+    {
+      "label": "head",
+      "round": 3,
+      "meanFps": 39.47543381424108,
+      "medianFps": 30.120481927710184,
+      "p10Fps": 29.94011976047937,
+      "frames": 475,
+      "renderer": {
+        "rendererName": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "rendererVendor": "Google Inc. (Google)",
+        "vehicleDrawCalls": 7,
+        "renderedFrames": 566,
+        "rendererCalls": 34
+      }
+    }
+  ]
+}

@@ -5,6 +5,8 @@ export type DigitalAction = 'forward' | 'backward' | 'left' | 'right' | 'primary
 export interface ControlState {
   readonly digital: Readonly<Record<DigitalAction, boolean>>;
   readonly touchStick: readonly [number, number] | null;
+  readonly pointerPrimaryAction: boolean;
+  readonly buttonKeyboardPrimaryAction: boolean;
 }
 
 /** 車両制御と車種別の主操作が共通で読む正規化済み入力値。 */
@@ -21,12 +23,24 @@ export function createControlState(): ControlState {
   return {
     digital: { backward: false, forward: false, left: false, primaryAction: false, right: false },
     touchStick: null,
+    pointerPrimaryAction: false,
+    buttonKeyboardPrimaryAction: false,
   };
 }
 
 /** keyboardまたはbuttonのdigital actionを不変更新する。 */
 export function setDigitalAction(state: ControlState, action: DigitalAction, pressed: boolean): ControlState {
   return { ...state, digital: { ...state.digital, [action]: pressed } };
+}
+
+/** 画面ボタンの保持をkeyboardと別に保存し、どちらを先に離しても他方を維持する。 */
+export function setPointerPrimaryAction(state: ControlState, pressed: boolean): ControlState {
+  return { ...state, pointerPrimaryAction: pressed };
+}
+
+/** 道具ボタンのローカルkeyboard保持を、ゲーム面keyboardとpointerから独立させる。 */
+export function setButtonKeyboardPrimaryAction(state: ControlState, pressed: boolean): ControlState {
+  return { ...state, buttonKeyboardPrimaryAction: pressed };
 }
 
 /** touch stickを有限な-1から1へclampし、dead zone内ならkeyboardへ戻す。 */
@@ -60,5 +74,5 @@ export function toDriveCommand(state: ControlState): DriveCommand {
       moveY = Math.sign(moveY) * Math.SQRT1_2;
     }
   }
-  return { moveX, moveY, primaryAction: state.digital.primaryAction };
+  return { moveX, moveY, primaryAction: state.digital.primaryAction || state.pointerPrimaryAction || state.buttonKeyboardPrimaryAction };
 }

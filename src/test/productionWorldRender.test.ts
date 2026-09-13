@@ -8,6 +8,7 @@ import {
 } from '../voxel-game/scene/VoxelWorld';
 import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import { flattenDecorationBoxes } from '../voxel-game/scene/worldStreetscape';
+import { createGarageCutawayBoxes } from '../voxel-game/scene/garageCutaway';
 
 interface InspectedElementProps {
   readonly args?: readonly [number, number, number];
@@ -62,7 +63,7 @@ describe('production world render', () => {
     ));
     const renderedVisualBoxes = visualBatches.flatMap(({ props }) => props.boxes ?? []);
     const decorationBoxes = flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters);
-    const expectedRenderBoxes = [...PRODUCTION_WORLD_MAP.visualBoxes, ...decorationBoxes];
+    const expectedRenderBoxes = [...createGarageCutawayBoxes(PRODUCTION_WORLD_MAP.visualBoxes), ...decorationBoxes];
     expect(visualBatches).toHaveLength(new Set(
       expectedRenderBoxes.map(({ color }) => color),
     ).size);

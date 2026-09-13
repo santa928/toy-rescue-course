@@ -1169,3 +1169,157 @@ button {
     animation: none;
   }
 }
+
+/* 車体は中央、選択は左、仕事札は上、補助操作は右。実寸のgridで互いを押し下げる。 */
+.hud-top {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(230px, min(32vw, 350px)) minmax(0, 1fr) 112px;
+  align-items: start;
+  gap: 16px;
+}
+
+.hud-top .vehicle-selector {
+  position: static;
+  grid-column: 1;
+  grid-row: 1;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  gap: 8px;
+}
+
+.vehicle-selector__button {
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 64px;
+  gap: 3px;
+  padding: 5px 3px;
+  font-size: 11px;
+  line-height: 1.25;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.vehicle-icon {
+  display: block;
+  flex: none;
+  width: 64px;
+  height: 38px;
+}
+
+.hud-top .status-stack {
+  position: static;
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  max-width: 520px;
+  justify-self: center;
+  transform: none;
+}
+
+.voxel-game-hud[data-vehicle-switch-available='false'] .status-stack {
+  grid-column: 1 / span 2;
+}
+
+.hud-top .mission-pill {
+  width: 100%;
+  min-height: 64px;
+  padding: 9px 12px;
+  font-size: 17px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.mission-pill__vehicle {
+  flex: 0 0 40px;
+  width: 40px;
+  height: auto;
+  margin-right: 10px;
+  transform: none;
+}
+
+.mission-pill__vehicle .vehicle-icon {
+  width: 40px;
+  height: 28px;
+}
+
+.mission-pill__copy { flex: 1; gap: 4px; }
+.mission-pill__details { align-items: flex-start; flex-direction: column; gap: 5px; font-size: 13px; }
+.mission-pill__job,
+.mission-pill__objective { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.mission-pill__progress { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 10px; }
+.mission-stamps { display: inline-flex; gap: 4px; }
+.mission-stamp { display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid #96816a; border-radius: 50%; color: #68543e; background: #f2e8d8; }
+.mission-stamp[data-complete='true'] { color: #fff; background: #386744; border-color: #386744; }
+
+.hud-utilities { grid-column: 3; grid-row: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.hud-utilities .fullscreen-button,
+.hud-utilities .audio-toggle-button { position: static; width: 100%; min-width: 0; min-height: 44px; justify-content: center; padding: 7px 6px; }
+.hud-utilities .mission-map { position: static; width: 100%; }
+.hud-utilities .audio-toggle-button { gap: 5px; font-size: 11px; letter-spacing: 0; }
+.hud-utilities .audio-toggle-button > span:last-child { white-space: nowrap; }
+.hud-utilities .audio-toggle-button__glyph { flex: none; width: 22px; margin-right: 0; }
+.primary-action-button__hint { margin-top: 4px; font-size: 10px; white-space: nowrap; }
+.touch-joystick__label { white-space: nowrap; }
+
+@media (max-height: 480px), (max-width: 844px) and (max-height: 720px) {
+  .hud-top { grid-template-columns: minmax(230px, 32vw) minmax(0, 1fr) 100px; gap: 12px; }
+  .vehicle-selector__button { min-height: 56px; padding: 3px 1px; border-width: 3px; font-size: 10px; gap: 2px; }
+  .vehicle-selector__button .vehicle-icon { width: 54px; height: 28px; }
+  .hud-top .mission-pill { padding: 7px 9px; font-size: 15px; }
+  .mission-pill__details { font-size: 12px; }
+  .mission-pill__vehicle { display: none; }
+  .hud-utilities { gap: 10px; }
+  .primary-action-button { width: 100px; padding: 8px; }
+  .touch-joystick { width: 112px; }
+}
+
+@media (max-width: 640px) and (min-height: 481px) {
+  .hud-top { grid-template-columns: minmax(0, 1fr) 96px; gap: 14px 10px; }
+  .hud-top .status-stack,
+  .voxel-game-hud[data-vehicle-switch-available='false'] .status-stack { grid-column: 1; }
+  .hud-utilities { grid-column: 2; }
+  .hud-top .vehicle-selector { grid-row: 2; grid-column: 1 / -1; }
+  .hud-top .mission-pill { font-size: 15px; padding: 8px; }
+  .mission-pill__vehicle { display: none; }
+  .mission-pill__details { font-size: 12px; }
+  /* 最も幅を取るショベル車体の右端からも8px以上を空ける。 */
+  .voxel-game-hud .hud-top .hud-utilities .mission-map { position: fixed; top: auto; right: calc(env(safe-area-inset-right) + 14px); bottom: calc(env(safe-area-inset-bottom) + 152px); width: clamp(92px, calc(100vw - 300px), 104px); }
+  .vehicle-selector__button { font-size: 11px; }
+}
+
+/* 短い縦画面は5台を1段に収め、中央の車体との上下余白を確保する。 */
+@media (max-width: 640px) and (min-height: 481px) and (max-height: 720px) {
+  .hud-top .vehicle-selector {
+    grid-template-columns: repeat(5, minmax(56px, 1fr));
+    gap: 4px;
+  }
+
+  .vehicle-selector__button {
+    min-height: 56px;
+    gap: 1px;
+    padding: 2px 0;
+    border-width: 3px;
+    font-size: 10px;
+  }
+
+  .vehicle-selector__button .vehicle-icon {
+    width: 54px;
+    height: 28px;
+  }
+}
+
+.action-hold-progress { position: absolute; right: 10px; bottom: -16px; left: 10px; height: 10px; overflow: hidden; border: 2px solid #27313d; border-radius: 8px; background: #fffaf0; visibility: hidden; pointer-events: none; }
+.action-hold-progress[data-active='true'] { visibility: visible; }
+.action-hold-progress__fill { display: block; width: 100%; height: 100%; background: #397f60; transform-origin: left; transform: scaleX(var(--hold-progress, 0)); }
+
+.game-status { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); color: #2b2119; background: #ead4b3; }
+.game-status__card { width: min(100%, 460px); padding: 24px; border: 3px solid #9b6818; border-radius: 20px; background: #fffaf0; text-align: center; box-shadow: 0 8px 0 #c39c61; }
+.game-status h1 { margin: 0 0 12px; font-size: clamp(20px, 4vw, 26px); line-height: 1.5; }
+.game-status p { font-size: 14px; line-height: 1.6; }
+.game-status__mark { display: block; color: #c93f32; font-size: 30px; margin-bottom: 12px; }
+.game-status button { min-height: 48px; padding: 12px 24px; border: 3px solid #81520d; border-radius: 12px; color: #2b2119; background: #f4bf3b; cursor: pointer; font-weight: 800; }
+.game-status button:focus-visible { outline: 3px solid #197994; outline-offset: 4px; }
+.game-status .game-status__parent { margin-bottom: 0; text-align: left; color: #67543e; }

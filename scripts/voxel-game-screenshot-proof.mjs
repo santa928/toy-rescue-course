@@ -208,7 +208,10 @@ export async function waitForHudCaptureReadiness(page) {
         const label = document.querySelector(target.labelSelector);
         if (!element || !label) throw new Error(`${name} HUD element is missing.`);
         const box = element.getBoundingClientRect();
-        const labelBox = label.getBoundingClientRect();
+        // gridで横に伸びた空白を文字の面積へ含めず、実際のテキストを検査する。
+        const textRange = document.createRange();
+        textRange.selectNodeContents(label);
+        const labelBox = textRange.getBoundingClientRect();
         const style = getComputedStyle(element);
         const labelStyle = getComputedStyle(label);
         controls[name] = {
