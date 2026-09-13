@@ -1285,7 +1285,8 @@ button {
   .hud-top .mission-pill { font-size: 15px; padding: 8px; }
   .mission-pill__vehicle { display: none; }
   .mission-pill__details { font-size: 12px; }
-  .voxel-game-hud .hud-top .hud-utilities .mission-map { position: fixed; top: auto; right: calc(env(safe-area-inset-right) + 14px); bottom: calc(env(safe-area-inset-bottom) + 152px); width: 104px; }
+  /* 最も幅を取るショベル車体の右端からも8px以上を空ける。 */
+  .voxel-game-hud .hud-top .hud-utilities .mission-map { position: fixed; top: auto; right: calc(env(safe-area-inset-right) + 14px); bottom: calc(env(safe-area-inset-bottom) + 152px); width: clamp(92px, calc(100vw - 300px), 104px); }
   .vehicle-selector__button { font-size: 11px; }
 }
 
