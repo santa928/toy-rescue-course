@@ -76,6 +76,9 @@ export class ToyAudioDirector {
   private backend: ToyAudioBackend | null = null;
   private contextState: ToyAudioContextState;
   private cueCount = 0;
+  private desiredEnabled = false;
+  private desiredVisible = true;
+  private disposed = false;
   private enabled = false;
   private lastCue: ToyAudioCue | null = null;
   private lastFrameInput = INITIAL_FRAME_INPUT;
@@ -84,6 +87,7 @@ export class ToyAudioDirector {
     actionPressed: false,
     enabled: false,
   });
+  private lifecycleQueue: Promise<void> = Promise.resolve();
   private previousPrimaryAction = false;
   private vibrationCount = 0;
 
@@ -117,56 +121,83 @@ export class ToyAudioDirector {
   /** user操作に応じて同じbackendをresume/suspendし、成功可否を返す。 */
   public async setEnabled(enabled: boolean): Promise<boolean> {
     if (!enabled) {
+      this.desiredEnabled = false;
       this.enabled = false;
       this.actionAttackStartedAtSeconds = -1;
       this.previousPrimaryAction = this.lastFrameInput.primaryAction;
       this.applyCurrentFrame();
-      if (this.backend && this.backend.state !== 'closed') {
+      if (!this.backend || this.disposed) return false;
+      return this.enqueueLifecycle(async () => {
         try {
-          await this.backend.suspend();
-          this.contextState = this.backend.state;
+          await this.reconcileBackendState();
         } catch {
-          this.contextState = 'error';
+          if (!this.disposed) this.contextState = 'error';
         }
-      }
-      return false;
+        return false;
+      });
     }
-    if (!this.options.available) return false;
+    if (!this.options.available || this.disposed) return false;
 
+    this.desiredEnabled = true;
+    let activationResume: Promise<void>;
     try {
       this.backend ??= this.options.backendFactory();
-      await this.backend.resume();
-      this.contextState = this.backend.state;
-      this.enabled = this.contextState === 'running';
-      this.applyCurrentFrame();
-      return this.enabled;
+      // 初回resumeはclickのuser activationを失わないよう、queueへ送る前に開始する。
+      activationResume = this.backend.resume();
     } catch {
+      this.desiredEnabled = false;
       this.enabled = false;
       this.contextState = 'error';
       return false;
     }
+
+    return this.enqueueLifecycle(async () => {
+      try {
+        await activationResume;
+        if (this.disposed || !this.desiredEnabled) return false;
+        this.contextState = this.backend?.state ?? 'error';
+        this.enabled = this.contextState === 'running';
+        if (!this.enabled) {
+          this.desiredEnabled = false;
+          this.applyCurrentFrame();
+          return false;
+        }
+        await this.reconcileBackendState();
+        this.applyCurrentFrame();
+        return this.enabled;
+      } catch {
+        if (!this.disposed) {
+          this.desiredEnabled = false;
+          this.enabled = false;
+          this.contextState = 'error';
+        }
+        return false;
+      }
+    });
   }
 
   /** tab可視性に合わせ、有効設定を保ったままgraphだけ停止・再開する。 */
   public async setVisible(visible: boolean): Promise<void> {
-    if (!this.enabled || !this.backend || this.backend.state === 'closed') return;
-    try {
-      if (visible) await this.backend.resume();
-      else {
-        this.actionAttackStartedAtSeconds = -1;
-        this.previousPrimaryAction = this.lastFrameInput.primaryAction;
-        this.applySilentFrame();
-        await this.backend.suspend();
-      }
-      this.contextState = this.backend.state;
-    } catch {
-      this.contextState = 'error';
+    if (this.disposed) return;
+    this.desiredVisible = visible;
+    if (!visible) {
+      this.actionAttackStartedAtSeconds = -1;
+      this.previousPrimaryAction = this.lastFrameInput.primaryAction;
+      this.applySilentFrame();
     }
+    await this.enqueueLifecycle(async () => {
+      if (!this.backend || !this.desiredEnabled || this.disposed) return;
+      try {
+        await this.reconcileBackendState();
+      } catch {
+        if (!this.disposed) this.contextState = 'error';
+      }
+    });
   }
 
   /** 最新telemetry入力をpure mixへ変換し、生成済みgraphだけへ適用する。 */
   public update(input: ToyAudioFrameInput): void {
-    const canStartAttack = this.enabled && this.contextState === 'running';
+    const canStartAttack = this.enabled && this.desiredVisible && this.contextState === 'running';
     if (canStartAttack && input.primaryAction && !this.previousPrimaryAction) {
       this.actionAttackStartedAtSeconds = Number.isFinite(input.elapsedSeconds)
         ? Math.max(0, input.elapsedSeconds)
@@ -181,7 +212,7 @@ export class ToyAudioDirector {
 
   /** 有効かつrunning中だけ離散cueと対応振動を発火する。 */
   public playCue(cue: ToyAudioCue): void {
-    if (!this.enabled || !this.backend || this.contextState !== 'running') return;
+    if (!this.enabled || !this.desiredVisible || !this.backend || this.contextState !== 'running') return;
     this.backend.playCue(cue);
     this.lastCue = cue;
     this.cueCount += 1;
@@ -196,16 +227,42 @@ export class ToyAudioDirector {
 
   /** 固定graphを閉じ、以後の再生を止める。 */
   public async dispose(): Promise<void> {
+    this.desiredEnabled = false;
     this.enabled = false;
     this.actionAttackStartedAtSeconds = -1;
     if (!this.backend) return;
+    this.disposed = true;
+    this.applySilentFrame();
+    const backend = this.backend;
     try {
-      this.applySilentFrame();
-      await this.backend.close();
-      this.contextState = this.backend.state;
+      // resumeがbrowser都合でpendingでも、context loss時のclose開始を待たせない。
+      await backend.close();
+      this.contextState = backend.state;
     } catch {
       this.contextState = 'error';
     }
+  }
+
+  /** backend操作を直列化し、遅く完了した古いvisibility操作で最終状態を戻さない。 */
+  private enqueueLifecycle<Result>(operation: () => Promise<Result>): Promise<Result> {
+    const result = this.lifecycleQueue.then(operation, operation);
+    this.lifecycleQueue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  /** 最新の有効化・可視性要求を1つのbackendへ反映する。 */
+  private async reconcileBackendState(): Promise<void> {
+    const backend = this.backend;
+    if (!backend || this.disposed || backend.state === 'closed') return;
+    if (this.desiredEnabled && this.desiredVisible) {
+      if (backend.state !== 'running') await backend.resume();
+    } else {
+      this.actionAttackStartedAtSeconds = -1;
+      this.previousPrimaryAction = this.lastFrameInput.primaryAction;
+      this.applySilentFrame();
+      if (backend.state === 'running') await backend.suspend();
+    }
+    if (!this.disposed) this.contextState = backend.state;
   }
 
   /** enabled状態を反映した最新frameを保存し、backendがあれば適用する。 */
@@ -217,6 +274,7 @@ export class ToyAudioDirector {
       ? Number.POSITIVE_INFINITY
       : elapsedSeconds - this.actionAttackStartedAtSeconds;
     const actionPressed = this.enabled
+      && this.desiredVisible
       && this.contextState === 'running'
       && attackAgeSeconds >= 0
       && attackAgeSeconds < ACTION_ATTACK_DURATION_SECONDS;
@@ -224,7 +282,7 @@ export class ToyAudioDirector {
       ...this.lastFrameInput,
       actionAttackAgeSeconds: actionPressed ? attackAgeSeconds : ACTION_ATTACK_DURATION_SECONDS,
       actionPressed,
-      enabled: this.enabled && this.contextState === 'running',
+      enabled: this.enabled && this.desiredVisible && this.contextState === 'running',
     });
     if (this.backend && this.backend.state !== 'closed') this.backend.applyFrame(this.lastMix);
   }

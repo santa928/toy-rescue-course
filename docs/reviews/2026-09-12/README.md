@@ -103,5 +103,6 @@ median fpsはbaseが59.88 / 30.12 / 30.12、最終版が59.52 / 59.52 / 30.12。
 ## レビューと公開
 
 同じ[ProのChat](https://chatgpt.com/c/6aa4df60-ee34-83ee-a5a5-54bd7aa60397)へPRレビューを依頼したが、利用上限の表示で実行できなかった。
-Pro承認はなく、PRはDraft・レビュー待ち。mainへのmerge、Issue close、Pages公開は行わない。
-枠が回復した後も同じChat・Issue・branch・PRを使い、最新headへの独立レビューから再開する。
+2026-09-13にユーザーがサブエージェントの独立レビューを代替として指定し、必須指摘を解消した後のPages公開まで許可した。
+同じIssue #4・branch・PR #5を維持する。レビューで見つかった480px境界のcamera倍率急増と、音ON中のタブ非表示の競合を修正し、境界viewportと非同期audio回帰を追加した。
+公開前は最新headのCI・独立再レビュー、公開後はPages URLに対するDockerブラウザ検証を行う。判定SHAと実行結果はPR #5に記録する。

@@ -1264,7 +1264,7 @@ button {
 .primary-action-button__hint { margin-top: 4px; font-size: 10px; white-space: nowrap; }
 .touch-joystick__label { white-space: nowrap; }
 
-@media (max-height: 480px) {
+@media (max-height: 480px), (max-width: 844px) and (max-height: 720px) {
   .hud-top { grid-template-columns: minmax(230px, 32vw) minmax(0, 1fr) 100px; gap: 12px; }
   .vehicle-selector__button { min-height: 56px; padding: 3px 1px; border-width: 3px; font-size: 10px; gap: 2px; }
   .vehicle-selector__button .vehicle-icon { width: 54px; height: 28px; }
@@ -1287,6 +1287,27 @@ button {
   .mission-pill__details { font-size: 12px; }
   .voxel-game-hud .hud-top .hud-utilities .mission-map { position: fixed; top: auto; right: calc(env(safe-area-inset-right) + 14px); bottom: calc(env(safe-area-inset-bottom) + 152px); width: 104px; }
   .vehicle-selector__button { font-size: 11px; }
+}
+
+/* 短い縦画面は5台を1段に収め、中央の車体との上下余白を確保する。 */
+@media (max-width: 640px) and (min-height: 481px) and (max-height: 720px) {
+  .hud-top .vehicle-selector {
+    grid-template-columns: repeat(5, minmax(56px, 1fr));
+    gap: 4px;
+  }
+
+  .vehicle-selector__button {
+    min-height: 56px;
+    gap: 1px;
+    padding: 2px 0;
+    border-width: 3px;
+    font-size: 10px;
+  }
+
+  .vehicle-selector__button .vehicle-icon {
+    width: 54px;
+    height: 28px;
+  }
 }
 
 .action-hold-progress { position: absolute; right: 10px; bottom: -16px; left: 10px; height: 10px; overflow: hidden; border: 2px solid #27313d; border-radius: 8px; background: #fffaf0; visibility: hidden; pointer-events: none; }

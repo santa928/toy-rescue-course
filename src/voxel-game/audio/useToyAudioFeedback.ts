@@ -145,14 +145,19 @@ export function useToyAudioFeedback({
   }, [coordinator, director]);
 
   useEffect(() => {
+    let active = true;
     /** hidden中は停止し、表示復帰時はenabled設定を保ったまま再開する。 */
     const handleVisibilityChange = (): void => {
       void director.setVisible(document.visibilityState === 'visible').finally(() => {
-        syncUiState(false);
+        if (active) syncUiState(false);
       });
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    handleVisibilityChange();
+    return () => {
+      active = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [director, syncUiState]);
 
   return { audioState, audioTelemetryRef, toggleAudio };

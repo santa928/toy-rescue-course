@@ -86,8 +86,8 @@ try {
       await page.locator(`.vehicle-selector__button[data-vehicle="${id}"]`).click();
       await page.waitForFunction(id => JSON.parse(window.render_game_to_text()).vehicle.id === id, id);
       await page.waitForTimeout(150);
-      report.layouts.push(await measure(page, width, height, id));
       await page.screenshot({ path: `${output}/${width}x${height}-${id}.png` });
+      report.layouts.push(await measure(page, width, height, id));
     }
     console.log(`[usability] layout ${width}x${height}: 5 vehicles`);
     await page.close();
