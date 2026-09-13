@@ -16,10 +16,12 @@ jobs:
     env:
       PRODUCTION_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && 'https://santa928.github.io/toy-rescue-course' || 'http://127.0.0.1:4173' }}
       VOXEL_GAME_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && 'https://santa928.github.io/toy-rescue-course' || 'http://127.0.0.1:4173' }}
-      USABILITY_VIEWPORTS: 1280x720,390x844
+      USABILITY_VIEWPORTS: 1280x720,390x844,667x480,667x481,844x480,844x481,700x375,701x375
     steps:
       - uses: actions/checkout@v7.0.1
       - run: npm ci
+      - name: Verify unit regressions in Docker
+        run: npm test
       - name: Build local preview for PR
         if: github.event_name == 'pull_request'
         run: npm run build

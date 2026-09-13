@@ -13,4 +13,15 @@ describe('resolveWorldFixedCameraZoom', () => {
     expect(resolveWorldFixedCameraZoom(390, 844)).toBeCloseTo(44.31818, 4);
     expect(resolveWorldFixedCameraZoom(360, 800)).toBeCloseTo(40.90909, 4);
   });
+
+  it('HUDの高さ・幅の境界を1px跨いでも車体を急拡大しない', () => {
+    for (const width of [640, 667, 700, 701, 844]) {
+      expect(Math.abs(resolveWorldFixedCameraZoom(width, 481)
+        - resolveWorldFixedCameraZoom(width, 480))).toBeLessThan(0.2);
+    }
+    for (const height of [375, 480, 481, 600, 720]) {
+      expect(Math.abs(resolveWorldFixedCameraZoom(701, height)
+        - resolveWorldFixedCameraZoom(700, height))).toBeLessThan(0.2);
+    }
+  });
 });
