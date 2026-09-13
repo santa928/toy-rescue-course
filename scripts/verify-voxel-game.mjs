@@ -1227,7 +1227,7 @@ async function driveMissionToFire(page, touchDriver) {
     `fire route target ${routePlan.approachFace} staging`,
     0.4,
     touchDriver,
-    { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.8 },
+    { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.8, precisionNudgeFrameCount: 2 },
   );
   await alignWorldCoordinate(
     page,
@@ -1236,7 +1236,7 @@ async function driveMissionToFire(page, touchDriver) {
     'fire route final heading',
     0.4,
     touchDriver,
-    { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.8 },
+    { precisionCounterPulse: true, precisionCounterPulseThreshold: 0.8, precisionNudgeFrameCount: 2 },
   );
   const maximumTargetAcquisitionAttempts = 12;
   const maximumTargetAcquisitionBrakeFrames = 150;
@@ -2834,7 +2834,7 @@ async function prepareTelemetryPostCollision(
   const approachIndex = AXIS_INDEX[approachAxis];
   const perpendicularTarget = obstacle.position[perpendicularIndex];
   const frontalAlignmentTolerance = Math.min(0.2, obstacle.scale[perpendicularIndex] / 3);
-  const runwayReserve = 2.5;
+  const runwayReserve = approachAxis === 'x' ? 4.5 : 2.5;
   const stagingCoordinate = obstacle.position[approachIndex] - approachDirection * (
     obstacle.scale[approachIndex] / 2 + safeSupport + runwayReserve
   );
@@ -4087,15 +4087,19 @@ async function verifyVoxelGame(scenarioProgress) {
   if (focusMode === 'collision') {
     const browser = await chromium.launch({ headless: true });
     const errors = [];
+    const requestedIds = process.env.VOXEL_GAME_COLLISION_IDS?.split(',') ?? null;
+    const artifacts = requestedIds
+      ? collisionScreenshots.filter(name => requestedIds.some(id => name.includes(id)))
+      : collisionScreenshots;
     try {
       const collisions = await runScenario('collision', async () => {
         const result = await verifyWorldCollisions(browser, errors);
-        for (const screenshot of collisionScreenshots) {
+        for (const screenshot of artifacts) {
           assert(fs.existsSync(`${outputDirectory}/${screenshot}`),
             `Missing focused collision screenshot: ${screenshot}`);
         }
         writeJsonArtifact('focused-collision.json', {
-          artifacts: collisionScreenshots,
+          artifacts,
           collisions: result,
           errors,
           screenshotProofs,
@@ -4103,7 +4107,7 @@ async function verifyVoxelGame(scenarioProgress) {
         assert.equal(errors.length, 0, `Focused collision browser/request errors: ${errors.join(' | ')}`);
         return result;
       });
-      console.log(JSON.stringify({ artifacts: collisionScreenshots, collisions, errors }));
+      console.log(JSON.stringify({ artifacts, collisions, errors }));
       return;
     } finally {
       await browser.close();

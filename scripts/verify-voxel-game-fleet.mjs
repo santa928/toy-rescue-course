@@ -419,7 +419,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: west road staging`,
-      target: targets[0].position[0] + 6,
+      target: -16,
       tolerance: 0.4,
       touchDriver,
     });
@@ -487,7 +487,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: return west staging`,
-      target: -14,
+      target: -16,
       tolerance: 0.6,
       touchDriver,
     });

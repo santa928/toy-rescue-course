@@ -167,6 +167,22 @@ describe('玩具街の造形と通行', () => {
     }
   });
 
+  it('移設した車庫の壁が全15仕事の出発案内を横切らない', () => {
+    for (const job of Object.values(VEHICLE_JOBS).flat()) {
+      const route = [spawn, ...job.routeMarkers];
+      for (let index = 1; index < route.length; index += 1) {
+        const start = new Vector3(route[index - 1][0], 0.8, route[index - 1][2]);
+        const end = new Vector3(route[index][0], 0.8, route[index][2]);
+        const ray = new Ray(start, end.clone().sub(start).normalize());
+        for (const wall of depot.filter(part => part.solid)) {
+          // 車幅・車長の半径を含め、黄色い案内線だけが壁を避ける偽の通路を拒む。
+          const hit = ray.intersectBox(bounds(wall).expandByVector(new Vector3(1.7, 0, 1.7)), new Vector3());
+          expect(hit === null || start.distanceTo(hit) >= start.distanceTo(end), `${job.id}: ${wall.id} segment ${index}`).toBe(true);
+        }
+      }
+    }
+  });
+
   it('三色旗は支柱を持ち、中央の走路を横切らない', () => {
     const flags = createPaintLaneFlags();
     for (const color of ['red', 'yellow', 'blue']) {
