@@ -1,0 +1,44 @@
+name: Browser smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+    env:
+      PRODUCTION_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && 'https://santa928.github.io/toy-rescue-course' || 'http://127.0.0.1:4173' }}
+      VOXEL_GAME_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && 'https://santa928.github.io/toy-rescue-course' || 'http://127.0.0.1:4173' }}
+      USABILITY_VIEWPORTS: 1280x720,390x844
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: npm ci
+      - name: Build local preview for PR
+        if: github.event_name == 'pull_request'
+        run: npm run build
+      - name: Verify entrypoints, layout, and input
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output/product-review
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            npm run preview -- --host 127.0.0.1 > output/product-review/preview.log 2>&1 &
+            preview_pid=$!
+            trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          fi
+          node scripts/verify-production-entrypoints.mjs
+          node scripts/verify-product-usability.mjs
+      - name: Save browser evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: browser-smoke-${{ github.sha }}
+          path: output/product-review/
+          retention-days: 7
