@@ -2866,7 +2866,7 @@ async function prepareTelemetryPostCollision(
     ? transitDirection < 0
       ? Math.min(perpendicularTarget, ...transitClearanceCoordinates)
       : Math.max(perpendicularTarget, ...transitClearanceCoordinates)
-    : perpendicularTarget;
+    : garageExitZ;
   await alignWorldCoordinate(
     page,
     perpendicularIndex,
@@ -3663,17 +3663,23 @@ async function verifyWorldCollisions(browser, errors) {
       recoveryDirection: 1,
     },
   ];
-  const requiredKeyboardCollisionIds = ['garage-back-wall'];
-  const testedIds = testedScenarios.map(({ id }) => id);
+  const focusedIds = process.env.VOXEL_GAME_COLLISION_IDS?.split(',') ?? null;
+  const selectedScenarios = focusedIds
+    ? testedScenarios.filter(({ id }) => focusedIds.includes(id))
+    : testedScenarios;
+  if (focusedIds) assert.deepEqual([...selectedScenarios.map(({ id }) => id)].sort(), [...focusedIds].sort(), 'Unknown focused collision ID.');
+  const requiredKeyboardCollisionIds = focusedIds
+    ? ['garage-back-wall'].filter(id => focusedIds.includes(id)) : ['garage-back-wall'];
+  const testedIds = selectedScenarios.map(({ id }) => id);
   assert.deepEqual(
     requiredKeyboardCollisionIds.filter((id) => !testedIds.includes(id)),
     [],
     'Required keyboard collision IDs are absent from real-input testedIds.',
   );
-  const fireHazard = await verifyFireHazardLifecycle(browser, errors);
-  const routeMarkers = await verifyRouteMarkerPassThrough(browser, errors);
+  const fireHazard = focusedIds ? null : await verifyFireHazardLifecycle(browser, errors);
+  const routeMarkers = focusedIds ? null : await verifyRouteMarkerPassThrough(browser, errors);
   const scenarios = {};
-  for (const scenario of testedScenarios) {
+  for (const scenario of selectedScenarios) {
     const { id } = scenario;
     const obstacle = worldSolids.find((candidate) => candidate.id === id);
     assert(obstacle, `${id}: collision obstacle definition is unavailable.`);
@@ -3695,6 +3701,7 @@ async function verifyWorldCollisions(browser, errors) {
   for (const id of requiredKeyboardCollisionIds) {
     assert.equal(scenarios[id]?.input, 'keyboard', `${id}: real keyboard collision evidence is missing.`);
   }
+  if (focusedIds) return { scope: 'focused collision only', scenarios, testedIds };
   const sharedDefinitionOnlyReasons = {
     'tree-trunk-1': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'tree-trunk-2': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
