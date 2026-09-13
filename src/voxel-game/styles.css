@@ -1323,3 +1323,19 @@ button {
 .game-status button { min-height: 48px; padding: 12px 24px; border: 3px solid #81520d; border-radius: 12px; color: #2b2119; background: #f4bf3b; cursor: pointer; font-weight: 800; }
 .game-status button:focus-visible { outline: 3px solid #197994; outline-offset: 4px; }
 .game-status .game-status__parent { margin-bottom: 0; text-align: left; color: #67543e; }
+
+/* 広い画面では車庫の屋根を空け、案内を左右の運転ボタンの間へ収める。 */
+@media (min-width: 960px) and (min-height: 600px) {
+  .hud-top .status-stack {
+    position: fixed;
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom) + 18px);
+    left: 50%;
+    right: auto;
+    justify-self: auto;
+    width: min(520px, calc(100vw - 376px));
+    max-width: none;
+    transform: translateX(-50%);
+    flex-direction: column-reverse;
+  }
+}

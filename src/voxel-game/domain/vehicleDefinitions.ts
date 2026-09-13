@@ -31,7 +31,7 @@ export interface VehiclePhysicsDefinition {
   readonly yawClamp: number;
 }
 
-/** actual telemetryと画面投影で共有する車両外接直方体。 */
+/** 静止車体と道具・灯火のアクションを包含し、telemetryとHUD投影で共有する保守的な外接。 */
 export interface VehicleVisualBoundsDefinition {
   readonly offset: WorldPoint;
   readonly scale: WorldPoint;
@@ -84,7 +84,7 @@ export const VEHICLE_DEFINITIONS = [
       movingResponse: 6.8,
       yawClamp: 4.8,
     },
-    visualBounds: { offset: [0, 0.78, 0], scale: [3.36, 1.92, 3.12] },
+    visualBounds: { offset: [0, 0.76, 0], scale: [3.36, 2.12, 3.12] },
   },
   {
     action: { ariaLabel: 'バケットを動かす', label: 'バケット' },
@@ -98,7 +98,7 @@ export const VEHICLE_DEFINITIONS = [
       movingResponse: 6.4,
       yawClamp: 4.9,
     },
-    visualBounds: { offset: [0, 0.84, -0.18], scale: [3.12, 2.08, 3.72] },
+    visualBounds: { offset: [0, 1.08, -0.24], scale: [3.12, 3.12, 4.2] },
   },
   {
     action: { ariaLabel: '手当てをする', label: 'てあて' },
@@ -112,7 +112,7 @@ export const VEHICLE_DEFINITIONS = [
       movingResponse: 7.2,
       yawClamp: 5.1,
     },
-    visualBounds: { offset: [0, 0.84, 0], scale: [2.64, 1.92, 3.12] },
+    visualBounds: { offset: [0, 1.01, 0], scale: [2.64, 2.26, 3.12] },
   },
   {
     action: { ariaLabel: 'サイレンを鳴らす', label: 'サイレン' },
@@ -126,7 +126,7 @@ export const VEHICLE_DEFINITIONS = [
       movingResponse: 7.6,
       yawClamp: 5.4,
     },
-    visualBounds: { offset: [0, 0.78, 0], scale: [2.64, 1.76, 3.12] },
+    visualBounds: { offset: [0, 0.9, 0], scale: [2.64, 2.04, 3.84] },
   },
 ] as const satisfies readonly VehicleDefinition[];
 

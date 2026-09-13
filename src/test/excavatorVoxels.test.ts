@@ -33,10 +33,10 @@ describe('EXCAVATOR_VOXELS', () => {
 
   it('長い前方アームを持つ低い履帯車の外形である', () => {
     expect(calculateVoxelBounds(EXCAVATOR_VOXELS)).toEqual({
-      center: { x: 0.5, y: 3.5, z: -2 },
-      max: { x: 6, y: 7, z: 5 },
+      center: { x: 0.5, y: 5, z: -2 },
+      max: { x: 6, y: 10, z: 5 },
       min: { x: -5, y: 0, z: -9 },
-      size: { x: 12, y: 8, z: 15 },
+      size: { x: 12, y: 11, z: 15 },
     });
   });
 
@@ -44,8 +44,8 @@ describe('EXCAVATOR_VOXELS', () => {
     expect(paletteAt(-5, 0, 0)).toBe('track');
     expect(paletteAt(-5, 1, 0)).toBe('darkGray');
     expect(paletteAt(-3, 5, 2)).toBe('window');
-    expect(paletteAt(0, 6, -5)).toBe('arm');
-    expect(paletteAt(0, 2, -9)).toBe('bucket');
+    expect(paletteAt(2, 10, -5)).toBe('arm');
+    expect(paletteAt(0, 1, -9)).toBe('bucket');
     expect(paletteAt(-1, 7, 3)).toBe('beacon');
   });
 

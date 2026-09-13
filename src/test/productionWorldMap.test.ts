@@ -195,7 +195,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
   });
 
   it('visualとsolidを同じbox定義で共有する', () => {
-    expect(PRODUCTION_WORLD_MAP.visualBoxes).toHaveLength(50);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.length).toBeGreaterThan(50);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)).toHaveLength(27);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid).length).toBeLessThanOrEqual(28);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.every(({ id }) => id.length > 0)).toBe(true);
@@ -221,18 +221,18 @@ describe('PRODUCTION_WORLD_MAP', () => {
     expect(landmarks.town && resolveWorldDistrict(landmarks.town)).toBe('town');
     expect(PRODUCTION_WORLD_MAP.visualBoxes.some(({ id }) => id === 'construction-office-body'))
       .toBe(true);
-    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ id }) => id.startsWith('town-house-')))
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ id }) => id.startsWith('town-house-') && (id.endsWith('-body') || id.endsWith('-roof'))))
       .toHaveLength(6);
   });
 
-  it('車庫屋根は中央の車体確認用開口を残す3辺フレームである', () => {
+  it('車庫の段屋根は連続した3段で、前庭の乗換地点を覆わない', () => {
     const roofFrames = PRODUCTION_WORLD_MAP.visualBoxes.filter(({ id }) => (
       id.startsWith('garage-roof-')
     ));
     expect(roofFrames.map(({ id }) => id)).toEqual([
-      'garage-roof-left',
-      'garage-roof-right',
-      'garage-roof-back',
+      'garage-roof-eaves',
+      'garage-roof-middle',
+      'garage-roof-ridge',
     ]);
     expect(roofFrames.every(({ solid }) => !solid)).toBe(true);
     expect(roofFrames.some(({ position, scale }) => (

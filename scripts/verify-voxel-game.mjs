@@ -41,6 +41,7 @@ const supportedFocusModes = [
   'break-green',
   'production-map',
   'water',
+  'fire-jobs',
 ];
 const focusMode = process.env.VOXEL_GAME_FOCUS ?? null;
 if (focusMode !== null) {
@@ -2375,7 +2376,7 @@ async function driveToBlockApproach(page, block) {
   const garageExitBefore = await readGameState(page);
   const garage = garageExitBefore.landmarks.garage;
   const plaza = garageExitBefore.landmarks.blockPlaza;
-  const hubGate = requireWorldSolid(garageExitBefore, 'hub-gate-post');
+  const hubGate = requireWorldSolid(garageExitBefore, 'hub-wayfinding-post');
   const garageExitAfter = await driveAlongWorldAxis(page, 'negativeZ', (state) => (
     state.vehicle.position[2] <= garage[2] - 3
   ),
@@ -2392,8 +2393,7 @@ async function driveToBlockApproach(page, block) {
       resetCount: garageExitBefore.vehicle.resetCount,
     },
   };
-  const gateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2
-    - VEHICLE_COLLIDER_HALF_EXTENTS[2] - 2;
+  const gateBypassZ = 0;
   await alignWorldCoordinate(page, 2, gateBypassZ, `${block.id} hub gate bypass Z`);
 
   if (block.id === 'plaza-green') {
@@ -2799,7 +2799,7 @@ function worldAxisInputName(axis, direction) {
 }
 
 /**
- * telemetryのgarage wallと対象post AABBから、安全な車庫出口・正面runwayを算出して実入力で配置する。
+ * 前庭から中央交差点へ出て、対象postと経路上のsolid AABBから正面runwayを算出する。
  */
 async function prepareTelemetryPostCollision(
   page,
@@ -2809,19 +2809,10 @@ async function prepareTelemetryPostCollision(
   touchDriver = null,
 ) {
   const initial = await readGameState(page);
-  const garageSideWalls = [
-    requireWorldSolid(initial, 'garage-left-wall'),
-    requireWorldSolid(initial, 'garage-right-wall'),
-  ];
-  const hubGate = requireWorldSolid(initial, 'hub-gate-post');
-  const garageFrontFaceZ = Math.min(...garageSideWalls.map((wall) => (
-    wall.position[2] - wall.scale[2] / 2
-  )));
+  const hubGate = requireWorldSolid(initial, 'hub-wayfinding-post');
   const safeSupport = Math.max(...VEHICLE_COLLIDER_HALF_EXTENTS);
-  const garageClearanceZ = garageFrontFaceZ - safeSupport - 0.75;
-  const hubGateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2
-    - VEHICLE_COLLIDER_HALF_EXTENTS[2] - 2;
-  const garageExitZ = Math.min(garageClearanceZ, hubGateBypassZ);
+  const hubGateBypassZ = 0;
+  const garageExitZ = hubGateBypassZ;
   await driveAlongWorldAxis(
     page,
     'negativeZ',
@@ -2847,8 +2838,7 @@ async function prepareTelemetryPostCollision(
   const stagingCoordinate = obstacle.position[approachIndex] - approachDirection * (
     obstacle.scale[approachIndex] / 2 + safeSupport + runwayReserve
   );
-  const garageCenterX = garageSideWalls.reduce((sum, wall) => sum + wall.position[0], 0)
-    / garageSideWalls.length;
+  const garageCenterX = initial.landmarks.garage[0];
   const transitDirection = perpendicularTarget < garageCenterX ? -1 : 1;
   const transitMinimumApproach = Math.min(garageExitZ, stagingCoordinate);
   const transitMaximumApproach = Math.max(garageExitZ, stagingCoordinate);
@@ -2863,16 +2853,9 @@ async function prepareTelemetryPostCollision(
         && solid.position[2] - halfDepth <= transitMaximumApproach;
     })
     : [];
-  const sameSideGarageWall = transitDirection < 0
-    ? garageSideWalls.reduce((west, wall) => (
-      wall.position[0] < west.position[0] ? wall : west
-    ))
-    : garageSideWalls.reduce((east, wall) => (
-      wall.position[0] > east.position[0] ? wall : east
-    ));
   const transitReserve = 2;
   const transitObstacles = [...new Map(
-    [hubGate, sameSideGarageWall, ...runwaySolids].map((solid) => [solid.id, solid]),
+    [hubGate, ...runwaySolids].map((solid) => [solid.id, solid]),
   ).values()];
   const transitClearanceCoordinates = transitObstacles.map((solid) => (
     solid.position[0] + transitDirection * (
@@ -2921,9 +2904,6 @@ async function prepareTelemetryPostCollision(
   const staged = await readGameState(page);
   return {
     garageExitZ,
-    garageClearanceZ,
-    garageFrontFaceZ,
-    garageSideWallIds: garageSideWalls.map(({ id }) => id),
     frontalAlignmentTolerance,
     hubGateBypassZ,
     hubGateId: hubGate.id,
@@ -3609,9 +3589,9 @@ async function verifyWorldCollisions(browser, errors) {
       approachAxis: 'x',
       approachDirection: -1,
       captureScreenshot: false,
-      id: 'hub-gate-post',
+      id: 'hub-wayfinding-post',
       prepare: async (page, touch) => prepareTelemetryPostCollision(
-        page, requireWorldSolid(await readGameState(page), 'hub-gate-post'), 'x', -1, touch,
+        page, requireWorldSolid(await readGameState(page), 'hub-wayfinding-post'), 'x', -1, touch,
       ),
       recoveryDirection: 1,
     },
@@ -3648,57 +3628,31 @@ async function verifyWorldCollisions(browser, errors) {
       recoveryDirection: 1,
     },
     {
-      approachAxis: 'z',
-      approachDirection: 1,
+      approachAxis: 'x',
+      approachDirection: -1,
       id: 'garage-back-wall',
       inputMode: 'keyboard',
       prepare: async (page, touch) => {
-        const state = await readGameState(page);
-        const obstacle = requireWorldSolid(state, 'garage-back-wall');
-        await alignWorldCoordinate(
-          page,
-          0,
-          state.landmarks.garage[0],
-          'garage back-wall X',
-          0.35,
-          touch,
-        );
-        await alignWorldCoordinate(
-          page,
-          2,
-          obstacle.position[2] - obstacle.scale[2] / 2
-            - VEHICLE_COLLIDER_HALF_EXTENTS[2] - 2.5,
-          'garage back-wall runway Z',
-          0.35,
-          touch,
-        );
+        const obstacle = requireWorldSolid(await readGameState(page), 'garage-back-wall');
+        await alignWorldCoordinate(page, 2, obstacle.position[2], 'garage back-wall Z', 0.35, touch);
+        await alignWorldCoordinate(page, 0,
+          obstacle.position[0] + obstacle.scale[0] / 2 + Math.max(...VEHICLE_COLLIDER_HALF_EXTENTS) + 2.5,
+          'garage back-wall runway X', 0.35, touch);
       },
-      recoveryDirection: -1,
+      recoveryDirection: 1,
     },
     {
-      approachAxis: 'x',
+      approachAxis: 'z',
       approachDirection: 1,
       id: 'garage-right-wall',
       prepare: async (page, touch) => {
-        const state = await readGameState(page);
-        const obstacle = requireWorldSolid(state, 'garage-right-wall');
-        await alignWorldCoordinate(
-          page,
-          2,
-          state.landmarks.garage[2],
-          'garage right-wall Z',
-          0.35,
-          touch,
-        );
-        await alignWorldCoordinate(
-          page,
-          0,
-          obstacle.position[0] - obstacle.scale[0] / 2
-            - Math.max(...VEHICLE_COLLIDER_HALF_EXTENTS) - 2.5,
-          'garage right-wall runway X',
-          0.35,
-          touch,
-        );
+        const obstacle = requireWorldSolid(await readGameState(page), 'garage-right-wall');
+        // 北側道路から外壁へ向かう。庫内南端をrunwayにすると反対壁と重なる。
+        await alignWorldCoordinate(page, 2, 0, 'garage north road', 0.35, touch);
+        await alignWorldCoordinate(page, 0, obstacle.position[0], 'garage right-wall X', 0.35, touch);
+        await alignWorldCoordinate(page, 2,
+          obstacle.position[2] - obstacle.scale[2] / 2 - Math.max(...VEHICLE_COLLIDER_HALF_EXTENTS) - 2.5,
+          'garage right-wall runway Z', 0.35, touch);
       },
       recoveryDirection: -1,
     },
@@ -3761,11 +3715,11 @@ async function verifyWorldCollisions(browser, errors) {
     'town-tree-trunk-c': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-sign-post-west': 'south-sign-post-west covers the same sign-post collider shape through real input',
     'town-sign-post-east': 'south-sign-post-east covers the same sign-post collider shape through real input',
-    'hub-tool-rack-post': 'hub-gate-post covers the same streetscape post cuboid through real input',
+    'hub-tool-rack-post': 'hub-wayfinding-post covers the same streetscape post cuboid through real input',
     'park-bench-seat': 'the dedicated streetscape E2E covers the adjacent picnic-table cuboid through real input',
     'park-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
     'park-picnic-table': 'the dedicated streetscape E2E covers this solid through real keyboard and touch input',
-    'fire-hydrant-body': 'hub-gate-post covers the same streetscape post cuboid through real input',
+    'fire-hydrant-body': 'hub-wayfinding-post covers the same streetscape post cuboid through real input',
     'fire-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
     'blocks-fence-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
     'south-viewing-bench': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
@@ -4088,6 +4042,22 @@ async function verifyVoxelGame(scenarioProgress) {
     } finally {
       await browser.close();
     }
+  }
+  if (focusMode === 'fire-jobs') {
+    const browser = await chromium.launch({ headless: true });
+    const errors = [];
+    try {
+      const results = [];
+      for (const touch of [false, true]) {
+        results.push(await verifyCompleteMission(browser, errors,
+          touch ? 'mobile-landscape' : 'desktop', touch,
+          { targetedScreenshot: `${outputDirectory}/${touch ? 'mobile-landscape' : 'desktop'}-fire-target.png` }));
+      }
+      assert.deepEqual(errors, []);
+      writeJsonArtifact('fire-jobs.json', { errors, results });
+      console.log('[fire-jobs] PASS desktop/mobile: three jobs and garage return');
+      return;
+    } finally { await browser.close(); }
   }
   if (focusMode === 'water') {
     const browser = await chromium.launch({ headless: true });

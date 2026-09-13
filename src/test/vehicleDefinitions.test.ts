@@ -59,8 +59,8 @@ describe('vehicle definitions', () => {
         yawClamp: 4.9,
       },
       visualBounds: {
-        offset: [0, 0.84, -0.18],
-        scale: [3.12, 2.08, 3.72],
+        offset: [0, 1.08, -0.24],
+        scale: [3.12, 3.12, 4.2],
       },
     });
   });
@@ -72,7 +72,7 @@ describe('vehicle definitions', () => {
       label: 'きゅうきゅうしゃ',
       missionId: 'patient-care',
       physics: { idleResponse: 4.7, mass: 1.6, movingResponse: 7.2, yawClamp: 5.1 },
-      visualBounds: { offset: [0, 0.84, 0], scale: [2.64, 1.92, 3.12] },
+      visualBounds: { offset: [0, 1.01, 0], scale: [2.64, 2.26, 3.12] },
     });
   });
 
@@ -83,7 +83,7 @@ describe('vehicle definitions', () => {
       label: 'パトカー',
       missionId: 'patrol',
       physics: { idleResponse: 4.9, mass: 1.45, movingResponse: 7.6, yawClamp: 5.4 },
-      visualBounds: { offset: [0, 0.78, 0], scale: [2.64, 1.76, 3.12] },
+      visualBounds: { offset: [0, 0.9, 0], scale: [2.64, 2.04, 3.84] },
     });
   });
 

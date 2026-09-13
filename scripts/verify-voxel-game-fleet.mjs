@@ -402,9 +402,9 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     const layout = await measureFleetHud(page, viewport);
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-garage.png` });
 
-    const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-gate-post');
+    const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-wayfinding-post');
     assert(hubGate, `${viewport.name}: hub gate telemetry is unavailable.`);
-    const gateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2 - 4;
+    const gateBypassZ = 0; // 中央交差点から各地区へ出発する。
     await driveToCoordinate(page, {
       coordinateIndex: 2,
       description: `${viewport.name}: garage gate bypass`,

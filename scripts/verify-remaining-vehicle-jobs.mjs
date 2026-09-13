@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
-import { createDriveHarness } from './voxel-game-e2e/drive-harness.mjs';
+import { createDomTouchStickDriver, createDriveHarness } from './voxel-game-e2e/drive-harness.mjs';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:4173';
 const output = 'output/product-review/remaining-jobs';
@@ -17,10 +17,11 @@ const harness = createDriveHarness({ alignAttemptLimit: 45, brakeFrameLimit: 220
 const { readGameState: state, driveToCoordinate, driveAlongWorldAxis, brakeVehicle, pulseWorldAxis } = harness;
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const results = [];
+let touchDriver = null;
 
-/** 通常のkeyboard入力だけで、道路上の指定X/Zへ停止する。 */
+/** 通常の移動入力で道路上の指定X/Zへ停止する。門の精密な進入にはDOMスティックを使う。 */
 async function move(page, coordinateIndex, target, description, tolerance = 0.5) {
-  await driveToCoordinate(page, { coordinateIndex, target, description, tolerance });
+  await driveToCoordinate(page, { coordinateIndex, target, description, tolerance, touchDriver });
 }
 
 /** 停止条件を満たして主操作を保持し、実ミッションの完了を待つ。 */
@@ -40,15 +41,16 @@ try {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     try {
+      touchDriver = null;
       await page.goto(`${baseUrl}/?job-seed=${seed}`);
       await page.locator('.primary-action-button').waitFor();
       await page.locator(`.vehicle-selector__button[data-vehicle="${vehicle}"]`).click();
       await page.waitForFunction(vehicle => JSON.parse(window.render_game_to_text()).vehicle.id === vehicle, vehicle);
       const initial = await state(page);
       assert.equal(initial.mission.jobId, id);
+      if (vehicle === 'police') touchDriver = await createDomTouchStickDriver(page);
       console.log('[jobs] start', id, seed);
-      const gate = initial.visualLayout.worldSolids.find(b => b.id === 'hub-gate-post');
-      const gateZ = gate.position[2] - gate.scale[2] / 2 - 4;
+      const gateZ = 0; // 中央交差点を経由し、車庫の外壁を横切らない。
       await move(page, 2, gateZ, `${id} garage exit`);
 
       if (vehicle === 'ambulance') {
@@ -67,23 +69,29 @@ try {
       } else if (vehicle === 'police') {
         const targets = initial.mission.targetPositions;
         // シャワー側は車庫の道具棚から車幅を離して南側道路へ出る。
+        if (id === 'patrol-pools') {
+          await move(page, 0, -3.5, `${id} forecourt lane`, 0.25);
+          await move(page, 2, 13, `${id} clear depot`, 0.25);
+        }
         await move(page, 0, id === 'patrol-showers' ? 14 : targets[0][0], `${id} side road`);
         await move(page, 2, 17, `${id} gate staging`);
         for (const [index, target] of targets.entries()) {
           if (id === 'patrol-showers' && index === 2) {
             await move(page, 2, 30, `${id} clear shower posts`);
           }
-          await move(page, 0, target[0], `${id} gate ${index + 1} longitude`);
+          // 各門の直前で座標を整える。長距離の開ループ入力による横ずれを門の判定と混同しない。
+          await move(page, 2, target[2] - 2, `${id} gate ${index + 1} staging`, 0.3);
+          await move(page, 0, target[0], `${id} gate ${index + 1} longitude`, 0.25);
           await page.screenshot({ path: `${output}/${id}-before-${index + 1}.png` });
           await page.keyboard.down('Space');
           try {
-            await driveAlongWorldAxis(page, { axis: 'positiveZ', description: `${id} gate ${index + 1}`,
+            await driveAlongWorldAxis(page, { axis: 'positiveZ', touchDriver, description: `${id} gate ${index + 1}`,
               predicate: s => s.police.completedCount >= index + 1 });
           } finally { await page.keyboard.up('Space'); }
         }
       } else {
         const targets = [...initial.mission.targetPositions].sort((a, b) => b[0] - a[0] || a[2] - b[2]);
-        await move(page, 0, -13, `${id} west staging`);
+        await move(page, 0, -16, `${id} west staging`);
         if (id === 'soil-west') await move(page, 0, -37, `${id} west lane`);
         for (const [index, target] of targets.entries()) {
           console.log('[jobs] target', id, index + 1, target);

@@ -329,11 +329,11 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(await bulldozerButton.getAttribute('aria-pressed'), 'true');
     const layout = await measureHudLayout(page, viewport);
 
-    const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-gate-post');
+    const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-wayfinding-post');
     const blocksFence = selected.visualLayout.worldSolids.find(({ id }) => id === 'blocks-fence-post');
     assert(hubGate, `${viewport.name}: hub gate telemetry is unavailable.`);
     assert(blocksFence, `${viewport.name}: blocks fence telemetry is unavailable.`);
-    const gateBypassZ = hubGate.position[2] - hubGate.scale[2] / 2 - 4;
+    const gateBypassZ = 0; // 中央交差点から各地区へ出発する。
     const blocksFenceBypassZ = blocksFence.position[2] + blocksFence.scale[2] / 2 + 5;
     await driveToCoordinate(
       page,
@@ -457,8 +457,8 @@ async function verifyViewport(browser, viewport, errors) {
     await driveToCoordinate(
       page,
       2,
-      gateBypassZ,
-      `${viewport.name} cycle 2 return gate bypass`,
+      blocksFenceBypassZ,
+      `${viewport.name} cycle 2 return blocks north lane`,
       activeTouchDriver,
       0.5,
     );

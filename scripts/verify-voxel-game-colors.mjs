@@ -225,9 +225,9 @@ async function waitForColorEffect(page, predicate, description) {
   })}.`);
 }
 
-/** hub gateを避けて中央車庫から指定南stationへ実入力で走る。 */
+/** 前庭から南の中央路へ出て、車庫を横切らず指定stationへ実入力で走る。 */
 async function driveFromGarageToSource(page, source, touchDriver, description) {
-  await driveToCoordinate(page, 2, -4.4, `${description} garage exit`, touchDriver, 0.45);
+  await driveToCoordinate(page, 2, 13, `${description} south central lane`, touchDriver, 0.45);
   await driveToCoordinate(page, 0, source.position[0], `${description} source lane`, touchDriver, 0.4);
   await driveToCoordinate(page, 2, source.position[2], `${description} source row`, touchDriver, 0.35);
   await alignWorldPoint(page, source.position, `${description} source center`, touchDriver, 0.4);

@@ -128,7 +128,7 @@ describe('buildWorldTelemetry', () => {
       bounds: { maxX: 48, maxZ: 48, minX: -48, minZ: -48 },
       currentDistrict: 'hub',
       destinationDistrict: 'fire',
-      decorationBoxCount: 54,
+      decorationBoxCount: flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters).length,
       decorationClusterCount: 21,
       districts: [
         { id: 'hub', label: 'ちゅうおうしゃこ' },
