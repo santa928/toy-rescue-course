@@ -8,11 +8,13 @@
 ## 対象と証拠の境界
 
 - 変更前: `63417398af506aa5ee8f2a7e82d5d786231fcec3`
-- 製品の最終修正: `c6b8d3dd145b84a056123f1cbb627e8ec84c2d5c`
-- 実行: macOS上のDocker、Playwright 1.59.1、Chromium、ANGLE/SwiftShader。
+- 9月12日の製品修正: `c6b8d3dd145b84a056123f1cbb627e8ec84c2d5c`。このディレクトリの画像・JSONは`836b7e2`で保存した当時の証拠。
+- 現行製品の最終修正: `e25f11270a4c6e0d83d9972caf813c17baa1bce0`。PR #5のmerge commitは`5ac336fb2cd23f3f521a9d6c7827353a3a243b92`。
+- 実行: 9月12日はmacOS上のDocker、9月13日はGitHub ActionsのPlaywright Docker container。Playwright 1.59.1、Chromium、ANGLE/SwiftShader。
 - 通常走行はkeyboardまたはpointer操作。追加7仕事はreset/teleportなしをassertする。
-- layout画像・fleet/vehiclesは最終修正前の同じUIで測定した。以後の製品差分はreset時の入力解除、WebGL初期化失敗の分類、正常時の非表示エラー代替文の除去で、配置・物理・UI寸法は変えていない。
-- inputはreset修正後。unit・Node・音・色水・消防・衝突・mapは`82e9379`の製品ソース。最後の代替文除去はrecovery・型検査/build・入口smokeで確認した。未変更の経路は成功証拠を再利用し、全検査を最新SHAで実行したとは扱わない。
+- ここに保存したlayout画像・fleet/vehiclesは9月12日のUIで測定した。9月13日にcamera倍率・短い画面の選択欄・ミニマップ幅・音のライフサイクルを追加修正したため、これらの最新UI/音の証拠には使わない。仕事配置・車両物理は維持している。
+- 9月12日のinputはreset修正後。unit・Node・音・色水・消防・衝突・mapは`82e9379`の製品ソース。代替文除去はrecovery・型検査/build・入口smokeで確認した。変更のない物理・仕事経路は成功証拠を再利用し、全検査を最新SHAで実行したとは扱わない。
+- 現行e25f112では[PR checks](https://github.com/santa928/toy-rescue-course/actions/runs/34762583787)と[Docker browser smoke](https://github.com/santa928/toy-rescue-course/actions/runs/34762583762)が成功。536 unit、38 Node helper、build、3入口、14寸法×5車種の70レイアウト、入力8系統、3寸法×5車種の実AudioContext/mixを再検証した。最新画像・生データは同runのartifactを参照（保存7日）。
 - 画像・数値はCodexが取得したもの。Proによる画像確認や独立レビューの完了を意味しない。
 - 実際の発音の聴取、物理GPU、iOS実機、子どもの理解度は未測定。DockerのfpsやAudioContext状態で代替しない。
 
@@ -38,11 +40,11 @@ WebGL初期化失敗。入力を停止し、再試行時の進捗初期化を表
 
 ![WebGL失敗と再試行](webgl-error.png)
 
-## 検証結果
+## 9月12日の検証結果（現行の再検証結果は冒頭参照）
 
 | 確認 | 結果・証拠 |
 | --- | --- |
-| unit / Node helper / 型検査・build | 51ファイル531件 / 38件 PASS。最終buildはgame 187,913 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで既存予算内 |
+| unit / Node helper / 型検査・build | 当時の51ファイル531件 / 38件 PASS。c6b8d3dのbuildはgame 187,913 bytes、Three 718,551 bytes、Rapier 2,237,128 bytesで既存予算内 |
 | 初期レイアウト | 7寸法×5車種=35組 PASS。[実寸・車体投影・描画call](layout-report.json)。端とHUD間8px、選択56px以上、文字欠けなし |
 | 入力 | [8系統 PASS](input-report.json)。同義キー、両解放順、native Space/Enter、focus変更、reset、実mouse capture、blur。IME/修飾キーは合成event検査 |
 | 複合touch | CDPで2本指の移動＋道具、cancel、4方向 PASS。物理タッチ端末とは区別 |
@@ -76,7 +78,7 @@ WebGL初期化失敗。入力を停止し、再試行時の進捗初期化を表
 
 ブラウザ検証は `VOXEL_GAME_BASE_URL` にDockerから到達可能なプレビューURLを指定して、以下をDocker内で実行する。
 
-- `node scripts/verify-product-usability.mjs`（7寸法・入力。入力だけは `USABILITY_INPUT_ONLY=1`）
+- `node scripts/verify-product-usability.mjs`（既定7寸法・入力。最新CIは`USABILITY_VIEWPORTS`で14寸法を指定。入力だけは `USABILITY_INPUT_ONLY=1`）
 - `node scripts/verify-game-recovery.mjs`（障害注入のためVite開発サーバを使う）
 - `node scripts/verify-remaining-vehicle-jobs.mjs`（追加7仕事。`JOB_FILTER`で仕事IDを絞れる）
 - `node scripts/verify-voxel-game-fleet.mjs`、`node scripts/verify-voxel-game-vehicles.mjs`

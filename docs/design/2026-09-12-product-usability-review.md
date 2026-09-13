@@ -72,7 +72,7 @@ Reactのlazy読み込みとRapierの準備待ちは分離し、Canvas内のSuspe
 sceneは34 draw calls以内、車体は7 draw calls以内。ゲーム本体350KB、Three750KB、Rapier2.25MBの既存予算を保つ。
 software rendererは同じ寸法・seedで変更前後を交互に3回測定する。物理GPUの60fps水準は別の実機認証で確認する。
 
-`scripts/verify-product-usability.mjs` は7寸法×5車種と入力競合、
+`scripts/verify-product-usability.mjs` は既定7寸法×5車種と入力競合を扱い、最新CIは`USABILITY_VIEWPORTS`で14寸法へ拡張する。
 `scripts/verify-game-recovery.mjs` は開発サーバへの障害注入、
 `scripts/compare-product-performance.mjs` は変更前後のsoftware renderer比較を行う。
 Docker内で実行し、結果・画像をgit対象外の `output/product-review/` へ保存する。
