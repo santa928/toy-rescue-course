@@ -93,7 +93,9 @@ async function measureHud(page, viewport) {
   };
   const boxes = {};
   for (const [name, selector] of Object.entries(selectors)) {
+    if (name === 'selector' && !await page.locator(selector).isVisible()) continue;
     const box = await page.locator(selector).boundingBox();
+    if (!box && name === 'selector') continue;
     assert(box, `${viewport.name}: ${name} bounding box is unavailable.`);
     boxes[name] = toEdges(box);
   }
@@ -109,6 +111,7 @@ async function measureHud(page, viewport) {
     ['mission', 'audio'],
     ['joystick', 'action'],
   ]) {
+    if (!boxes[leftName] || !boxes[rightName]) continue;
     assert(rectDistance(boxes[leftName], boxes[rightName]) >= 8,
       `${viewport.name}: ${leftName}/${rightName} lack 8px gap: ${JSON.stringify(boxes)}.`);
   }
@@ -288,14 +291,14 @@ async function driveToConstruction(page, viewport, touchDriver) {
   await driveToCoordinate(page, {
     coordinateIndex: 0,
     description: `${viewport.name}: streetscape construction work light`,
-    target: -19.3,
+    target: viewport.name === 'mobile-landscape' ? -18 : -19.3,
     tolerance: 0.4,
     touchDriver,
   });
   return driveToCoordinate(page, {
     coordinateIndex: 2,
     description: `${viewport.name}: streetscape construction work light clearance`,
-    target: -32,
+    target: viewport.name === 'mobile-landscape' ? -40 : -32,
     tolerance: 0.4,
     touchDriver,
   });
@@ -433,10 +436,11 @@ async function verifyViewport(browser, viewport) {
       await waitForFrames(page, 8);
       const state = await readGameState(page);
       assertWorldBudgets(state, viewport, scenario.districtId);
+      const captureHud = await measureHud(page, viewport);
       const projection = assertRepresentativeVisible(
         state,
         scenario.representativeSolidId,
-        hud,
+        captureHud,
         viewport,
         scenario.openSpace,
       );

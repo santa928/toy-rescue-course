@@ -431,6 +431,16 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
         touchDriver,
       });
       const approachBrakeX = target.position[0] + 3;
+      if (index === 0) {
+        await driveToCoordinate(page, {
+          coordinateIndex: 0,
+          description: `${viewport.name}: soil visible approach`,
+          target: target.position[0] + 5.5,
+          tolerance: 0.3,
+          touchDriver,
+        });
+        await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-approach.png` });
+      }
       const digReady = await driveAlongWorldAxis(page, {
         axis: 'negativeX',
         description: `${viewport.name}: soil ${index + 1} bucket approach`,
@@ -444,7 +454,6 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
         ) <= 2.55,
         `${viewport.name}: excavator stopped outside the actual soil contact radius: ${JSON.stringify({ vehicle: digReady.vehicle, contact: digReady.excavator.contactPoint, target })}`,
       );
-      if (index === 0) await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-approach.png` });
       completed = await digTarget(page, viewport, index + 1);
       assert.equal(
         completed.excavator.targets.find(({ id }) => id === target.id)?.completed,
