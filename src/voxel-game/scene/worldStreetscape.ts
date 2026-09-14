@@ -17,7 +17,7 @@ export const WORLD_SURFACE_MAX_TOP_Y = 0.08;
 export const WORLD_MIN_NON_ROAD_COVERAGE = 0.7;
 
 /** 既存と新規を合わせたstatic colliderの上限。 */
-export const WORLD_MAX_STATIC_COLLIDERS = 40;
+export const WORLD_MAX_STATIC_COLLIDERS = 24;
 
 /** 新しいsolid装飾を道路から車体半幅分だけ離す安全余白。 */
 export const WORLD_ROAD_SOLID_CLEARANCE = 1.6;
@@ -186,13 +186,10 @@ export function validateWorldStreetscape(
   const clusterCounts = countDecorationClustersByDistrict(map.decorationClusters);
   for (const district of map.districts) {
     const count = clusterCounts[district.id];
-    if (count < 2 || count > 4) {
-      errors.push(`district decoration cluster count outside 2..4: ${district.id} (${count})`);
+    // 遊び自体が場所を説明する地区には、数合わせの装飾を要求しない。
+    if (count > 3) {
+      errors.push(`district decoration cluster count exceeds 3: ${district.id} (${count})`);
     }
-    const hasEntry = map.decorationClusters.some(
-      ({ districtId, purpose }) => districtId === district.id && purpose === 'entry',
-    );
-    if (!hasEntry) errors.push(`district missing entry decoration: ${district.id}`);
 
     const coverage = calculateDistrictNonRoadSurfaceCoverage(
       district,

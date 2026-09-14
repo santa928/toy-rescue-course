@@ -9,6 +9,7 @@ import {
 } from '../voxel-game/scene/VoxelWorld';
 import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import { flattenDecorationBoxes } from '../voxel-game/scene/worldStreetscape';
+import { createRoadMarkings } from '../voxel-game/scene/worldRoadMarkings';
 
 interface InspectedElementProps {
   readonly args?: readonly [number, number, number];
@@ -47,13 +48,8 @@ describe('production world render', () => {
     )).toHaveLength(1);
 
     const roadMarkingBatch = children.find(({ props }) => props.color === '#f0c94a');
-    expect(roadMarkingBatch?.props.boxes).toHaveLength(26);
-    expect(roadMarkingBatch?.props.boxes).toEqual(expect.arrayContaining([
-      { position: [-17.75, 0.19, 0], scale: [32.5, 0.05, 0.22] },
-      { position: [17.75, 0.19, 0], scale: [32.5, 0.05, 0.22] },
-      { position: [0, 0.19, -17.75], scale: [0.22, 0.05, 32.5] },
-      { position: [0, 0.19, 22.1], scale: [0.22, 0.05, 23.8] },
-    ]));
+    expect(WORLD_ROAD_RENDER_BOXES).toBe(PRODUCTION_WORLD_MAP.roads);
+    expect(roadMarkingBatch?.props.boxes).toEqual(createRoadMarkings(PRODUCTION_WORLD_MAP.roads));
 
     const visualBatches = children.filter(({ props }) => (
       props.boxes?.length

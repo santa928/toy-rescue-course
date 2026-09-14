@@ -274,23 +274,7 @@ async function verifyViewport(browser, viewport, errors) {
     const bluePool = sourceById.get('pool-blue');
     const yellowShower = sourceById.get('shower-yellow');
     assert(redPool && bluePool && yellowShower, `${viewport.name}: required sources are missing.`);
-    const eastSignPost = initial.visualLayout.worldSolids.find(
-      ({ id }) => id === 'south-sign-post-east',
-    );
-    const southBench = initial.visualLayout.worldSolids.find(
-      ({ id }) => id === 'south-viewing-bench',
-    );
-    assert(eastSignPost, `${viewport.name}: east sign post telemetry is missing.`);
-    assert(southBench, `${viewport.name}: south bench telemetry is missing.`);
-    const vehiclePlanarHalfExtent = Math.max(
-      initial.visualLayout.vehicleBounds.scale[0],
-      initial.visualLayout.vehicleBounds.scale[2],
-    ) / 2;
-    const signPlanarHalfExtent = Math.max(eastSignPost.scale[0], eastSignPost.scale[2]) / 2;
-    const yellowShowerSignBypassZ = Math.min(
-      eastSignPost.position[2] - vehiclePlanarHalfExtent - signPlanarHalfExtent - 1.5,
-      southBench.position[2] - vehiclePlanarHalfExtent - southBench.scale[2] / 2 - 1.5,
-    );
+    const yellowShowerApproachZ = 20; // 南広場の開放通路を使い、他の色源への接触を避ける。
 
     const firstRed = await driveFromGarageToSource(
       page,
@@ -388,8 +372,8 @@ async function verifyViewport(browser, viewport, errors) {
     await driveToCoordinate(
       page,
       2,
-      yellowShowerSignBypassZ,
-      `${viewport.name} yellow shower sign bypass`,
+      yellowShowerApproachZ,
+      `${viewport.name} yellow shower open approach`,
       touchDriver,
       0.2,
     );

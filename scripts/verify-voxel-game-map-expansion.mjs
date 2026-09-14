@@ -217,26 +217,26 @@ async function collideWithConstructionOffice(page, viewport, touchDriver, initia
   await driveToCoordinate(page, {
     coordinateIndex: 0,
     description: `${viewport.name}: construction office staging`,
-    target: -31,
+    target: -38,
     tolerance: 0.35,
     touchDriver,
   });
   await alignWorldCoordinate(page, {
     coordinateIndex: 2,
     description: `${viewport.name}: construction office lane`,
-    target: -37,
+    target: -44,
     tolerance: 0.35,
     touchDriver,
   });
   await pulseWorldAxis(page, {
-    axis: 'negativeX',
+    axis: 'positiveZ',
     description: `${viewport.name}: construction office collision`,
     frameCount: 90,
     touchDriver,
   });
   const collided = await readGameState(page);
   assert.equal(collided.vehicle.resetCount, initialResetCount);
-  assert(collided.vehicle.position[0] < -32 && collided.vehicle.position[0] >= -33.75,
+  assert(collided.vehicle.position[2] > -42 && collided.vehicle.position[2] <= -40.5,
     `${viewport.name}: construction office collision failed: ${JSON.stringify(collided.vehicle)}.`);
   return collided;
 }
@@ -244,16 +244,16 @@ async function collideWithConstructionOffice(page, viewport, touchDriver, initia
 /** 公園側から入ったこうじヤードを南側から積み木地区へ抜ける。 */
 async function exitConstructionToBlocks(page, viewport, touchDriver) {
   await driveToCoordinate(page, {
-    coordinateIndex: 0,
+    coordinateIndex: 2,
     description: `${viewport.name}: construction office recovery`,
-    target: -31,
+    target: -44,
     tolerance: 0.4,
     touchDriver,
   });
   await driveToCoordinate(page, {
-    coordinateIndex: 2,
+    coordinateIndex: 0,
     description: `${viewport.name}: construction north recovery road`,
-    target: -44,
+    target: -31,
     tolerance: 0.4,
     touchDriver,
   });
@@ -402,7 +402,7 @@ async function verifyViewport(browser, viewport, errors) {
     ]);
     assert.deepEqual(initial.landmarks.construction, [-31, 0, -31]);
     assert.deepEqual(initial.landmarks.town, [31, 0, 31]);
-    assert.equal(initial.visualLayout.worldSolids.length, 40);
+    assert.equal(initial.visualLayout.worldSolids.length, 22);
     const initialResetCount = initial.vehicle.resetCount;
     const hud = await measureHud(page, viewport);
 
@@ -463,7 +463,7 @@ async function verifyViewport(browser, viewport, errors) {
     const town = await driveToTown(page, viewport, touchDriver);
     await waitForFrames(page, 6);
     const townState = await readGameState(page);
-    const townLandmark = requireWorldSolid(townState, 'town-west-lamp-post');
+    const townLandmark = requireWorldSolid(townState, 'town-house-white-body');
     const townProjection = assertLandmarkVisible(townState, townLandmark, hud, viewport);
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-town.png` });
     const townCollision = await collideWithTownHouse(

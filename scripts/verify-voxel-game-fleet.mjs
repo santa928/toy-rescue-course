@@ -10,7 +10,7 @@ import {
 } from './voxel-game-e2e/drive-harness.mjs';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
-const outputDirectory = 'output/voxel-game-fleet';
+const outputDirectory = process.env.VOXEL_GAME_FLEET_OUTPUT ?? 'output/voxel-game-fleet';
 const allViewports = [
   { height: 720, name: 'desktop', touch: false, width: 1_280 },
   { height: 768, name: 'tablet', touch: true, width: 1_024 },
@@ -402,8 +402,6 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     const layout = await measureFleetHud(page, viewport);
     await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-garage.png` });
 
-    const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-wayfinding-post');
-    assert(hubGate, `${viewport.name}: hub gate telemetry is unavailable.`);
     const gateBypassZ = 0; // 中央交差点から各地区へ出発する。
     await driveToCoordinate(page, {
       coordinateIndex: 2,
@@ -446,6 +444,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
         ) <= 2.55,
         `${viewport.name}: excavator stopped outside the actual soil contact radius: ${JSON.stringify({ vehicle: digReady.vehicle, contact: digReady.excavator.contactPoint, target })}`,
       );
+      if (index === 0) await page.screenshot({ path: `${outputDirectory}/${viewport.name}-excavator-approach.png` });
       completed = await digTarget(page, viewport, index + 1);
       assert.equal(
         completed.excavator.targets.find(({ id }) => id === target.id)?.completed,
@@ -580,6 +579,7 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
       tolerance: 0.28,
       touchDriver,
     });
+    await page.screenshot({ path: `${outputDirectory}/${viewport.name}-ambulance-approach.png` });
     await driveToCoordinate(page, {
       coordinateIndex: 0,
       description: `${viewport.name}: ambulance patient lane`,
@@ -742,26 +742,14 @@ async function verifyExcavatorViewport(browser, viewport, errors) {
     const garageRightWall = policeSelected.visualLayout.worldSolids.find(
       ({ id }) => id === 'garage-right-wall',
     );
-    const hubToolRack = policeSelected.visualLayout.worldSolids.find(
-      ({ id }) => id === 'hub-tool-rack-post',
-    );
-    const southBench = policeSelected.visualLayout.worldSolids.find(
-      ({ id }) => id === 'south-viewing-bench',
-    );
     assert(garageRightWall, `${viewport.name}: garage right wall telemetry is unavailable.`);
-    assert(hubToolRack, `${viewport.name}: hub tool rack telemetry is unavailable.`);
-    assert(southBench, `${viewport.name}: south bench telemetry is unavailable.`);
     const policeVehicleHalfWidth = policeSelected.visualLayout.vehicleBounds.scale[0] / 2;
     const policeGarageBypassX = Math.max(
       garageRightWall.position[0] + garageRightWall.scale[0] / 2
         + policeVehicleHalfWidth + 1.5,
-      hubToolRack.position[0] + hubToolRack.scale[0] / 2
-        + policeVehicleHalfWidth + 1.5,
+      policeSelected.landmarks.garage[0] + 6.5,
     );
-    const policeReturnBypassZ = southBench.position[2]
-      - southBench.scale[2] / 2
-      - policeSelected.visualLayout.vehicleBounds.scale[2] / 2
-      - 1.5;
+    const policeReturnBypassZ = 20; // 色遊びの入口より北の開放通路で帰路に合流する。
 
     await driveToCoordinate(page, {
       coordinateIndex: 2,

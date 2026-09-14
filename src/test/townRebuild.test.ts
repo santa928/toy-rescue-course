@@ -5,7 +5,9 @@ import { WORLD_SOLID_BOXES } from '../voxel-game/scene/worldCollisionLayout';
 import { VEHICLE_DEFINITIONS } from '../voxel-game/domain/vehicleDefinitions';
 import { WORLD_CAMERA_OFFSET } from '../voxel-game/scene/worldCameraConfig';
 import { VEHICLE_JOBS } from '../voxel-game/domain/vehicleJobs';
-import { createPaintLaneFlags, createRescueDepot } from '../voxel-game/scene/toyTownArchitecture';
+import { createRescueDepot } from '../voxel-game/scene/toyTownArchitecture';
+import { createRoadMarkings } from '../voxel-game/scene/worldRoadMarkings';
+import { flattenDecorationBoxes } from '../voxel-game/scene/worldStreetscape';
 
 import { FIRE_TRUCK_RENDER_PLAN } from '../vehicle-lab/scene/VoxelFireTruck';
 import { BULLDOZER_RENDER_PLAN, getBulldozerActionPose } from '../vehicle-lab/scene/VoxelBulldozer';
@@ -161,9 +163,27 @@ describe('玩具街の造形と通行', () => {
       const eye = new Vector3(last[0], target.y, last[2]);
       const ray = new Ray(eye, target.clone().sub(eye).normalize());
       for (const solid of WORLD_SOLID_BOXES) {
+        expect(bounds(solid).containsPoint(target), `${job.id}: target inside ${solid.id}`).toBe(false);
         const hit = ray.intersectBox(bounds(solid), new Vector3());
         expect(hit === null || eye.distanceTo(hit) >= eye.distanceTo(target), `${job.id}: ${solid.id}`).toBe(true);
       }
+    }
+  });
+
+  it('救急の案内名に対応する池・遊具・ピクニックを対象のすぐそばに置く', () => {
+    const scenery = [...PRODUCTION_WORLD_MAP.visualBoxes,
+      ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters)];
+    for (const [jobId, landmarkId] of [
+      ['patient-pond', 'park-pond'],
+      ['patient-playground', 'playground-plank'],
+      ['patient-picnic', 'park-picnic-blanket'],
+    ]) {
+      const job = VEHICLE_JOBS.ambulance.find(candidate => candidate.id === jobId)!;
+      const landmark = scenery.find(candidate => candidate.id === landmarkId)!;
+      const [x, , z] = job.targets[0].position;
+      const gapX = Math.max(0, Math.abs(x - landmark.position[0]) - landmark.scale[0] / 2);
+      const gapZ = Math.max(0, Math.abs(z - landmark.position[2]) - landmark.scale[2] / 2);
+      expect(Math.hypot(gapX, gapZ), jobId).toBeLessThan(3);
     }
   });
 
@@ -183,14 +203,54 @@ describe('玩具街の造形と通行', () => {
     }
   });
 
-  it('三色旗は支柱を持ち、中央の走路を横切らない', () => {
-    const flags = createPaintLaneFlags();
-    for (const color of ['red', 'yellow', 'blue']) {
-      expect(flags.some(box => box.id === `south-flag-post-${color}`)).toBe(true);
-      const panels = flags.filter(box => box.id.startsWith(`south-entry-flag-${color}`));
-      expect(panels).toHaveLength(3);
-      expect(panels[0].scale[1]).toBeGreaterThan(panels[2].scale[1]);
+  it('南の巡回路と積み木広場は遊びに関係ない小物で塞がない', () => {
+    const boxes = [...PRODUCTION_WORLD_MAP.visualBoxes,
+      ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters)];
+    for (const area of [
+      new Box3(new Vector3(-2.5, 0.2, 14), new Vector3(2.5, 3, 34)),
+      new Box3(new Vector3(-30, 0.2, -10), new Vector3(-14, 3, 16)),
+    ]) {
+      expect(boxes.filter(box => bounds(box).intersectsBox(area)).map(box => box.id)).toEqual([]);
     }
-    expect(flags.every(box => bounds(box).min.x > 2.5)).toBe(true);
+  });
+
+  it('全15仕事の出発から道しるべまで、車幅を含む経路を固定障害物で塞がない', () => {
+    for (const job of Object.values(VEHICLE_JOBS).flat()) {
+      const route = [spawn, ...job.routeMarkers];
+      for (let index = 1; index < route.length; index += 1) {
+        const start = new Vector3(route[index - 1][0], 0, route[index - 1][2]);
+        const end = new Vector3(route[index][0], 0, route[index][2]);
+        if (start.equals(end)) continue;
+        const ray = new Ray(start, end.clone().sub(start).normalize());
+        for (const solid of WORLD_SOLID_BOXES) {
+          const obstacle = bounds(solid);
+          obstacle.expandByVector(new Vector3(1.45, 0, 1.7));
+          obstacle.min.y = -1;
+          obstacle.max.y = 1;
+          expect(obstacle.containsPoint(start) || obstacle.containsPoint(end),
+            `${job.id}: inside ${solid.id} segment ${index}`).toBe(false);
+          const hit = ray.intersectBox(obstacle, new Vector3());
+          expect(hit === null || start.distanceTo(hit) >= start.distanceTo(end),
+            `${job.id}: ${solid.id} segment ${index}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('帰庫前庭を道路と中央線が横切らず、全交差点で中央線が途切れる', () => {
+    const forecourt = new Box3(new Vector3(-2.5, 0, 2.51), new Vector3(2.5, 1, 9.99));
+    expect(PRODUCTION_WORLD_MAP.roads.every(road => !bounds(road).intersectsBox(forecourt))).toBe(true);
+    const markings = createRoadMarkings(PRODUCTION_WORLD_MAP.roads);
+    expect(markings.length).toBeGreaterThan(25);
+    for (const marking of markings) {
+      const horizontal = marking.scale[0] > marking.scale[2];
+      for (const road of PRODUCTION_WORLD_MAP.roads) {
+        if ((road.scale[0] > road.scale[2]) === horizontal) continue;
+        const roadBounds = bounds(road);
+        roadBounds.min.y = 0;
+        roadBounds.max.y = 1;
+        expect(bounds(marking).intersectsBox(roadBounds), road.id).toBe(false);
+      }
+    }
   });
 });

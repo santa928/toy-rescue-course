@@ -39,7 +39,7 @@ describe('world streetscape', () => {
     }
   });
 
-  it('旧地面IDをsurfaceへ移し、7地区へ2〜4個ずつ計21の街角群を置く', () => {
+  it('地区の床を保ち、遊び場へ数合わせの装飾を置かない', () => {
     expect(PRODUCTION_WORLD_MAP.surfaceTiles.filter(({ id }) => [
       'park-ground',
       'block-plaza-ground',
@@ -54,15 +54,15 @@ describe('world streetscape', () => {
       'town-green-east',
     ]);
     expect(countDecorationClustersByDistrict(PRODUCTION_WORLD_MAP.decorationClusters)).toEqual({
-      blocks: 3,
-      construction: 3,
-      fire: 3,
-      hub: 2,
-      park: 3,
-      south: 3,
-      town: 4,
+      blocks: 0,
+      construction: 1,
+      fire: 2,
+      hub: 1,
+      park: 1,
+      south: 0,
+      town: 2,
     });
-    expect(PRODUCTION_WORLD_MAP.decorationClusters).toHaveLength(21);
+    expect(PRODUCTION_WORLD_MAP.decorationClusters).toHaveLength(7);
   });
 
   it('装飾boxを一意なcanonical列へ平坦化し、硬い大物だけを追加solidにする', () => {
@@ -71,21 +71,12 @@ describe('world streetscape', () => {
 
     expect(new Set(boxes.map(({ id }) => id)).size).toBe(boxes.length);
     expect(solidIds).toEqual([
-      'hub-tool-rack-post',
-      'park-bench-seat',
-      'park-lamp-post',
       'park-picnic-table',
       'fire-hydrant-body',
-      'fire-lamp-post',
-      'blocks-fence-post',
-      'south-viewing-bench',
-      'construction-barrier-post',
-      'construction-work-lamp-post',
-      'town-west-lamp-post',
-      'town-east-lamp-post',
+      'construction-material-stack',
       'town-bench-seat',
     ]);
-    expect(solidIds).toHaveLength(13);
+    expect(solidIds).toHaveLength(4);
   });
 
   it('canonical streetscapeを検証し、重複・高さ・群数・道路侵入をID付きで拒否する', () => {
@@ -112,14 +103,13 @@ describe('world streetscape', () => {
       `surface above road-safe height: ${PRODUCTION_WORLD_MAP.surfaceTiles[0].id}`,
     );
 
-    const missingHubCluster = {
+    const crowdedHub = {
       ...PRODUCTION_WORLD_MAP,
-      decorationClusters: PRODUCTION_WORLD_MAP.decorationClusters.filter(
-        ({ id }) => id !== 'hub-entry-guides',
-      ),
+      decorationClusters: [...PRODUCTION_WORLD_MAP.decorationClusters,
+        ...[1, 2, 3].map(index => ({ ...PRODUCTION_WORLD_MAP.decorationClusters[0], id: `extra-${index}` }))],
     } as ProductionWorldMapDefinition;
-    expect(validateWorldStreetscape(missingHubCluster)).toContain(
-      'district decoration cluster count outside 2..4: hub (1)',
+    expect(validateWorldStreetscape(crowdedHub)).toContain(
+      'district decoration cluster count exceeds 3: hub (4)',
     );
 
     const roadSolid = {

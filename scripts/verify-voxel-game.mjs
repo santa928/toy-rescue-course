@@ -266,7 +266,7 @@ function assertInitialWorldPhysicsContract(initial) {
   assert.equal(initial.visualLayout.routeMarkers.length, 12, 'Route marker layout is incomplete.');
   assert(initial.visualLayout.routeMarkers.every(({ scale }) => scale[1] <= 0.14),
     'Route marker is still obstacle-height.');
-  assert.equal(initial.visualLayout.worldSolids.length, 40, 'Production world solids are incomplete.');
+  assert.equal(initial.visualLayout.worldSolids.length, 22, 'Production world solids are incomplete.');
 }
 
 /** 実camera telemetryを使ってworld座標を現在viewportのscreen座標へ投影する。 */
@@ -720,20 +720,13 @@ async function verifyProductionMap(browser, errors) {
     });
     assert.equal(initial.world.currentDistrict, 'hub');
     assert.equal(initial.world.destinationDistrict, 'fire');
-    assert.equal(initial.visualLayout.worldSolids.length, 40);
-    const southSignPost = requireWorldSolid(initial, 'south-sign-post-west');
-    const hubToolRack = requireWorldSolid(initial, 'hub-tool-rack-post');
-    const southTransitX = Math.max(
-      initial.landmarks.garage[0] + 6.5,
-      hubToolRack.position[0]
-        + hubToolRack.scale[0] / 2
-        + VEHICLE_COLLIDER_HALF_EXTENTS[0]
-        + 1,
-    );
-    // 南側からhub境界へ戻る区間はgarage背面の手前で終了するため、工具ラックを
-    // 奥まで通過する往路とは分け、旧来のgarage外周レーンを使う。
+    assert.equal(initial.visualLayout.worldSolids.length, 22);
+    const southTransitX = initial.landmarks.garage[0] + 6.5;
+    // 整理した前庭の東側を通り、南広場の開放通路へ往復する。
     const southReturnTransitX = initial.landmarks.garage[0] + 6.5;
-    const southCaptureTargetZ = southSignPost.position[2] - 2;
+    const southCaptureTargetZ = 16.5;
+    const southColorSource = initial.landmarks.colorPlaySources.find(({ id }) => id === 'pool-red');
+    assert(southColorSource, 'Production south color-play landmark is missing.');
     const hubRoadHalfWidth = 2.5;
     const hubRoadSafetyMargin = 0.5;
     const hubRoadCenterTolerance = hubRoadHalfWidth
@@ -854,7 +847,7 @@ async function verifyProductionMap(browser, errors) {
       page,
       'positiveZ',
       (state) => state.vehicle.position[2] >= southCaptureTargetZ,
-      'production-map south sign staging',
+      'production-map south color-play staging',
     );
     await waitForFrames(page, 3);
     const southCaptureState = await readGameState(page);
@@ -863,37 +856,37 @@ async function verifyProductionMap(browser, errors) {
     assert.equal(southCaptureState.world.currentDistrict, 'south',
       `production-map south capture left south: ${JSON.stringify(southCaptureState.world)}`);
     assert(southCaptureState.vehicle.position[2] >= southCaptureTargetZ,
-      `production-map south capture stopped before the signs: ${JSON.stringify(
-        { sign: southSignPost, targetZ: southCaptureTargetZ, vehicle: southCaptureState.vehicle },
+      `production-map south capture stopped before the play area: ${JSON.stringify(
+        { source: southColorSource, targetZ: southCaptureTargetZ, vehicle: southCaptureState.vehicle },
       )}`);
     const southCaptureLayout = await measureLayout(page, viewport);
-    const southSignScreenPosition = projectWorldPoint(
+    const southSourceScreenPosition = projectWorldPoint(
       southCaptureState.camera,
-      southSignPost.position,
+      southColorSource.position,
     );
-    const [southSignScreenX, southSignScreenY] = southSignScreenPosition;
+    const [southSourceScreenX, southSourceScreenY] = southSourceScreenPosition;
     const screenSafetyMargin = 24;
     assert(
-      southSignScreenX >= southCaptureLayout.canvas.left + screenSafetyMargin
-        && southSignScreenX <= southCaptureLayout.canvas.right - screenSafetyMargin
-        && southSignScreenY >= southCaptureLayout.canvas.top + screenSafetyMargin
-        && southSignScreenY <= southCaptureLayout.canvas.bottom - screenSafetyMargin,
-      `production-map south sign is outside the canvas safe area: ${JSON.stringify({
-        screenPosition: southSignScreenPosition,
-        sign: southSignPost,
+      southSourceScreenX >= southCaptureLayout.canvas.left + screenSafetyMargin
+        && southSourceScreenX <= southCaptureLayout.canvas.right - screenSafetyMargin
+        && southSourceScreenY >= southCaptureLayout.canvas.top + screenSafetyMargin
+        && southSourceScreenY <= southCaptureLayout.canvas.bottom - screenSafetyMargin,
+      `production-map south color source is outside the canvas safe area: ${JSON.stringify({
+        screenPosition: southSourceScreenPosition,
+        source: southColorSource,
       })}`,
     );
     const overlappingHudControl = Object.entries(southCaptureLayout.controls).find(
-      ([, box]) => southSignScreenX >= box.left - screenSafetyMargin
-        && southSignScreenX <= box.right + screenSafetyMargin
-        && southSignScreenY >= box.top - screenSafetyMargin
-        && southSignScreenY <= box.bottom + screenSafetyMargin,
+      ([, box]) => southSourceScreenX >= box.left - screenSafetyMargin
+        && southSourceScreenX <= box.right + screenSafetyMargin
+        && southSourceScreenY >= box.top - screenSafetyMargin
+        && southSourceScreenY <= box.bottom + screenSafetyMargin,
     );
     assert.equal(overlappingHudControl, undefined,
-      `production-map south sign overlaps a HUD safe area: ${JSON.stringify({
+      `production-map south color source overlaps a HUD safe area: ${JSON.stringify({
         control: overlappingHudControl,
-        screenPosition: southSignScreenPosition,
-        sign: southSignPost,
+        screenPosition: southSourceScreenPosition,
+        source: southColorSource,
       })}`);
     const southMissionLabel = await captureStableMissionScreenshot(
       page,
@@ -949,10 +942,10 @@ async function verifyProductionMap(browser, errors) {
       },
       southCapture: {
         missionLabel: southMissionLabel,
-        signPost: {
-          id: southSignPost.id,
-          position: southSignPost.position,
-          screenPosition: southSignScreenPosition,
+        colorSource: {
+          id: southColorSource.id,
+          position: southColorSource.position,
+          screenPosition: southSourceScreenPosition,
           targetVehicleZ: southCaptureTargetZ,
         },
         vehicle: southCaptureState.vehicle,
@@ -2376,7 +2369,6 @@ async function driveToBlockApproach(page, block) {
   const garageExitBefore = await readGameState(page);
   const garage = garageExitBefore.landmarks.garage;
   const plaza = garageExitBefore.landmarks.blockPlaza;
-  const hubGate = requireWorldSolid(garageExitBefore, 'hub-wayfinding-post');
   const garageExitAfter = await driveAlongWorldAxis(page, 'negativeZ', (state) => (
     state.vehicle.position[2] <= garage[2] - 3
   ),
@@ -2809,7 +2801,6 @@ async function prepareTelemetryPostCollision(
   touchDriver = null,
 ) {
   const initial = await readGameState(page);
-  const hubGate = requireWorldSolid(initial, 'hub-wayfinding-post');
   const safeSupport = Math.max(...VEHICLE_COLLIDER_HALF_EXTENTS);
   const hubGateBypassZ = 0;
   const garageExitZ = hubGateBypassZ;
@@ -2854,9 +2845,7 @@ async function prepareTelemetryPostCollision(
     })
     : [];
   const transitReserve = 2;
-  const transitObstacles = [...new Map(
-    [hubGate, ...runwaySolids].map((solid) => [solid.id, solid]),
-  ).values()];
+  const transitObstacles = runwaySolids;
   const transitClearanceCoordinates = transitObstacles.map((solid) => (
     solid.position[0] + transitDirection * (
       solid.scale[0] / 2 + VEHICLE_COLLIDER_HALF_EXTENTS[0] + transitReserve
@@ -2906,7 +2895,6 @@ async function prepareTelemetryPostCollision(
     garageExitZ,
     frontalAlignmentTolerance,
     hubGateBypassZ,
-    hubGateId: hubGate.id,
     obstaclePosition: obstacle.position,
     obstacleScale: obstacle.scale,
     perpendicularTarget,
@@ -3571,7 +3559,38 @@ async function verifyRouteMarkerPassThrough(browser, errors) {
   }
 }
 
-/** 8代表solid、動的fire hazard、非solid route markerを実車検証する。 */
+/** 撤去した道中の柱とベンチ跡を通り、目に見えないcolliderが残っていないことを実走する。 */
+async function verifyClearedTownCorridors(browser, errors) {
+  const { context, page } = await openViewportPage(
+    browser,
+    { hasTouch: false, height: 720, name: 'cleared-town-corridors', width: 1_280 },
+    errors,
+  );
+  try {
+    const initial = await readGameState(page);
+    const waypoints = [
+      [2, 12], [0, -3.5], [2, 33],
+      [0, 3.5], [2, 12], [0, 9], [2, 0],
+    ];
+    const positions = [];
+    for (const [coordinateIndex, target] of waypoints) {
+      await alignWorldCoordinate(page, coordinateIndex, target,
+        `cleared town corridor ${coordinateIndex}:${target}`, 0.35);
+      const state = await readGameState(page);
+      assert.equal(state.vehicle.resetCount, initial.vehicle.resetCount,
+        'Cleared town corridor required a vehicle reset.');
+      assert(Math.abs(state.vehicle.position[coordinateIndex] - target) <= 0.35,
+        `Cleared town corridor was blocked before ${target}.`);
+      positions.push(state.vehicle.position);
+    }
+    await captureVerifiedScreenshot(page, `${outputDirectory}/desktop-cleared-town-corridors.png`);
+    return { input: 'keyboard', positions, resetCount: initial.vehicle.resetCount };
+  } finally {
+    await context.close();
+  }
+}
+
+/** 代表solid、撤去跡の開放路、動的fire hazard、非solid route markerを実車検証する。 */
 async function verifyWorldCollisions(browser, errors) {
   const layoutPage = await openViewportPage(
     browser,
@@ -3589,29 +3608,9 @@ async function verifyWorldCollisions(browser, errors) {
       approachAxis: 'x',
       approachDirection: -1,
       captureScreenshot: false,
-      id: 'hub-wayfinding-post',
+      id: 'fire-hydrant-body',
       prepare: async (page, touch) => prepareTelemetryPostCollision(
-        page, requireWorldSolid(await readGameState(page), 'hub-wayfinding-post'), 'x', -1, touch,
-      ),
-      recoveryDirection: 1,
-    },
-    {
-      approachAxis: 'z',
-      approachDirection: 1,
-      captureScreenshot: false,
-      id: 'south-sign-post-west',
-      prepare: async (page, touch) => prepareTelemetryPostCollision(
-        page, requireWorldSolid(await readGameState(page), 'south-sign-post-west'), 'z', 1, touch,
-      ),
-      recoveryDirection: -1,
-    },
-    {
-      approachAxis: 'z',
-      approachDirection: -1,
-      captureScreenshot: false,
-      id: 'south-sign-post-east',
-      prepare: async (page, touch) => prepareTelemetryPostCollision(
-        page, requireWorldSolid(await readGameState(page), 'south-sign-post-east'), 'z', -1, touch,
+        page, requireWorldSolid(await readGameState(page), 'fire-hydrant-body'), 'x', -1, touch,
       ),
       recoveryDirection: 1,
     },
@@ -3660,6 +3659,19 @@ async function verifyWorldCollisions(browser, errors) {
       approachAxis: 'z',
       approachDirection: -1,
       id: 'playground-plank',
+      prepare: async (page, touch) => {
+        const obstacle = requireWorldSolid(await readGameState(page), 'playground-plank');
+        // 西のピクニック卓を縦断せず、中央園路から遊具の南側へ回る。
+        await alignWorldCoordinate(page, 0, 0, 'playground central road X', 0.35, touch);
+        const approachZ = obstacle.position[2] + obstacle.scale[2] / 2
+          + VEHICLE_COLLIDER_HALF_EXTENTS[2] + 2.5;
+        await driveAlongWorldAxis(page, 'negativeZ',
+          state => state.vehicle.position[2] <= approachZ,
+          'playground central park road', touch);
+        await alignWorldCoordinate(page, 2, approachZ, 'playground south staging Z', 0.35, touch);
+        await alignWorldCoordinate(page, 0, obstacle.position[0],
+          'playground south staging X', 0.35, touch);
+      },
       recoveryDirection: 1,
     },
   ];
@@ -3678,6 +3690,7 @@ async function verifyWorldCollisions(browser, errors) {
   );
   const fireHazard = focusedIds ? null : await verifyFireHazardLifecycle(browser, errors);
   const routeMarkers = focusedIds ? null : await verifyRouteMarkerPassThrough(browser, errors);
+  const clearedCorridors = focusedIds ? null : await verifyClearedTownCorridors(browser, errors);
   const scenarios = {};
   for (const scenario of selectedScenarios) {
     const { id } = scenario;
@@ -3710,30 +3723,14 @@ async function verifyWorldCollisions(browser, errors) {
     'construction-office-body': 'the dedicated production-map E2E covers this solid through real keyboard and touch input',
     'construction-crane-post-west': 'the east crane post shares the same post collider dimensions and production-map contract',
     'construction-crane-post-east': 'the west crane post shares the same post collider dimensions and production-map contract',
-    'construction-timber-stack-a': 'the three timber stacks share one collider shape and the dedicated route proves the assembly blocks traversal',
-    'construction-timber-stack-b': 'the three timber stacks share one collider shape and the dedicated route proves the assembly blocks traversal',
-    'construction-timber-stack-c': 'the three timber stacks share one collider shape and the dedicated route proves the assembly blocks traversal',
-    'construction-sign-post': 'the dedicated production-map route proves this signed road edge remains a solid obstacle',
     'town-house-red-body': 'the dedicated production-map E2E covers this solid through real keyboard and touch input',
     'town-house-yellow-body': 'the red house covers the same house collider dimensions through real input',
     'town-house-white-body': 'the red house covers the same house collider dimensions through real input',
     'town-tree-trunk-a': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-tree-trunk-b': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-tree-trunk-c': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
-    'town-sign-post-west': 'south-sign-post-west covers the same sign-post collider shape through real input',
-    'town-sign-post-east': 'south-sign-post-east covers the same sign-post collider shape through real input',
-    'hub-tool-rack-post': 'hub-wayfinding-post covers the same streetscape post cuboid through real input',
-    'park-bench-seat': 'the dedicated streetscape E2E covers the adjacent picnic-table cuboid through real input',
-    'park-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
     'park-picnic-table': 'the dedicated streetscape E2E covers this solid through real keyboard and touch input',
-    'fire-hydrant-body': 'hub-wayfinding-post covers the same streetscape post cuboid through real input',
-    'fire-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
-    'blocks-fence-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
-    'south-viewing-bench': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
-    'construction-barrier-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
-    'construction-work-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
-    'town-west-lamp-post': 'south-sign-post-west covers the same streetscape post cuboid through real input',
-    'town-east-lamp-post': 'south-sign-post-east covers the same streetscape post cuboid through real input',
+    'construction-material-stack': 'the shared solid-box unit contract covers this relocated material bay; no dedicated real collision is claimed',
     'town-bench-seat': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
   };
   const sharedDefinitionOnly = worldSolids
@@ -3745,13 +3742,14 @@ async function verifyWorldCollisions(browser, errors) {
     'Definition-only collision coverage changed without a recorded reason.',
   );
   return {
+    clearedCorridors,
     fireHazard,
     routeMarkers,
     scenarios,
     sharedDefinitionOnly,
     sharedDefinitionOnlyReasons,
     testedIds,
-    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 40 production solids share one definition',
+    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 22 production solids share one definition',
   };
 }
 

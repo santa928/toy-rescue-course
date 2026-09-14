@@ -158,13 +158,13 @@ docker compose run --rm web node --test \
 ```
 共有走行、回転車体とsolidのSAT接触、scenario進捗、HUD screenshot proof、job別火災経路を含むNode test 32件を実行します。
 canonical fullの最新manifestは19 scenario成功、37 artifacts＝37 screenshot proofs、contract failure 0、
-browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目へ進みます。96×96マップ専用E2Eは、こうじヤード68unit、おもちゃのまち71unitの実走、別出口、代表solid衝突、7地区、40 solid、HUD 8px安全余白を3 viewportで確認します。
+browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事を完了し、帰庫後に3件目へ進みます。96×96マップ専用E2Eは、こうじヤード、おもちゃのまちへの実走、別出口、代表solid衝突、7地区、22 solid、HUD 8px安全余白を検査します。
 
 カメラ安定性専用E2EはDesktop／Tablet／Mobile landscapeで車体を車庫壁へ押し付け、車体の
 XZ移動が127〜141回反転する条件でも、カメラXYZの反転0回、高さ変動0、browser error 0件を
 確認します。3枚の目視用画像は`output/voxel-game-camera-stability/`へ生成されます。
 
-7地区には、道路より低い19枚の固有色床・入口模様と21群（54 box）の街角セットがあります。床、模様、花、コーン、看板板などは通過でき、街灯柱、ベンチ本体、柵支柱、消火栓など硬い大物だけをsolidにしています。既存27件と合わせたstatic colliderは40件です。専用E2Eは7地区×Desktop／Tablet／Mobile landscapeの21画面で床色、装飾、HUD実寸、代表solid衝突、non-solid通過、scene 34 calls以下を検証します。
+7地区には、道路より低い19枚の固有色床・入口模様と、用途ごとにまとめた7群（51 box）の街角セットがあります。独立した矢印看板・柵・街灯・小箱は撤去し、公園の家具、消火栓、家の玄関と花、工事場奥の資材に整理しました。固定colliderは22件です。遊び・操作はそのままで、道しるべの経路と街の見通しを保ちます。[街の再構築の設計](docs/design/2026-09-14-town-clarity.md)を参照してください。専用E2Eは7地区の床色、開放空間、HUD実寸、代表solid衝突、non-solid通過、scene 34 calls以下を検証します。
 
 ```bash
 VOXEL_GAME_STREETSCAPE_VIEWPORT=desktop docker compose --profile e2e run --rm --build voxel-game-streetscape-e2e

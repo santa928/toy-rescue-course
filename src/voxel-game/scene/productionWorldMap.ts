@@ -1,4 +1,5 @@
-import { addTownDetails, createPaintLaneFlags, createRescueDepot } from './toyTownArchitecture';
+import { addTownDetails, createRescueDepot } from './toyTownArchitecture';
+import { createTownPlaces } from './townPlaces';
 import { validateWorldStreetscape } from './worldStreetscape';
 
 /** 96×96の本番箱庭を描画・物理・ゲームプレイで共有する純粋な座標定義。 */
@@ -141,211 +142,7 @@ export interface ProductionWorldMapDefinition {
 /** 描画・物理・ゲームプレイ間で共有する96×96本番箱庭の唯一の座標定義。 */
 const PRODUCTION_WORLD_MAP_DEFINITION = {
   bounds: { maxX: 48, maxZ: 48, minX: -48, minZ: -48 },
-  decorationClusters: [
-    {
-      boxes: [
-        { color: '#86552f', id: 'hub-tool-rack-post', position: [8.2, 0.85, 7.2], scale: [1.8, 1.5, 0.6], solid: true },
-        { color: '#f2c94c', id: 'hub-tool-rack-shelf', position: [8.2, 1.7, 7.2], scale: [2.2, 0.2, 0.85], solid: false },
-        { color: '#f1efe6', id: 'hub-tool-rack-door-left', position: [7.75, 0.95, 7.55], scale: [0.72, 1.1, 0.1], solid: false },
-        { color: '#f1efe6', id: 'hub-tool-rack-door-right', position: [8.65, 0.95, 7.55], scale: [0.72, 1.1, 0.1], solid: false },
-        { color: '#86552f', id: 'hub-tool-rack-handle-left', position: [8, 1, 7.65], scale: [0.12, 0.25, 0.1], solid: false },
-        { color: '#86552f', id: 'hub-tool-rack-handle-right', position: [8.4, 1, 7.65], scale: [0.12, 0.25, 0.1], solid: false },
-        { color: '#a86f3f', id: 'hub-parcel-a', position: [6.1, 0.45, 8.7], scale: [1.2, 0.9, 1.2], solid: false },
-        { color: '#a86f3f', id: 'hub-parcel-b', position: [8.1, 0.35, 8.6], scale: [1, 0.7, 1], solid: false },
-      ],
-      districtId: 'hub',
-      id: 'hub-tools-and-parcels',
-      purpose: 'service',
-    },
-    {
-      boxes: [
-        { color: '#f2c94c', id: 'hub-entry-guide-red', position: [-4.6, 0.075, 4.8], scale: [1.4, 0.01, 0.15], solid: false },
-        { color: '#f2c94c', id: 'hub-entry-guide-white', position: [-4.6, 0.075, 7.2], scale: [1.4, 0.01, 0.15], solid: false },
-      ],
-      districtId: 'hub',
-      id: 'hub-entry-guides',
-      purpose: 'entry',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'park-bench-seat', position: [5.2, 0.55, -22], scale: [1.6, 0.7, 2.4], solid: true },
-        { color: '#e24b3f', id: 'park-entry-flower-red', position: [5.2, 0.32, -24.2], scale: [0.6, 0.55, 0.6], solid: false },
-        { color: '#f2c94c', id: 'park-entry-flower-yellow', position: [5.2, 0.32, -25], scale: [0.6, 0.55, 0.6], solid: false },
-      ],
-      districtId: 'park',
-      id: 'park-entry-flowerbed',
-      purpose: 'entry',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'park-lamp-post', position: [-5.2, 1.25, -28], scale: [0.5, 2.3, 0.5], solid: true },
-        { color: '#f2c94c', id: 'park-lamp-light', position: [-5.2, 2.55, -28], scale: [0.9, 0.45, 0.9], solid: false },
-        { color: '#3f7f3a', id: 'park-hedge', position: [-5.2, 0.45, -29.2], scale: [1.4, 0.8, 0.55], solid: false },
-      ],
-      districtId: 'park',
-      id: 'park-lamp-and-hedge',
-      purpose: 'landmark',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'park-picnic-table', position: [-5.2, 0.6, -17], scale: [1.6, 0.8, 2], solid: true },
-        { color: '#e24b3f', id: 'park-picnic-cloth', position: [-5.2, 1.05, -17], scale: [1.7, 0.12, 2.1], solid: false },
-      ],
-      districtId: 'park',
-      id: 'park-picnic-corner',
-      purpose: 'rest',
-    },
-    {
-      boxes: [
-        { color: '#e24b3f', id: 'fire-hydrant-body', position: [16, 0.65, -12], scale: [0.8, 1.2, 0.8], solid: true },
-        { color: '#f2c94c', id: 'fire-hydrant-cap', position: [16, 1.35, -12], scale: [1.05, 0.25, 1.05], solid: false },
-        { color: '#f1efe6', id: 'fire-entry-curb', position: [15, 0.25, -8.5], scale: [0.5, 0.4, 3], solid: false },
-      ],
-      districtId: 'fire',
-      id: 'fire-entry-hydrant',
-      purpose: 'entry',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'fire-lamp-post', position: [18, 1.25, -7], scale: [0.5, 2.3, 0.5], solid: true },
-        { color: '#f2c94c', id: 'fire-lamp-light', position: [18, 2.55, -7], scale: [0.9, 0.45, 0.9], solid: false },
-      ],
-      districtId: 'fire',
-      id: 'fire-sidewalk-lamp',
-      purpose: 'landmark',
-    },
-    {
-      boxes: [
-        { color: '#c83e34', id: 'fire-mailbox', position: [27, 0.85, -8], scale: [0.8, 1.4, 0.8], solid: false },
-        { color: '#3f7f3a', id: 'fire-planter-green', position: [25.5, 0.4, -8], scale: [1, 0.7, 1], solid: false },
-        { color: '#f2c94c', id: 'fire-planter-flower', position: [25.5, 0.85, -8], scale: [0.6, 0.35, 0.6], solid: false },
-      ],
-      districtId: 'fire',
-      id: 'fire-mailbox-planters',
-      purpose: 'service',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'blocks-fence-post', position: [-16, 1, -9], scale: [0.6, 1.8, 0.6], solid: true },
-        { color: '#e24b3f', id: 'blocks-entry-cone-red', position: [-18, 0.4, -9], scale: [0.7, 0.75, 0.7], solid: false },
-        { color: '#f2c94c', id: 'blocks-entry-cone-yellow', position: [-19.2, 0.4, -9], scale: [0.7, 0.75, 0.7], solid: false },
-        { color: '#f1efe6', id: 'blocks-fence-board', position: [-16, 1.25, -8.7], scale: [0.4, 0.35, 2.6], solid: false },
-      ],
-      districtId: 'blocks',
-      id: 'blocks-entry-fence',
-      purpose: 'entry',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'blocks-pallet-base', position: [-20, 0.3, 8], scale: [3, 0.4, 2], solid: false },
-        { color: '#a86f3f', id: 'blocks-pallet-crate', position: [-20, 0.85, 8], scale: [1.4, 0.8, 1.4], solid: false },
-      ],
-      districtId: 'blocks',
-      id: 'blocks-pallet-corner',
-      purpose: 'service',
-    },
-    {
-      boxes: [
-        { color: '#3b82f6', id: 'blocks-toolbox', position: [-16.5, 0.45, 10.5], scale: [1.8, 0.8, 1.1], solid: false },
-        { color: '#f2c94c', id: 'blocks-guide-board', position: [-16.5, 1.4, 11.2], scale: [2.4, 1.1, 0.35], solid: false },
-      ],
-      districtId: 'blocks',
-      id: 'blocks-tools-and-guide',
-      purpose: 'landmark',
-    },
-    {
-      boxes: [
-        ...createPaintLaneFlags(),
-      ],
-      districtId: 'south',
-      id: 'south-entry-flags',
-      purpose: 'entry',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'south-viewing-bench', position: [5, 0.55, 26], scale: [0.8, 0.7, 2.6], solid: true },
-        { color: '#f1efe6', id: 'south-bench-back', position: [5.25, 1.05, 26], scale: [0.25, 0.8, 2.6], solid: false },
-      ],
-      districtId: 'south',
-      id: 'south-viewing-corner',
-      purpose: 'rest',
-    },
-    {
-      boxes: [
-        { color: '#3f7f3a', id: 'south-flowerbed-green', position: [0, 0.3, 30], scale: [3.2, 0.5, 1], solid: false },
-        { color: '#e24b3f', id: 'south-flowerbed-red', position: [-0.8, 0.65, 30], scale: [0.45, 0.35, 0.45], solid: false },
-        { color: '#f2c94c', id: 'south-flowerbed-yellow', position: [0.8, 0.65, 30], scale: [0.45, 0.35, 0.45], solid: false },
-      ],
-      districtId: 'south',
-      id: 'south-color-flowerbed',
-      purpose: 'landmark',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'construction-barrier-post', position: [-40, 1, -31], scale: [0.6, 1.8, 0.6], solid: true },
-        { color: '#e24b3f', id: 'construction-barrier-board-red', position: [-40, 1.35, -31], scale: [0.4, 0.45, 3], solid: false },
-        { color: '#f1efe6', id: 'construction-barrier-board-white', position: [-40, 0.75, -31], scale: [0.4, 0.45, 3], solid: false },
-      ],
-      districtId: 'construction',
-      id: 'construction-entry-barrier',
-      purpose: 'entry',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'construction-material-stack', position: [-31, 0.45, -22.5], scale: [3, 0.8, 1.6], solid: false },
-        { color: '#3b82f6', id: 'construction-toolbox', position: [-28.5, 0.45, -22.5], scale: [1.6, 0.8, 1.1], solid: false },
-      ],
-      districtId: 'construction',
-      id: 'construction-materials',
-      purpose: 'service',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'construction-work-lamp-post', position: [-22.1, 1.3, -31], scale: [0.6, 2.4, 0.6], solid: true },
-        { color: '#facc15', id: 'construction-work-lamp', position: [-22.1, 2.7, -31], scale: [1, 0.5, 1], solid: false },
-      ],
-      districtId: 'construction',
-      id: 'construction-work-light',
-      purpose: 'landmark',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'town-west-lamp-post', position: [22.1, 1.3, 29.5], scale: [0.6, 2.4, 0.6], solid: true },
-        { color: '#f2c94c', id: 'town-west-lamp-light', position: [22.1, 2.7, 29.5], scale: [1, 0.5, 1], solid: false },
-      ],
-      districtId: 'town',
-      id: 'town-west-lamp',
-      purpose: 'entry',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'town-east-lamp-post', position: [39.9, 1.3, 31], scale: [0.6, 2.4, 0.6], solid: true },
-        { color: '#f2c94c', id: 'town-east-lamp-light', position: [39.9, 2.7, 31], scale: [1, 0.5, 1], solid: false },
-      ],
-      districtId: 'town',
-      id: 'town-east-lamp',
-      purpose: 'landmark',
-    },
-    {
-      boxes: [
-        { color: '#86552f', id: 'town-bench-seat', position: [31, 0.55, 31], scale: [3, 0.7, 0.8], solid: true },
-        { color: '#3f7f3a', id: 'town-bench-hedge', position: [31, 0.55, 32.2], scale: [3.4, 1, 0.7], solid: false },
-      ],
-      districtId: 'town',
-      id: 'town-bench-and-hedge',
-      purpose: 'rest',
-    },
-    {
-      boxes: [
-        { color: '#c83e34', id: 'town-mailbox', position: [31, 0.85, 22.3], scale: [0.8, 1.4, 0.8], solid: false },
-        { color: '#f1efe6', id: 'town-doorstep-west', position: [25, 0.22, 22], scale: [2.4, 0.3, 0.8], solid: false },
-        { color: '#f2c94c', id: 'town-doorstep-east', position: [37, 0.22, 22], scale: [2.4, 0.3, 0.8], solid: false },
-      ],
-      districtId: 'town',
-      id: 'town-mailbox-doorsteps',
-      purpose: 'service',
-    },
-  ],
+  decorationClusters: createTownPlaces(),
   districts: [
     { bounds: { maxX: 10, maxZ: 10, minX: -10, minZ: -10 }, id: 'hub', label: 'ちゅうおうしゃこ' },
     { bounds: { maxX: 12, maxZ: -14, minX: -12, minZ: -34 }, id: 'park', label: 'こうえん' },
@@ -469,7 +266,8 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
   },
   roads: [
     { connects: ['blocks', 'hub', 'fire'], id: 'road-hub-east-west', position: [0, 0.08, 0], scale: [68, 0.18, 5] },
-    { connects: ['park', 'hub', 'south'], id: 'road-hub-north-south', position: [0, 0.08, 0], scale: [5, 0.18, 68] },
+    { connects: ['park', 'hub'], id: 'road-hub-north', position: [0, 0.08, -16], scale: [5, 0.18, 36] },
+    { connects: ['hub', 'south'], id: 'road-hub-south', position: [0, 0.08, 22], scale: [5, 0.18, 24] },
     { connects: ['park'], id: 'road-park-north', position: [0, 0.08, -32], scale: [24, 0.18, 4] },
     { connects: ['park'], id: 'road-park-west', position: [-10, 0.08, -24], scale: [4, 0.18, 16] },
     { connects: ['park'], id: 'road-park-east', position: [10, 0.08, -24], scale: [4, 0.18, 16] },
@@ -535,36 +333,25 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#eee7d2', districtId: 'town', id: 'town-entry-pattern', position: [31, 0.06, 17], scale: [8, 0.04, 0.65] },
   ],
   visualBoxes: addTownDetails([
-    { color: '#67c7df', id: 'park-pond', position: [2, 0.12, -24], scale: [6, 0.08, 3], solid: false },
+    { color: '#67c7df', id: 'park-pond', position: [-5.3, 0.12, -25.2], scale: [2.4, 0.08, 2], solid: false },
     { color: '#86552f', id: 'tree-trunk-1', position: [-7, 1.25, -28], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#86552f', id: 'tree-trunk-2', position: [-7, 1.25, -20], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#86552f', id: 'tree-trunk-3', position: [7, 1.25, -20], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#3f7f3a', id: 'tree-crown-1', position: [-7, 2.85, -28], scale: [2.2, 1.4, 2.2], solid: false },
     { color: '#3f7f3a', id: 'tree-crown-2', position: [-7, 2.85, -20], scale: [2.2, 1.4, 2.2], solid: false },
     { color: '#3f7f3a', id: 'tree-crown-3', position: [7, 2.85, -20], scale: [2.2, 1.4, 2.2], solid: false },
-    { color: '#e24b3f', id: 'playground-plank', position: [3, 0.75, -26], scale: [3.4, 0.28, 0.7], solid: true },
-    { color: '#f2c94c', id: 'playground-support', position: [3, 0.45, -26], scale: [0.36, 0.8, 0.36], solid: true },
+    { color: '#e24b3f', id: 'playground-plank', position: [3.1, 0.75, -28.8], scale: [0.7, 0.28, 2.4], solid: true },
+    { color: '#f2c94c', id: 'playground-support', position: [3.1, 0.45, -28.8], scale: [0.36, 0.8, 0.36], solid: true },
     ...createRescueDepot(),
     { color: '#a86f3f', id: 'fire-building-body', position: [23.5, 1.8, -16.5], scale: [6, 3.4, 5], solid: true },
     { color: '#6f4327', id: 'fire-building-roof', position: [23.5, 3.75, -16.5], scale: [6.8, 0.5, 5.8], solid: false },
     { color: '#7ed1e6', id: 'fire-window-1', position: [22.2, 1.9, -19.05], scale: [1.5, 1.5, 0.18], solid: false },
     { color: '#7ed1e6', id: 'fire-window-2', position: [24.8, 1.9, -19.05], scale: [1.5, 1.5, 0.18], solid: false },
-    { color: '#86552f', id: 'hub-wayfinding-post', position: [9, 0.8, 4.5], scale: [0.3, 1.6, 0.3], solid: true },
-    { color: '#f2c94c', id: 'hub-wayfinding-board', position: [9, 1.7, 4.5], scale: [1.5, 0.6, 0.2], solid: false },
-    { color: '#86552f', id: 'south-sign-post-west', position: [-3.5, 1.1, 18.5], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#86552f', id: 'south-sign-post-east', position: [3.5, 1.1, 29.5], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#f2c94c', id: 'south-sign-board-west', position: [-3.5, 2.15, 18.5], scale: [3, 1, 0.4], solid: false },
-    { color: '#e24b3f', id: 'south-sign-board-east', position: [3.5, 2.15, 29.5], scale: [3, 1, 0.4], solid: false },
     { color: '#3b82f6', id: 'construction-office-body', position: [-38, 1.5, -37], scale: [6, 2.8, 5], solid: true },
     { color: '#facc15', id: 'construction-office-roof', position: [-38, 3.1, -37], scale: [6.8, 0.4, 5.8], solid: false },
     { color: '#f2c94c', id: 'construction-crane-post-west', position: [-27, 2, -38], scale: [0.8, 3.8, 0.8], solid: true },
     { color: '#f2c94c', id: 'construction-crane-post-east', position: [-21, 2, -38], scale: [0.8, 3.8, 0.8], solid: true },
     { color: '#f2c94c', id: 'construction-crane-beam', position: [-24, 3.85, -38], scale: [7, 0.5, 0.8], solid: false },
-    { color: '#86552f', id: 'construction-timber-stack-a', position: [-35, 0.8, -26], scale: [3, 1.4, 2], solid: true },
-    { color: '#86552f', id: 'construction-timber-stack-b', position: [-30, 0.8, -26], scale: [3, 1.4, 2], solid: true },
-    { color: '#86552f', id: 'construction-timber-stack-c', position: [-25, 0.8, -26], scale: [3, 1.4, 2], solid: true },
-    { color: '#86552f', id: 'construction-sign-post', position: [-40, 1.1, -22], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#e24b3f', id: 'construction-sign-board', position: [-40, 2.15, -22], scale: [3.4, 1, 0.4], solid: false },
     { color: '#e24b3f', id: 'town-house-red-body', position: [25, 1.5, 25], scale: [6, 2.8, 5], solid: true },
     { color: '#c83e34', id: 'town-house-red-roof', position: [25, 3.1, 25], scale: [6.8, 0.4, 5.8], solid: false },
     { color: '#f2c94c', id: 'town-house-yellow-body', position: [37, 1.5, 25], scale: [6, 2.8, 5], solid: true },
@@ -577,9 +364,6 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#3f7f3a', id: 'town-tree-crown-b', position: [40, 2.85, 33], scale: [2.2, 1.4, 2.2], solid: false },
     { color: '#86552f', id: 'town-tree-trunk-c', position: [24, 1.25, 40], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#3f7f3a', id: 'town-tree-crown-c', position: [24, 2.85, 40], scale: [2.2, 1.4, 2.2], solid: false },
-    { color: '#86552f', id: 'town-sign-post-west', position: [28, 1.1, 21.5], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#86552f', id: 'town-sign-post-east', position: [34, 1.1, 21.5], scale: [0.7, 2, 0.7], solid: true },
-    { color: '#f2c94c', id: 'town-sign-board', position: [31, 2.15, 21.5], scale: [7, 1, 0.4], solid: false },
   ]),
 } as const satisfies ProductionWorldMapDefinition;
 

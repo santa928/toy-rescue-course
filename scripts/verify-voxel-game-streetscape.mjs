@@ -22,14 +22,16 @@ const viewports = viewportFilter === null
 assert(viewports.length > 0, `Unknown VOXEL_GAME_STREETSCAPE_VIEWPORT: ${viewportFilter}.`);
 
 const districtScenarios = [
-  { districtId: 'hub', representativeSolidId: 'hub-tool-rack-post' },
+  { districtId: 'hub', openSpace: [-3, 0.2, 6] },
   { districtId: 'park', representativeSolidId: 'park-picnic-table' },
   { districtId: 'fire', representativeSolidId: 'fire-hydrant-body' },
-  { districtId: 'blocks', representativeSolidId: 'blocks-fence-post' },
-  { districtId: 'south', representativeSolidId: 'south-viewing-bench' },
-  { districtId: 'construction', representativeSolidId: 'construction-work-lamp-post' },
-  { districtId: 'town', representativeSolidId: 'town-west-lamp-post' },
-];
+  { districtId: 'blocks', openSpace: [-20, 0.2, -6] },
+  { districtId: 'south', openSpace: [0, 0.2, 28] },
+  { districtId: 'construction', representativeSolidId: 'construction-crane-post-east' },
+  { districtId: 'town', representativeSolidId: 'town-house-red-body' },
+].filter(scenario => !process.env.VOXEL_GAME_STREETSCAPE_DISTRICT
+  || scenario.districtId === process.env.VOXEL_GAME_STREETSCAPE_DISTRICT);
+assert(districtScenarios.length > 0, 'Unknown VOXEL_GAME_STREETSCAPE_DISTRICT.');
 const harness = createDriveHarness({
   alignAttemptLimit: 48,
   brakeFrameLimit: 240,
@@ -126,11 +128,11 @@ function projectWorldPoint(cameraTelemetry, position) {
   return [(projected.x + 1) * width / 2, (1 - projected.y) * height / 2];
 }
 
-/** 代表solidがCanvas安全域にあり主要HUDの下へ隠れないことを検証する。 */
-function assertRepresentativeVisible(state, solidId, hud, viewport) {
+/** 代表建物または開放した走行空間がCanvas安全域にあることを検証する。 */
+function assertRepresentativeVisible(state, solidId, hud, viewport, openSpace) {
   const solid = state.visualLayout.worldSolids.find(({ id }) => id === solidId);
-  assert(solid, `${viewport.name}: world solid telemetry lacks ${solidId}.`);
-  const visibleTopCenter = [
+  assert(solid || openSpace, `${viewport.name}: world solid telemetry lacks ${solidId}.`);
+  const visibleTopCenter = openSpace ?? [
     solid.position[0],
     solid.position[1] + solid.scale[1] / 2,
     solid.position[2],
@@ -146,7 +148,7 @@ function assertRepresentativeVisible(state, solidId, hud, viewport) {
   ));
   assert.equal(hiddenBy, undefined,
     `${viewport.name}: ${solidId} is hidden by HUD: ${JSON.stringify({ hiddenBy, x, y })}.`);
-  return { solidId, x, y };
+  return { solidId, openSpace, x, y };
 }
 
 /** previewまたは公開URLが応答するまで30秒だけpollする。 */
@@ -347,10 +349,10 @@ function assertWorldBudgets(state, viewport, districtId) {
   assert.equal(state.world.currentDistrict, districtId,
     `${viewport.name}: expected ${districtId}, received ${state.world.currentDistrict}: ${JSON.stringify(state.vehicle)}.`);
   assert.equal(state.world.surfaceTileCount, 19);
-  assert.equal(state.world.decorationClusterCount, 21);
-  assert.equal(state.world.decorationBoxCount, 70);
-  assert.equal(state.world.staticColliderCount, 40);
-  assert.equal(state.visualLayout.worldSolids.length, 40);
+  assert.equal(state.world.decorationClusterCount, 7);
+  assert.equal(state.world.decorationBoxCount, 51);
+  assert.equal(state.world.staticColliderCount, 22);
+  assert.equal(state.visualLayout.worldSolids.length, 22);
   assert(state.renderer.rendererCalls > 0 && state.renderer.rendererCalls <= 34,
     `${viewport.name}/${districtId}: renderer calls outside 1..34: ${state.renderer.rendererCalls}.`);
 }
@@ -436,6 +438,7 @@ async function verifyViewport(browser, viewport) {
         scenario.representativeSolidId,
         hud,
         viewport,
+        scenario.openSpace,
       );
       const screenshotPath = `${outputDirectory}/${viewport.name}-${scenario.districtId}.png`;
       await page.screenshot({ path: screenshotPath });
