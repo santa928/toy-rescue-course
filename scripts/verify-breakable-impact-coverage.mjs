@@ -33,20 +33,12 @@ async function waitForServer() {
   throw new Error(`Breakable impact preview did not become ready: ${baseUrl}`);
 }
 
-/** 指定IDのworld solidを公開telemetryから取得する。 */
-function requireWorldSolid(state, id) {
-  const solid = state.visualLayout.worldSolids.find((entry) => entry.id === id);
-  assert(solid, `Missing world solid: ${id}.`);
-  return solid;
-}
-
 /** 車庫から黄色い積み木の東側runwayへ、他の積み木へ触れず移動する。 */
 async function stageAtYellowEastRunway(page, harness, touchDriver, lateralOffset) {
   const initial = await harness.readGameState(page);
   const block = initial.landmarks.breakableBlocks.find(({ id }) => id === targetBlockId);
   assert(block, `${targetBlockId} landmark is unavailable.`);
   const garage = initial.landmarks.garage;
-  const hubGate = requireWorldSolid(initial, 'hub-wayfinding-post');
   await harness.driveAlongWorldAxis(page, {
     axis: 'negativeZ',
     description: `${lateralOffset}: garage exit`,

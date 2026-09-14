@@ -172,8 +172,8 @@ describe('PRODUCTION_WORLD_MAP', () => {
     ]);
   });
 
-  it('道路24本が既存地区を維持し、新2地区へ各2方向から接続する', () => {
-    expect(PRODUCTION_WORLD_MAP.roads).toHaveLength(24);
+  it('道路25本が既存地区を維持し、新2地区へ各2方向から接続する', () => {
+    expect(PRODUCTION_WORLD_MAP.roads).toHaveLength(25);
     expect(new Set(PRODUCTION_WORLD_MAP.roads.flatMap(({ connects }) => connects))).toEqual(
       new Set(['hub', 'park', 'fire', 'blocks', 'south', 'construction', 'town']),
     );
@@ -196,7 +196,7 @@ describe('PRODUCTION_WORLD_MAP', () => {
 
   it('visualとsolidを同じbox定義で共有する', () => {
     expect(PRODUCTION_WORLD_MAP.visualBoxes.length).toBeGreaterThan(50);
-    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)).toHaveLength(27);
+    expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid)).toHaveLength(18);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.filter(({ solid }) => solid).length).toBeLessThanOrEqual(28);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.every(({ id }) => id.length > 0)).toBe(true);
     expect(PRODUCTION_WORLD_MAP.visualBoxes.some(({ id }) => [

@@ -47,20 +47,6 @@ export function createRescueDepot(): readonly WorldBoxDefinition[] {
   });
 }
 
-/** 薄い壁に見えないよう、南地区の入口旗を歩道上の柱と段付き三角にする。 */
-export function createPaintLaneFlags(): readonly WorldBoxDefinition[] {
-  return ['#e24b3f', GOLD, '#3b82f6'].flatMap((color, index) => {
-    const x = 4 + index * 1.5;
-    const id = ['red', 'yellow', 'blue'][index];
-    return [
-      box(`south-flag-base-${id}`, WOOD, [x, 0.15, 15], [0.65, 0.3, 0.65]),
-      box(`south-flag-post-${id}`, WOOD, [x, 1.1, 15], [0.16, 1.9, 0.16]),
-      ...[0, 1, 2].map(step => box(`south-entry-flag-${id}-${step}`, color,
-        [x + 0.22 + step * 0.22, 1.66, 15], [0.22, 0.84 - step * 0.24, 0.14])),
-    ];
-  });
-}
-
 /** 建物の寸法を変えずに、窓・入口・段屋根・道具の意味を共有paletteで付ける。 */
 export function addTownDetails(boxes: readonly WorldBoxDefinition[]): readonly WorldBoxDefinition[] {
   const details: WorldBoxDefinition[] = [];
@@ -69,34 +55,31 @@ export function addTownDetails(boxes: readonly WorldBoxDefinition[]): readonly W
     const [w, h, d] = source.scale;
     if (source.id === 'fire-building-body' || source.id === 'construction-office-body'
       || (source.id.startsWith('town-house-') && source.id.endsWith('-body'))) {
-      const front = z + d / 2 + 0.04;
+      const side = source.id === 'town-house-white-body' ? -1 : 1;
+      const front = z + side * (d / 2 + 0.04);
       details.push(box(`${source.id}-door`, WOOD, [x, y - h / 2 + 0.85, front], [0.9, 1.6, 0.1]));
+      details.push(box(`${source.id}-door-handle`, GOLD, [x + 0.25, 0.95, front + side * 0.1], [0.12, 0.12, 0.08]));
       for (const dx of [-w * 0.3, w * 0.3]) {
         const suffix = dx < 0 ? 'left' : 'right';
         details.push(box(`${source.id}-window-frame-${suffix}`, CREAM, [x + dx, y + 0.25, front], [1.5, 1.3, 0.12]));
-        details.push(box(`${source.id}-window-glass-${suffix}`, '#7ed1e6', [x + dx, y + 0.25, front + 0.09], [1.15, 0.95, 0.1]));
-        details.push(box(`${source.id}-window-mullion-${suffix}`, CREAM, [x + dx, y + 0.25, front + 0.15], [0.1, 0.95, 0.06]));
+        details.push(box(`${source.id}-window-glass-${suffix}`, '#7ed1e6', [x + dx, y + 0.25, front + side * 0.09], [1.15, 0.95, 0.1]));
+        details.push(box(`${source.id}-window-mullion-${suffix}`, CREAM, [x + dx, y + 0.25, front + side * 0.15], [0.1, 0.95, 0.06]));
       }
     }
-    if (source.id.includes('town-house-') && source.id.endsWith('-roof')) {
+    if ((source.id.includes('town-house-') || source.id === 'fire-building-roof') && source.id.endsWith('-roof')) {
       for (const level of [1, 2, 3]) details.push(box(`${source.id}-step-${level}`, source.color,
         [x, y + level * 0.35, z], [w - level * 0.45, 0.35, d - level * 1.2]));
     }
     if (source.id.includes('tree-crown')) {
       details.push(box(`${source.id}-top`, source.color, [x, y + h * 0.6, z], [w * 0.65, h * 0.5, d * 0.65]));
     }
-    if (source.id.includes('sign-board') || source.id === 'hub-wayfinding-board') {
-      // 矢印はカメラ側の両面に置き、空白の横棒を残さない。
+    if (source.id === 'playground-plank') {
+      // 脚だけの赤い棒ではなく、左右の座席と握りがあるシーソーにする。
       for (const side of [-1, 1]) {
-        const face = z + side * (d / 2 + 0.05);
-        details.push(box(`${source.id}-arrow-shaft-${side}`, WOOD, [x, y, face], [w * 0.4, h * 0.18, 0.08]));
-        for (const sign of [-1, 1]) details.push(box(`${source.id}-arrow-tip-${side}-${sign}`, WOOD,
-          [x + w * 0.15, y + sign * h * 0.14, face], [w * 0.1, h * 0.2, 0.08]));
+        details.push(box(`playground-seat-${side}`, GOLD, [x, y + 0.2, z + side * 0.85], [0.85, 0.16, 0.55]));
+        details.push(box(`playground-handle-stem-${side}`, WOOD, [x, y + 0.43, z + side * 0.5], [0.14, 0.55, 0.14]));
+        details.push(box(`playground-handle-grip-${side}`, WOOD, [x, y + 0.72, z + side * 0.5], [0.65, 0.14, 0.14]));
       }
-    }
-    if (source.id.startsWith('construction-timber-stack')) {
-      for (const offset of [-0.9, 0.9]) details.push(box(`${source.id}-band-${offset}`, GOLD,
-        [x + offset, y + h / 2 + 0.03, z], [0.18, 0.06, d]));
     }
     if (source.id === 'construction-crane-beam') {
       details.push(box('construction-crane-trolley', WOOD, [x, y - 0.35, z], [1.1, 0.4, 1.05]));

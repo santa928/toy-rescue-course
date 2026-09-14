@@ -7,7 +7,7 @@ import {
 } from './voxel-game-e2e/drive-harness.mjs';
 
 const baseUrl = process.env.VOXEL_GAME_BASE_URL ?? 'http://127.0.0.1:5173';
-const outputDirectory = 'output/voxel-game-vehicles';
+const outputDirectory = process.env.VOXEL_GAME_VEHICLE_OUTPUT ?? 'output/voxel-game-vehicles';
 const allViewports = [
   { height: 720, name: 'desktop', touch: false, width: 1_280 },
   { height: 768, name: 'tablet', touch: true, width: 1_024 },
@@ -21,6 +21,7 @@ const viewports = viewportFilter === null
 assert(viewports.length > 0, `Unknown VOXEL_GAME_VEHICLE_VIEWPORT: ${viewportFilter}.`);
 
 const driveHarness = createDriveHarness({
+  precisionCounterPulse: true,
   alignAttemptLimit: 28,
   brakeFrameLimit: 180,
   defaultMaxBursts: 420,
@@ -329,12 +330,8 @@ async function verifyViewport(browser, viewport, errors) {
     assert.equal(await bulldozerButton.getAttribute('aria-pressed'), 'true');
     const layout = await measureHudLayout(page, viewport);
 
-    const hubGate = selected.visualLayout.worldSolids.find(({ id }) => id === 'hub-wayfinding-post');
-    const blocksFence = selected.visualLayout.worldSolids.find(({ id }) => id === 'blocks-fence-post');
-    assert(hubGate, `${viewport.name}: hub gate telemetry is unavailable.`);
-    assert(blocksFence, `${viewport.name}: blocks fence telemetry is unavailable.`);
     const gateBypassZ = 0; // 中央交差点から各地区へ出発する。
-    const blocksFenceBypassZ = blocksFence.position[2] + blocksFence.scale[2] / 2 + 5;
+    const blocksApproachZ = -3.7; // 積み木へ触れず、西側の開いた進入路を通る。
     await driveToCoordinate(
       page,
       2,
@@ -351,8 +348,8 @@ async function verifyViewport(browser, viewport, errors) {
     await driveToCoordinate(
       page,
       2,
-      blocksFenceBypassZ,
-      `${viewport.name} blocks fence bypass`,
+      blocksApproachZ,
+      `${viewport.name} blocks open approach`,
       activeTouchDriver,
       0.4,
     );
@@ -457,7 +454,7 @@ async function verifyViewport(browser, viewport, errors) {
     await driveToCoordinate(
       page,
       2,
-      blocksFenceBypassZ,
+      blocksApproachZ,
       `${viewport.name} cycle 2 return blocks north lane`,
       activeTouchDriver,
       0.5,

@@ -4,10 +4,10 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 import {
   PRODUCTION_WORLD_MAP,
-  type WorldRoadDefinition,
   type WorldSurfaceTileDefinition,
 } from './productionWorldMap';
 import { flattenDecorationBoxes } from './worldStreetscape';
+import { createRoadMarkings } from './worldRoadMarkings';
 import {
   WORLD_GROUND_BOX,
   WORLD_SOLID_BOXES,
@@ -27,56 +27,9 @@ interface InstancedBoxesProps {
   readonly color: string;
 }
 
-const ROAD_MARKING_Y = 0.19;
-const ROAD_MARKING_THICKNESS = 0.05;
-const ROAD_MARKING_SHORT_AXIS = 0.22;
-const HUB_INTERSECTION_CLEARANCE = 3;
-
-/** 道路の長軸へ線を置き、中央2道路だけ交差点中央3unitを空ける。 */
-function buildRoadMarkingBoxes(road: WorldRoadDefinition): readonly BoxInstance[] {
-  const isHorizontal = road.scale[0] >= road.scale[2];
-  const longAxis = isHorizontal ? road.scale[0] : road.scale[2];
-  const isHubIntersectionRoad = (
-    road.id === 'road-hub-east-west' || road.id === 'road-hub-north-south'
-  );
-  if (!isHubIntersectionRoad) {
-    return [{
-      position: [road.position[0], ROAD_MARKING_Y, road.position[2]],
-      scale: isHorizontal
-        ? [longAxis, ROAD_MARKING_THICKNESS, ROAD_MARKING_SHORT_AXIS]
-        : [ROAD_MARKING_SHORT_AXIS, ROAD_MARKING_THICKNESS, longAxis],
-    }];
-  }
-
-  if (road.id === 'road-hub-north-south') {
-    return [
-      { position: [0, ROAD_MARKING_Y, -17.75], scale: [ROAD_MARKING_SHORT_AXIS, ROAD_MARKING_THICKNESS, 32.5] },
-      { position: [0, ROAD_MARKING_Y, 22.1], scale: [ROAD_MARKING_SHORT_AXIS, ROAD_MARKING_THICKNESS, 23.8] },
-    ];
-  }
-
-  const segmentLength = (longAxis - HUB_INTERSECTION_CLEARANCE) / 2;
-  const centerOffset = HUB_INTERSECTION_CLEARANCE / 2 + segmentLength / 2;
-  return [-centerOffset, centerOffset].map((offset) => ({
-    position: isHorizontal
-      ? [road.position[0] + offset, ROAD_MARKING_Y, road.position[2]]
-      : [road.position[0], ROAD_MARKING_Y, road.position[2] + offset],
-    scale: isHorizontal
-      ? [segmentLength, ROAD_MARKING_THICKNESS, ROAD_MARKING_SHORT_AXIS]
-      : [ROAD_MARKING_SHORT_AXIS, ROAD_MARKING_THICKNESS, segmentLength],
-  }));
-}
-
-/** 帰庫前庭を道路の上へ積まず、路面を前庭の境界で分ける。 */
-export const WORLD_ROAD_RENDER_BOXES = PRODUCTION_WORLD_MAP.roads.flatMap<WorldRoadDefinition>(road => {
-  if (road.id !== 'road-hub-north-south') return [road];
-  return [
-    { ...road, position: [0, 0.08, -16] as const, scale: [5, 0.18, 36] as const },
-    { ...road, position: [0, 0.08, 22] as const, scale: [5, 0.18, 24] as const },
-  ];
-});
-
-const ROAD_MARKING_BOXES = PRODUCTION_WORLD_MAP.roads.flatMap(buildRoadMarkingBoxes);
+/** 描画と走行余白の検証へ同じ道路定義を渡す。 */
+export const WORLD_ROAD_RENDER_BOXES = PRODUCTION_WORLD_MAP.roads;
+const ROAD_MARKING_BOXES = createRoadMarkings(PRODUCTION_WORLD_MAP.roads);
 const WORLD_RENDER_BOXES = [
   ...PRODUCTION_WORLD_MAP.visualBoxes,
   ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),

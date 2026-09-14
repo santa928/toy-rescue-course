@@ -129,7 +129,7 @@ describe('buildWorldTelemetry', () => {
       currentDistrict: 'hub',
       destinationDistrict: 'fire',
       decorationBoxCount: flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters).length,
-      decorationClusterCount: 21,
+      decorationClusterCount: 7,
       districts: [
         { id: 'hub', label: 'ちゅうおうしゃこ' },
         { id: 'park', label: 'こうえん' },
@@ -139,7 +139,7 @@ describe('buildWorldTelemetry', () => {
         { id: 'construction', label: 'こうじヤード' },
         { id: 'town', label: 'おもちゃのまち' },
       ],
-      staticColliderCount: 40,
+      staticColliderCount: 22,
       surfaceTileCount: 19,
     });
     expect(buildWorldTelemetry([0, 0.8, 6])).toMatchObject({
