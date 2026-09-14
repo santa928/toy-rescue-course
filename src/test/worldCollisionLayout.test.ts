@@ -75,7 +75,7 @@ describe('worldCollisionLayout', () => {
     rapierRenderRecords.rigidBodies.length = 0;
   });
 
-  it('用途が読める大物だけを22個のstatic colliderとして公開する', () => {
+  it('用途が読める大物だけを24個のstatic colliderとして公開する', () => {
     expect(WORLD_SOLID_BOXES.map(({ id }) => id)).toEqual([
       'tree-trunk-1',
       'tree-trunk-2',
@@ -96,11 +96,13 @@ describe('worldCollisionLayout', () => {
       'town-tree-trunk-b',
       'town-tree-trunk-c',
       'park-picnic-table',
+      'park-picnic-bench--1',
+      'park-picnic-bench-1',
       'fire-hydrant-body',
       'construction-material-stack',
       'town-bench-seat',
     ]);
-    expect(WORLD_SOLID_BOXES).toHaveLength(22);
+    expect(WORLD_SOLID_BOXES).toHaveLength(24);
     expect(TREE_TRUNKS).toEqual(WORLD_SOLID_BOXES.slice(0, 3));
     expect(FIRE_BUILDING_BODY).toBe(WORLD_SOLID_BOXES[8]);
     expect(GARAGE_WALLS).toEqual(WORLD_SOLID_BOXES.slice(5, 8));
@@ -180,13 +182,13 @@ describe('worldCollisionLayout', () => {
     )).toBe(false);
   });
 
-  it('単一fixed bodyに共有定義由来の22 colliderだけを構成する', () => {
+  it('単一fixed bodyに共有定義由来の24 colliderだけを構成する', () => {
     const rigidBody = inspectElement(WorldSolidColliders());
     const colliders = Children.toArray(rigidBody.props.children).map(inspectElement);
 
     expect(rigidBody.type).toBe(RigidBody);
     expect(rigidBody.props).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(colliders).toHaveLength(22);
+    expect(colliders).toHaveLength(24);
     expect(colliders.every((collider) => collider.type === CuboidCollider)).toBe(true);
     expect(colliders.map(({ props }) => ({
       args: props.args,
@@ -204,7 +206,7 @@ describe('worldCollisionLayout', () => {
 
     expect(rapierRenderRecords.rigidBodies).toHaveLength(1);
     expect(rapierRenderRecords.rigidBodies[0]).toMatchObject({ colliders: false, type: 'fixed' });
-    expect(rapierRenderRecords.cuboidColliders).toHaveLength(22);
+    expect(rapierRenderRecords.cuboidColliders).toHaveLength(24);
     expect(rapierRenderRecords.cuboidColliders.map(({ args, position, rotation }) => ({
       args,
       position,

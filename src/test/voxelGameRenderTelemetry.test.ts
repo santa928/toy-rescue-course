@@ -139,7 +139,7 @@ describe('buildWorldTelemetry', () => {
         { id: 'construction', label: 'こうじヤード' },
         { id: 'town', label: 'おもちゃのまち' },
       ],
-      staticColliderCount: 22,
+      staticColliderCount: 24,
       surfaceTileCount: 19,
     });
     expect(buildWorldTelemetry([0, 0.8, 6])).toMatchObject({

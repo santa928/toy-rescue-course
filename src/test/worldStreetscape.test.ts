@@ -72,11 +72,13 @@ describe('world streetscape', () => {
     expect(new Set(boxes.map(({ id }) => id)).size).toBe(boxes.length);
     expect(solidIds).toEqual([
       'park-picnic-table',
+      'park-picnic-bench--1',
+      'park-picnic-bench-1',
       'fire-hydrant-body',
       'construction-material-stack',
       'town-bench-seat',
     ]);
-    expect(solidIds).toHaveLength(4);
+    expect(solidIds).toHaveLength(6);
   });
 
   it('canonical streetscapeを検証し、重複・高さ・群数・道路侵入をID付きで拒否する', () => {

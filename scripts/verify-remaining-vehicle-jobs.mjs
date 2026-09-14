@@ -17,9 +17,10 @@ const cases = [
   ['police', 5376, 'patrol-pools'], ['police', 10752, 'patrol-showers'],
   ['bulldozer', 5376, 'debris-south'],
   ['police', 1, 'patrol-main'],
+  ['ambulance', 1, 'patient-pond'],
 ].filter(([, , id]) => process.env.JOB_FILTER
   ? process.env.JOB_FILTER.split(',').includes(id)
-  : id !== 'patrol-main');
+  : !['patrol-main', 'patient-pond'].includes(id));
 const harness = createDriveHarness({ alignAttemptLimit: 45, brakeFrameLimit: 220, defaultMaxBursts: 480 });
 const { readGameState: state, driveToCoordinate, driveAlongWorldAxis, brakeVehicle, pulseWorldAxis } = harness;
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
@@ -79,7 +80,11 @@ try {
       if (vehicle === 'ambulance') {
         const target = initial.mission.targetPositions[0];
         await move(page, 2, -12, `${id} park road`);
-        if (id === 'patient-playground') {
+        if (id === 'patient-pond') {
+          await move(page, 2, target[2], `${id} pond latitude`);
+          await page.screenshot({ path: `${output}/${id}-approach.png` });
+          await move(page, 0, target[0], `${id} pond patient approach`);
+        } else if (id === 'patient-playground') {
           await move(page, 0, 10.5, `${id} east park lane`);
           await move(page, 2, target[2], `${id} north park lane`);
           await page.screenshot({ path: `${output}/${id}-approach.png` });

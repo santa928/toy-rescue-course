@@ -266,7 +266,7 @@ function assertInitialWorldPhysicsContract(initial) {
   assert.equal(initial.visualLayout.routeMarkers.length, 12, 'Route marker layout is incomplete.');
   assert(initial.visualLayout.routeMarkers.every(({ scale }) => scale[1] <= 0.14),
     'Route marker is still obstacle-height.');
-  assert.equal(initial.visualLayout.worldSolids.length, 22, 'Production world solids are incomplete.');
+  assert.equal(initial.visualLayout.worldSolids.length, 24, 'Production world solids are incomplete.');
 }
 
 /** 実camera telemetryを使ってworld座標を現在viewportのscreen座標へ投影する。 */
@@ -720,7 +720,7 @@ async function verifyProductionMap(browser, errors) {
     });
     assert.equal(initial.world.currentDistrict, 'hub');
     assert.equal(initial.world.destinationDistrict, 'fire');
-    assert.equal(initial.visualLayout.worldSolids.length, 22);
+    assert.equal(initial.visualLayout.worldSolids.length, 24);
     const southTransitX = initial.landmarks.garage[0] + 6.5;
     // 整理した前庭の東側を通り、南広場の開放通路へ往復する。
     const southReturnTransitX = initial.landmarks.garage[0] + 6.5;
@@ -3729,7 +3729,9 @@ async function verifyWorldCollisions(browser, errors) {
     'town-tree-trunk-a': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-tree-trunk-b': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
     'town-tree-trunk-c': 'tree-trunk-3 covers the same shared trunk collider shape through real input',
-    'park-picnic-table': 'the dedicated streetscape E2E covers this solid through real keyboard and touch input',
+    'park-picnic-table': 'the shared box contract covers the tabletop; the approach stops at the attached east bench',
+    'park-picnic-bench--1': 'the shared box contract covers this symmetric bench; no separate west-side collision is claimed',
+    'park-picnic-bench-1': 'the dedicated streetscape E2E covers this east bench through real input',
     'construction-material-stack': 'the shared solid-box unit contract covers this relocated material bay; no dedicated real collision is claimed',
     'town-bench-seat': 'the dedicated streetscape E2E covers the shared hard street-furniture cuboid layer',
   };
@@ -3749,7 +3751,7 @@ async function verifyWorldCollisions(browser, errors) {
     sharedDefinitionOnly,
     sharedDefinitionOnlyReasons,
     testedIds,
-    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 22 production solids share one definition',
+    unitContract: 'src/test/worldCollisionLayout.test.ts verifies all 24 production solids share one definition',
   };
 }
 

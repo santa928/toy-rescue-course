@@ -164,7 +164,7 @@ browser error 0/0/0です。消防車は3 viewportすべてで異なる2仕事�
 XZ移動が127〜141回反転する条件でも、カメラXYZの反転0回、高さ変動0、browser error 0件を
 確認します。3枚の目視用画像は`output/voxel-game-camera-stability/`へ生成されます。
 
-7地区には、道路より低い19枚の固有色床・入口模様と、用途ごとにまとめた7群（51 box）の街角セットがあります。独立した矢印看板・柵・街灯・小箱は撤去し、公園の家具、消火栓、家の玄関と花、工事場奥の資材に整理しました。固定colliderは22件です。遊び・操作はそのままで、道しるべの経路と街の見通しを保ちます。[街の再構築の設計](docs/design/2026-09-14-town-clarity.md)を参照してください。専用E2Eは7地区の床色、開放空間、HUD実寸、代表solid衝突、non-solid通過、scene 34 calls以下を検証します。
+7地区には、道路より低い19枚の固有色床・入口模様と、用途ごとにまとめた7群（94 box）の街角セットがあります。独立した矢印看板・柵・街灯・小箱は撤去し、公園のベンチ一体型机・市松の敷物・かご・傾いたシーソー、消火栓、家の玄関と花、工事場奥の資材に整理しました。固定colliderは24件です。遊び・操作はそのままで、道しるべの経路と街の見通しを保ちます。[街の再構築の設計](docs/design/2026-09-14-town-clarity.md)を参照してください。専用E2Eは7地区の床色、開放空間、HUD実寸、代表solid衝突、non-solid通過、scene 34 calls以下を検証します。
 
 ```bash
 VOXEL_GAME_STREETSCAPE_VIEWPORT=desktop docker compose --profile e2e run --rm --build voxel-game-streetscape-e2e

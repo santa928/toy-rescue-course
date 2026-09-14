@@ -402,7 +402,7 @@ async function verifyViewport(browser, viewport, errors) {
     ]);
     assert.deepEqual(initial.landmarks.construction, [-31, 0, -31]);
     assert.deepEqual(initial.landmarks.town, [31, 0, 31]);
-    assert.equal(initial.visualLayout.worldSolids.length, 22);
+    assert.equal(initial.visualLayout.worldSolids.length, 24);
     const initialResetCount = initial.vehicle.resetCount;
     const hud = await measureHud(page, viewport);
 
