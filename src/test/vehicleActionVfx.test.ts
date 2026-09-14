@@ -7,6 +7,7 @@ import {
   updateVehicleActionVfxFrame,
 } from '../voxel-game/scene/actionVfx/vehicleActionFrame';
 import type { VehicleId } from '../voxel-game/domain/vehicleDefinitions';
+import { getPoliceActionPose } from '../vehicle-lab/scene/VoxelPolice';
 import {
   VEHICLE_ACTION_MATERIAL_USES_GEOMETRY_VERTEX_COLORS,
 } from '../voxel-game/scene/actionVfx/VehicleActionEffects';
@@ -88,6 +89,34 @@ describe('vehicle action VFX', () => {
     expect(moving.activeCount).toBe(18);
     expect(Math.max(...moving.voxels.filter(({ active }) => active)
       .map(({ position }) => position[1]))).toBeLessThanOrEqual(2.92);
+  });
+
+  it('救急車はばらばらの粒でなく、前方に一つのつながったハートを出す', () => {
+    const frame = pressVehicleAction('ambulance');
+    const heart = frame.voxels.filter(({ active, palette }) => active && palette === 'ambulance-red');
+    expect(heart).toHaveLength(16);
+    for (const voxel of heart) {
+      expect(voxel.position[2]).toBeGreaterThan(8);
+      expect(voxel.position[1]).toBeGreaterThan(2);
+      expect(heart.some(other => other !== voxel
+        && Math.hypot(...voxel.position.map((v, axis) => v - other.position[axis])) < 0.4)).toBe(true);
+    }
+  });
+
+  it('赤青の波が車体の灯火と同じ側から同じ半周期で広がる', () => {
+    const frame = pressVehicleAction('police', 0);
+    for (const elapsedSeconds of [0.25, 0.75]) {
+      updateVehicleActionVfxFrame(frame, {
+        actionActive: true, deltaSeconds: 1 / 60, elapsedSeconds,
+        forward: [0, 0, 1], position: [0, 0, 0], speed: 0, vehicleId: 'police',
+      });
+      const red = frame.voxels.filter(v => v.active && v.palette === 'police-red');
+      const blue = frame.voxels.filter(v => v.active && v.palette === 'police-blue');
+      expect(red.every(v => v.position[0] > 0)).toBe(true);
+      expect(blue.every(v => v.position[0] < 0)).toBe(true);
+      const pose = getPoliceActionPose(true, elapsedSeconds);
+      expect(red[0].scale[0] > blue[0].scale[0]).toBe(pose.redGlow > pose.blueGlow);
+    }
   });
 
   it('押し続ける間は配列を再生成せずcycleを繰り返す', () => {

@@ -40,6 +40,7 @@ jobs:
           node scripts/verify-product-usability.mjs
           node scripts/verify-voxel-game-audio.mjs
           DEPOT_VEHICLES=fire-truck DEPOT_OUTPUT=output/product-review/depot node scripts/verify-town-depot.mjs
+          RESCUE_EFFECTS_OUTPUT=output/product-review/rescue-effects node scripts/verify-rescue-vehicle-effects.mjs
       - name: Save browser evidence
         if: always()
         uses: actions/upload-artifact@v7.0.1

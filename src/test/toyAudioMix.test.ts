@@ -82,9 +82,9 @@ describe('createToyAudioMixFrame', () => {
     expect(inactive.actionGainA + inactive.actionGainB + inactive.noiseGain).toBe(0);
   });
 
-  it('パトカーの赤青2音を0.28秒ごとに交互へする', () => {
+  it('パトカーの赤青2音を灯火と同じ0.5秒ごとに交互へする', () => {
     const red = createFrame({ elapsedSeconds: 0, primaryAction: true, vehicleId: 'police' });
-    const blue = createFrame({ elapsedSeconds: 0.28, primaryAction: true, vehicleId: 'police' });
+    const blue = createFrame({ elapsedSeconds: 0.5, primaryAction: true, vehicleId: 'police' });
 
     expect(red.actionFrequencyA).not.toBe(blue.actionFrequencyA);
     expect(red.actionGainA).toBeGreaterThan(0);

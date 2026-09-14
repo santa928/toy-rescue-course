@@ -49,27 +49,32 @@ describe('AMBULANCE_VOXELS', () => {
     expect(paletteAt(-1, 7, 1)).toBe('beacon');
   });
 
-  it('主操作中だけ赤十字と灯火をやさしく脈動させる', () => {
+  it('手当て中も赤十字を車体へ固定し、部品を膨らませない', () => {
     expect(getAmbulanceCarePulseScale(false, 0.25)).toBe(1);
     expect(getAmbulanceCarePulseScale(true, 0)).toBeCloseTo(1, 5);
-    expect(getAmbulanceCarePulseScale(true, 0.25)).toBeGreaterThan(1);
-    expect(getAmbulanceCarePulseScale(true, 0.25)).toBeLessThanOrEqual(1.07);
+    expect(getAmbulanceCarePulseScale(true, 0.25)).toBe(1);
   });
 
-  it('押下直後は赤十字と灯火を1.12超までburstし、その後は2Hz以下でholdする', () => {
+  it('押下直後から光で応答し、その後も穏やかな周期で手当てを示す', () => {
     const press = getAmbulanceActionPose(true, 0.08);
     const hold = getAmbulanceActionPose(true, 0.4);
 
     expect(press.phase).toBe('press');
-    expect(press.crossScale).toBeGreaterThan(1.12);
-    expect(press.beaconScale).toBeGreaterThan(1.12);
+    expect(press.crossGlow).toBeGreaterThan(0);
+    expect(press.beaconGlow).toBeGreaterThan(0.34);
+    expect(press.crossScale).toBe(1);
+    expect(press.beaconScale).toBe(1);
     expect(hold.phase).toBe('hold');
     expect(hold.beaconPulseHz).toBeLessThanOrEqual(2);
-    expect(hold.crossScale).toBeLessThanOrEqual(1.08);
+    expect(hold.crossScale).toBe(1);
+    expect(getAmbulanceActionPose(true, 0.25).beaconGlow)
+      .toBeGreaterThan(getAmbulanceActionPose(true, 0.75).beaconGlow);
   });
 
   it('非押下と不正時刻ではneutral poseを返す', () => {
     const neutral = {
+      beaconGlow: 0.34,
+      crossGlow: 0,
       beaconPulseHz: 0,
       beaconScale: 1,
       crossScale: 1,

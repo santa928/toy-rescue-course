@@ -77,23 +77,23 @@ function addWheel(voxels: MutableVoxelMap, x: number, zCenter: number): void {
   setVoxel(voxels, x, 2, zCenter, 'darkGray');
 }
 
-/** 低い白黒車体、青緑窓、屋根の赤青灯を持つ純voxelパトカーを生成する。 */
+/** 肩まで高さのある白黒車体、二段の窓、屋根の赤青灯を持つ玩具パトカーを作る。 */
 function buildPoliceVoxels(): readonly VoxelCell<PolicePaletteId>[] {
   const voxels: MutableVoxelMap = new Map();
 
   fillBox(voxels, [-4, 1, -6], [4, 1, 6], 'darkGray');
-  shellBox(voxels, [-4, 2, -5], [4, 3, 5], 'white');
-  shellBox(voxels, [-3, 4, -2], [3, 5, 2], 'white');
+  shellBox(voxels, [-4, 2, -5], [4, 4, 5], 'white');
+  shellBox(voxels, [-3, 5, -2], [3, 7, 2], 'white');
   for (const x of [-5, 5]) {
     addWheel(voxels, x, -4);
     addWheel(voxels, x, 4);
   }
 
-  fillBox(voxels, [-2, 4, -2], [2, 4, -2], 'window');
-  fillBox(voxels, [-3, 4, -1], [-3, 4, 1], 'window');
-  fillBox(voxels, [3, 4, -1], [3, 4, 1], 'window');
+  fillBox(voxels, [-2, 5, -2], [2, 6, -2], 'window');
+  fillBox(voxels, [-3, 5, -1], [-3, 6, 1], 'window');
+  fillBox(voxels, [3, 5, -1], [3, 6, 1], 'window');
 
-  fillBox(voxels, [-2, 4, 2], [2, 4, 2], 'window');
+  fillBox(voxels, [-2, 5, 2], [2, 6, 2], 'window');
   fillBox(voxels, [-3, 2, -6], [3, 2, -6], 'white');
 
   fillBox(voxels, [-4, 3, -5], [-4, 3, 5], 'black');
@@ -103,9 +103,9 @@ function buildPoliceVoxels(): readonly VoxelCell<PolicePaletteId>[] {
   setVoxel(voxels, -3, 2, 6, 'redBeacon');
   setVoxel(voxels, 3, 2, 6, 'redBeacon');
 
-  fillBox(voxels, [-2, 6, 0], [-1, 6, 0], 'redBeacon');
-  fillBox(voxels, [1, 6, 0], [2, 6, 0], 'blueBeacon');
-  setVoxel(voxels, 0, 6, 0, 'darkGray');
+  fillBox(voxels, [-2, 8, 0], [-1, 8, 0], 'redBeacon');
+  fillBox(voxels, [1, 8, 0], [2, 8, 0], 'blueBeacon');
+  setVoxel(voxels, 0, 8, 0, 'darkGray');
 
   return [...voxels.values()].sort(
     (left, right) => left.y - right.y || left.z - right.z || left.x - right.x,

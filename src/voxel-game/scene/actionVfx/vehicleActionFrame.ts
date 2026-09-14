@@ -1,4 +1,5 @@
 import type { VehicleId } from '../../domain/vehicleDefinitions';
+import { WORLD_CAMERA_LOOK_OFFSET, WORLD_CAMERA_OFFSET } from '../worldCameraConfig';
 
 export const VEHICLE_ACTION_VOXEL_POOL_SIZE = 48;
 export const VEHICLE_ACTION_RELEASE_TAIL_SECONDS = 0.32;
@@ -28,10 +29,10 @@ export const VEHICLE_ACTION_PALETTE_COLORS: Readonly<Record<VehicleActionPalette
 };
 
 const CYCLE_DURATION_SECONDS: Readonly<Record<SpectacleVehicleId, number>> = {
-  ambulance: 1,
+  ambulance: 1.4,
   bulldozer: 0.55,
   excavator: 0.9,
-  police: 0.5,
+  police: 1,
 };
 
 const HIDDEN_Y = -40;
@@ -195,31 +196,45 @@ function updateExcavatorVoxels(
   }
 }
 
-/** 救急車の周囲へ赤白の十字waveを二重に配置する。 */
+const CARE_HEART = [[-1, 1], [1, 1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0],
+  [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [-1, -2], [0, -2], [1, -2], [0, -3]] as const;
+// 車の向きに関係なくハートが読めるよう、固定cameraの画面平面へ向ける。
+const GLYPH_VIEW = WORLD_CAMERA_OFFSET.map((v, axis) => v - WORLD_CAMERA_LOOK_OFFSET[axis]);
+const GLYPH_HORIZONTAL = Math.hypot(GLYPH_VIEW[0], GLYPH_VIEW[2]);
+const GLYPH_DISTANCE = Math.hypot(...GLYPH_VIEW);
+const GLYPH_RIGHT = [GLYPH_VIEW[2] / GLYPH_HORIZONTAL, 0, -GLYPH_VIEW[0] / GLYPH_HORIZONTAL];
+const GLYPH_UP = [-GLYPH_VIEW[0] * GLYPH_VIEW[1] / (GLYPH_HORIZONTAL * GLYPH_DISTANCE),
+  GLYPH_HORIZONTAL / GLYPH_DISTANCE, -GLYPH_VIEW[2] * GLYPH_VIEW[1] / (GLYPH_HORIZONTAL * GLYPH_DISTANCE)];
+
+/** 救急車の前方へ一つのハートと二段のケア波を出し、部品の飛散と区別する。 */
 function updateAmbulanceVoxels(
   frame: VehicleActionVfxFrame,
   basis: Parameters<typeof showVoxel>[2],
   progress: number,
   tailScale: number,
 ): void {
-  for (let slot = 0; slot < 16; slot += 1) {
-    const arm = slot % 4;
-    const ring = Math.floor(slot / 4);
-    const distance = 0.9 + ring * 0.34 + progress * 0.8;
-    const x = arm === 0 ? distance : arm === 1 ? -distance : 0;
-    const z = arm === 2 ? distance : arm === 3 ? -distance : 0;
+  for (let slot = 0; slot < CARE_HEART.length; slot += 1) {
+    const [x, y] = CARE_HEART[slot];
+    const pulse = 1 + Math.sin(progress * Math.PI) * 0.12;
+    showVoxel(frame, slot, basis,
+      [0, 2.65 + progress * 0.22, 1.65],
+      0.29 * pulse * tailScale, 'ambulance-red');
+    for (let axis = 0; axis < 3; axis += 1) {
+      frame.voxels[slot].position[axis] += (x * GLYPH_RIGHT[axis] + y * GLYPH_UP[axis]) * 0.26 * pulse;
+    }
+  }
+  for (let slot = CARE_HEART.length; slot < CARE_HEART.length + 6; slot += 1) {
+    const column = (slot - CARE_HEART.length) % 3 - 1;
+    const row = Math.floor((slot - CARE_HEART.length) / 3);
     showVoxel(
-      frame,
-      slot,
-      basis,
-      [x, 0.85 + ring * 0.15 + Math.sin(progress * Math.PI) * 0.2, z],
-      (0.2 + (3 - ring) * 0.035) * tailScale,
-      (slot + ring) % 2 === 0 ? 'ambulance-red' : 'white',
+      frame, slot, basis,
+      [column * (0.5 + progress * 0.2), 0.45 + row * 0.15, 1.9 + row * 0.5 + progress * 0.65],
+      (0.28 - row * 0.04) * tailScale, 'white',
     );
   }
 }
 
-/** パトカーへ赤青の左右ringと走行trailを配置する。 */
+/** 屋根灯から左右へ広がる二つのサイレン波と、走行中だけの短い軌跡を描く。 */
 function updatePoliceVoxels(
   frame: VehicleActionVfxFrame,
   basis: Parameters<typeof showVoxel>[2],
@@ -228,29 +243,21 @@ function updatePoliceVoxels(
   actionActive: boolean,
   tailScale: number,
 ): void {
-  for (let slot = 0; slot < 8; slot += 1) {
-    const side = slot % 2 === 0 ? -1 : 1;
-    const step = Math.floor(slot / 2);
-    const palette: VehicleActionPalette = side < 0 ? 'police-red' : 'police-blue';
+  for (let slot = 0; slot < 12; slot += 1) {
+    const side = slot < 6 ? -1 : 1;
+    const step = slot % 6;
+    const angle = -1.2 + step * 2.4 / 5;
+    const activeSide = progress < 0.5 ? 1 : -1;
+    const wave = (progress * 2) % 1;
+    // 車体modelはcontrollerでπ回転するため、赤灯は走行方向基準のright側。
+    const palette: VehicleActionPalette = side > 0 ? 'police-red' : 'police-blue';
     showVoxel(
       frame,
       slot,
       basis,
-      [side * (0.9 + step * 0.22 + progress * 0.55), 1.08 + step * 0.18, 0.28 - step * 0.2],
-      (0.2 + (step % 2) * 0.06) * tailScale,
+      [side * (1.15 + wave * 0.6 + Math.cos(angle) * 0.45), 1.85 + Math.sin(angle) * 0.5, 0],
+      (side === activeSide ? 0.3 : 0.14) * tailScale,
       palette,
-    );
-  }
-  for (let slot = 8; slot < 12; slot += 1) {
-    const step = slot - 8;
-    const redPhase = progress < 0.5;
-    showVoxel(
-      frame,
-      slot,
-      basis,
-      [(step % 2 === 0 ? -0.3 : 0.3), 1.18 + step * 0.32, 0],
-      (0.18 + (step % 2) * 0.035) * tailScale,
-      redPhase === (step % 2 === 0) ? 'police-red' : 'police-blue',
     );
   }
   if (getActivePoliceTrailCount({ actionActive, speed }) === 0) return;

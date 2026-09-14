@@ -39,6 +39,7 @@ const POLICE_STATIC_BATCHES = POLICE_RENDER_PLAN.batches.filter(
 interface VoxelBatchProps {
   readonly batch: VoxelRenderBatch<PolicePaletteId>;
   readonly paintColor: string | null;
+  readonly glowMaterialRef?: RefObject<THREE.MeshLambertMaterial | null>;
 }
 
 export type VoxelPoliceProps = ThreeElements['group'] & {
@@ -47,6 +48,8 @@ export type VoxelPoliceProps = ThreeElements['group'] & {
 };
 
 export interface PoliceActionPose {
+  readonly blueGlow: number;
+  readonly redGlow: number;
   readonly blueScale: number;
   readonly flashHz: number;
   readonly phase: 'hold' | 'idle' | 'press';
@@ -54,13 +57,15 @@ export interface PoliceActionPose {
 }
 
 const IDLE_POLICE_POSE: PoliceActionPose = {
+  blueGlow: 0.38,
+  redGlow: 0.34,
   blueScale: 1,
   flashHz: 0,
   phase: 'idle',
   redScale: 1,
 };
 
-/** 押下burstと0.5秒ごとの赤青hold切替を決定的な車体poseへ変換する。 */
+/** 車体の形を固定し、0.5秒ごとに屋根灯の明るさだけを交互へ切り替える。 */
 export function getPoliceActionPose(
   actionActive: boolean,
   actionElapsedSeconds: number,
@@ -69,38 +74,27 @@ export function getPoliceActionPose(
     return IDLE_POLICE_POSE;
   }
   const redActive = Math.floor(actionElapsedSeconds * 2) % 2 === 0;
-  if (actionElapsedSeconds < 0.18) {
-    const burst = Math.sin(actionElapsedSeconds / 0.18 * Math.PI);
-    const activeScale = 1 + burst * 0.22;
-    return {
-      blueScale: redActive ? 0.82 : activeScale,
-      flashHz: 2,
-      phase: 'press',
-      redScale: redActive ? activeScale : 0.82,
-    };
-  }
   return {
-    blueScale: redActive ? 0.82 : 1.14,
+    blueGlow: redActive ? 0.1 : 1.2,
+    redGlow: redActive ? 1.2 : 0.1,
+    blueScale: 1,
     flashHz: 2,
-    phase: 'hold',
-    redScale: redActive ? 1.14 : 0.82,
+    phase: actionElapsedSeconds < 0.18 ? 'press' : 'hold',
+    redScale: 1,
   };
 }
 
-/** サイレン中は0.5秒ごとに赤青灯の大きさを交互へ切り替える。 */
+/** 互換用の寸法取得。サイレン中も灯火を屋根へ固定し、拡大しない。 */
 export function getPoliceBeaconScales(
   actionActive: boolean,
   elapsedSeconds: number,
 ): { readonly blue: number; readonly red: number } {
-  if (!actionActive || !Number.isFinite(elapsedSeconds)) return { blue: 1, red: 1 };
-  const redActive = Math.floor(Math.max(0, elapsedSeconds) * 2) % 2 === 0;
-  return redActive
-    ? { blue: 0.82, red: 1.12 }
-    : { blue: 1.12, red: 0.82 };
+  const pose = getPoliceActionPose(actionActive, elapsedSeconds);
+  return { blue: pose.blueScale, red: pose.redScale };
 }
 
 /** 同色voxelを1つのInstancedMeshとして描画する。 */
-function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
+function VoxelBatch({ batch, paintColor, glowMaterialRef }: VoxelBatchProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const material = POLICE_PALETTE[batch.paletteId];
 
@@ -125,6 +119,7 @@ function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
       ref={meshRef}
     >
       <meshLambertMaterial
+        ref={glowMaterialRef}
         color={resolveVehiclePaintColor({
           baseColor: material.color,
           paintColor,
@@ -144,22 +139,19 @@ export function VoxelPolice({
   paintColor = null,
   ...groupProps
 }: VoxelPoliceProps): ReactElement {
-  const redBeaconRef = useRef<THREE.Group>(null);
-  const blueBeaconRef = useRef<THREE.Group>(null);
+  const redMaterialRef = useRef<THREE.MeshLambertMaterial>(null);
+  const blueMaterialRef = useRef<THREE.MeshLambertMaterial>(null);
   const actionElapsedSecondsRef = useRef(0);
   assertValidVoxelModel(POLICE_VOXELS, POLICE_PALETTE_IDS);
 
   useFrame((_state, delta) => {
-    const red = redBeaconRef.current;
-    const blue = blueBeaconRef.current;
-    if (!red || !blue) return;
     const actionActive = actionActiveRef?.current === true;
     actionElapsedSecondsRef.current = actionActive
       ? actionElapsedSecondsRef.current + Math.max(0, Math.min(delta, 0.05))
       : 0;
     const pose = getPoliceActionPose(actionActive, actionElapsedSecondsRef.current);
-    red.scale.setScalar(pose.redScale);
-    blue.scale.setScalar(pose.blueScale);
+    if (redMaterialRef.current) redMaterialRef.current.emissiveIntensity = pose.redGlow;
+    if (blueMaterialRef.current) blueMaterialRef.current.emissiveIntensity = pose.blueGlow;
   });
 
   return (
@@ -169,13 +161,13 @@ export function VoxelPolice({
           <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
         ))}
         {POLICE_RED_BEACON_BATCH ? (
-          <group ref={redBeaconRef}>
-            <VoxelBatch batch={POLICE_RED_BEACON_BATCH} paintColor={paintColor} />
+          <group>
+            <VoxelBatch batch={POLICE_RED_BEACON_BATCH} paintColor={paintColor} glowMaterialRef={redMaterialRef} />
           </group>
         ) : null}
         {POLICE_BLUE_BEACON_BATCH ? (
-          <group ref={blueBeaconRef}>
-            <VoxelBatch batch={POLICE_BLUE_BEACON_BATCH} paintColor={paintColor} />
+          <group>
+            <VoxelBatch batch={POLICE_BLUE_BEACON_BATCH} paintColor={paintColor} glowMaterialRef={blueMaterialRef} />
           </group>
         ) : null}
       </group>

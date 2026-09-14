@@ -2,7 +2,7 @@ export const WATER_STREAM_COUNT = 24;
 export const WATER_SPLASH_COUNT = 8;
 export const WATER_INSTANCE_COUNT = WATER_STREAM_COUNT + WATER_SPLASH_COUNT;
 const STREAM_EMISSION_INTERVAL_SECONDS = 0.032;
-const STREAM_PERIOD_SECONDS = 1.15;
+const STREAM_PERIOD_SECONDS = WATER_STREAM_COUNT * STREAM_EMISSION_INTERVAL_SECONDS;
 const SPLASH_LIFETIME_SECONDS = 0.22;
 const TARGET_STOP_OFFSET = 0.55;
 const UNTARGETED_VISIBLE_DISTANCE = 6;
@@ -76,10 +76,10 @@ export function createWaterFlowPath(input: WaterFlowPathInput): WaterFlowPath {
   if (!input.targeted) {
     return {
       controlX: startX + directionX * UNTARGETED_VISIBLE_DISTANCE / 2,
-      controlY: startY + directionY * UNTARGETED_VISIBLE_DISTANCE / 2,
+      controlY: startY + 0.45,
       controlZ: startZ + directionZ * UNTARGETED_VISIBLE_DISTANCE / 2,
       endX: startX + directionX * UNTARGETED_VISIBLE_DISTANCE,
-      endY: startY + directionY * UNTARGETED_VISIBLE_DISTANCE,
+      endY: 0.12,
       endZ: startZ + directionZ * UNTARGETED_VISIBLE_DISTANCE,
       startX,
       startY,
@@ -115,7 +115,7 @@ export function createWaterFlowFrame(input: WaterFlowInput): WaterFlowFrame {
     const localTime = input.sprayElapsedSeconds - slot * STREAM_EMISSION_INTERVAL_SECONDS;
     const active = input.sprayActive && localTime >= 0;
     const age = active ? (localTime % STREAM_PERIOD_SECONDS) / STREAM_PERIOD_SECONDS : 0;
-    const arc = -0.24 * age * age + Math.sin((age + slot * 0.13) * Math.PI * 2) * 0.035;
+    const arc = Math.sin((age + slot * 0.13) * Math.PI * 2) * Math.sin(age * Math.PI) * 0.02;
     const inverse = 1 - age;
     const startWeight = inverse * inverse;
     const controlWeight = 2 * inverse * age;
@@ -136,15 +136,18 @@ export function createWaterFlowFrame(input: WaterFlowInput): WaterFlowFrame {
           + controlWeight * input.path.controlZ
           + endWeight * input.path.endZ,
       ],
-      scale: active ? 0.12 + Math.sin(Math.PI * age) * 0.09 : 0,
+      scale: active ? 0.22 + Math.sin(Math.PI * age) * 0.06 : 0,
       slot,
     });
   }
 
   for (let splashSlot = 0; splashSlot < WATER_SPLASH_COUNT; splashSlot += 1) {
     const slot = WATER_STREAM_COUNT + splashSlot;
-    const age = Math.min(1, Math.max(0, input.splashElapsedSeconds / SPLASH_LIFETIME_SECONDS));
-    const active = input.sprayActive && input.targeted && age > 0 && age < 1;
+    const splashTime = input.targeted ? input.splashElapsedSeconds
+      : input.sprayElapsedSeconds >= STREAM_PERIOD_SECONDS
+        ? (input.sprayElapsedSeconds - STREAM_PERIOD_SECONDS) % SPLASH_LIFETIME_SECONDS : 0;
+    const age = Math.min(1, Math.max(0, splashTime / SPLASH_LIFETIME_SECONDS));
+    const active = input.sprayActive && age > 0 && age < 1;
     const spread = SPLASH_DIRECTIONS[splashSlot];
     instances.push({
       active,
@@ -155,7 +158,7 @@ export function createWaterFlowFrame(input: WaterFlowInput): WaterFlowFrame {
         input.path.endY + spread[1] * age * 0.65 - age * age * 0.22,
         input.path.endZ + spread[2] * age * 0.65,
       ],
-      scale: active ? 0.18 * (1 - age) : 0,
+      scale: active ? 0.25 * (1 - age) : 0,
       slot,
     });
   }
