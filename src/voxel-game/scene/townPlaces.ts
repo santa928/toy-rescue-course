@@ -1,3 +1,4 @@
+import { createParkPicnicCorner } from './parkScenery';
 import type { WorldBoxDefinition, WorldDecorationClusterDefinition, WorldPoint } from './productionWorldMap';
 
 const WOOD = '#86552f';
@@ -46,17 +47,7 @@ export function createTownPlaces(): readonly WorldDecorationClusterDefinition[] 
     },
     {
       id: 'park-picnic-corner', districtId: 'park', purpose: 'rest',
-      boxes: [
-        box('park-picnic-table', WOOD, [-5.2, 0.95, -17], [1.6, 0.2, 2], true),
-        box('park-picnic-cloth', RED, [-5.2, 1.08, -17], [1.1, 0.06, 2.02]),
-        ...[-0.55, 0.55].flatMap(dx => [-0.75, 0.75].map(dz =>
-          box(`park-picnic-leg-${dx}-${dz}`, WOOD, [-5.2 + dx, 0.49, -17 + dz], [0.22, 0.78, 0.22]))),
-        box('park-picnic-blanket', RED, [4.9, 0.1, -17.4], [1.8, 0.04, 1.4]),
-        ...[-0.45, 0.45].map(dx => box(`park-picnic-blanket-stripe-${dx}`, CREAM,
-          [4.9 + dx, 0.13, -17.4], [0.15, 0.02, 1.4])),
-        box('park-picnic-basket', GOLD, [5.3, 0.33, -17.3], [0.55, 0.38, 0.65]),
-        box('park-picnic-basket-handle', WOOD, [5.3, 0.6, -17.3], [0.12, 0.18, 0.6]),
-      ],
+      boxes: createParkPicnicCorner(),
     },
     {
       id: 'fire-entry-hydrant', districtId: 'fire', purpose: 'service',

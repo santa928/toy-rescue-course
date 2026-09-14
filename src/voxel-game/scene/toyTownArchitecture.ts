@@ -1,3 +1,4 @@
+import { createPondDetails, createSeesawDetails } from './parkScenery';
 import type { WorldBoxDefinition } from './productionWorldMap';
 
 const CREAM = '#f1efe6';
@@ -73,14 +74,8 @@ export function addTownDetails(boxes: readonly WorldBoxDefinition[]): readonly W
     if (source.id.includes('tree-crown')) {
       details.push(box(`${source.id}-top`, source.color, [x, y + h * 0.6, z], [w * 0.65, h * 0.5, d * 0.65]));
     }
-    if (source.id === 'playground-plank') {
-      // 脚だけの赤い棒ではなく、左右の座席と握りがあるシーソーにする。
-      for (const side of [-1, 1]) {
-        details.push(box(`playground-seat-${side}`, GOLD, [x, y + 0.2, z + side * 0.85], [0.85, 0.16, 0.55]));
-        details.push(box(`playground-handle-stem-${side}`, WOOD, [x, y + 0.43, z + side * 0.5], [0.14, 0.55, 0.14]));
-        details.push(box(`playground-handle-grip-${side}`, WOOD, [x, y + 0.72, z + side * 0.5], [0.65, 0.14, 0.14]));
-      }
-    }
+    if (source.id === 'playground-plank') details.push(...createSeesawDetails(source));
+    if (source.id === 'park-pond') details.push(...createPondDetails(source));
     if (source.id === 'construction-crane-beam') {
       details.push(box('construction-crane-trolley', WOOD, [x, y - 0.35, z], [1.1, 0.4, 1.05]));
       details.push(box('construction-crane-cable', WOOD, [x, y - 1.15, z], [0.12, 1.3, 0.12]));

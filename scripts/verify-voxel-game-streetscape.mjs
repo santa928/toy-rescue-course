@@ -353,9 +353,9 @@ function assertWorldBudgets(state, viewport, districtId) {
     `${viewport.name}: expected ${districtId}, received ${state.world.currentDistrict}: ${JSON.stringify(state.vehicle)}.`);
   assert.equal(state.world.surfaceTileCount, 19);
   assert.equal(state.world.decorationClusterCount, 7);
-  assert.equal(state.world.decorationBoxCount, 51);
-  assert.equal(state.world.staticColliderCount, 22);
-  assert.equal(state.visualLayout.worldSolids.length, 22);
+  assert.equal(state.world.decorationBoxCount, 94);
+  assert.equal(state.world.staticColliderCount, 24);
+  assert.equal(state.visualLayout.worldSolids.length, 24);
   assert(state.renderer.rendererCalls > 0 && state.renderer.rendererCalls <= 34,
     `${viewport.name}/${districtId}: renderer calls outside 1..34: ${state.renderer.rendererCalls}.`);
 }
@@ -381,18 +381,18 @@ async function verifyNonSolidPassThrough(page, viewport, touchDriver) {
   return crossed.vehicle.position;
 }
 
-/** 公園ピクニック卓へ横から押し当て、代表の新solidを車両が貫通しないことを確認する。 */
+/** 公園ピクニック卓のベンチへ横から押し当て、代表の新solidを車両が貫通しないことを確認する。 */
 async function verifyNewSolidCollision(page, viewport, touchDriver, initialResetCount) {
   await pulseWorldAxis(page, {
     axis: 'negativeX',
-    description: `${viewport.name}: park picnic table collision`,
+    description: `${viewport.name}: park picnic bench collision`,
     frameCount: 100,
     touchDriver,
   });
   const collided = await readGameState(page);
   assert.equal(collided.vehicle.resetCount, initialResetCount);
   assert(collided.vehicle.position[0] >= -3.35 && collided.vehicle.position[0] < -1,
-    `Park picnic table solid collision failed: ${JSON.stringify(collided.vehicle)}.`);
+    `Park picnic bench solid collision failed: ${JSON.stringify(collided.vehicle)}.`);
   return collided.vehicle.position;
 }
 

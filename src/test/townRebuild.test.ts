@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Box3, Ray, Vector3 } from 'three';
+import { Box3, Euler, Matrix4, Quaternion, Ray, Vector3 } from 'three';
 import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import { WORLD_SOLID_BOXES } from '../voxel-game/scene/worldCollisionLayout';
 import { VEHICLE_DEFINITIONS } from '../voxel-game/domain/vehicleDefinitions';
@@ -16,8 +16,11 @@ import { AMBULANCE_RENDER_PLAN, getAmbulanceActionPose } from '../vehicle-lab/sc
 import { POLICE_RENDER_PLAN, getPoliceActionPose } from '../vehicle-lab/scene/VoxelPolice';
 
 /** 描画・衝突共通boxのAABBを返す。 */
-function bounds(box: { position: readonly number[]; scale: readonly number[] }): Box3 {
-  return new Box3().setFromCenterAndSize(new Vector3(...box.position), new Vector3(...box.scale));
+function bounds(box: { position: readonly number[]; scale: readonly number[]; rotation?: readonly number[] }): Box3 {
+  const [rx, ry, rz] = box.rotation ?? [0, 0, 0];
+  const matrix = new Matrix4().compose(new Vector3(...box.position),
+    new Quaternion().setFromEuler(new Euler(rx, ry, rz)), new Vector3(1, 1, 1));
+  return new Box3().setFromCenterAndSize(new Vector3(), new Vector3(...box.scale)).applyMatrix4(matrix);
 }
 
 const depot = createRescueDepot();
