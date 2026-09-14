@@ -294,7 +294,14 @@ async function patrolCheckpoint(
           break;
         }
       }
-      assert(chaseCaptured, `${viewport.name}: checkpoint accent chase was never observed.`);
+      if (!chaseCaptured || !completed) {
+        fs.writeFileSync(`${outputDirectory}/${viewport.name}-police-failed-state.json`, JSON.stringify(latest, null, 2));
+        await page.screenshot({ path: `${outputDirectory}/${viewport.name}-police-failed.png` });
+      }
+      assert(chaseCaptured, `${viewport.name}: checkpoint accent chase was never observed: ${JSON.stringify({
+        position: latest?.vehicle.position, completedCount: latest?.police.completedCount,
+        holdMilliseconds: latest?.police.holdMilliseconds,
+      })}.`);
       assert(completed, `${viewport.name}: checkpoint did not complete during spectacle capture.`);
       assert.equal(completed.police.activeParticleCount, 10,
         `${viewport.name}: checkpoint completion did not emit its ten-cube arch.`);

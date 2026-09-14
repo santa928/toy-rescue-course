@@ -21,6 +21,7 @@ const viewports = viewportFilter === null
 assert(viewports.length > 0, `Unknown VOXEL_GAME_VEHICLE_VIEWPORT: ${viewportFilter}.`);
 
 const driveHarness = createDriveHarness({
+  precisionCounterPulse: true,
   alignAttemptLimit: 28,
   brakeFrameLimit: 180,
   defaultMaxBursts: 420,

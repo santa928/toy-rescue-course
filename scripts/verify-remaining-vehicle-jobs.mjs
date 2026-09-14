@@ -16,7 +16,10 @@ const cases = [
   ['excavator', 5376, 'soil-south'], ['excavator', 10752, 'soil-west'],
   ['police', 5376, 'patrol-pools'], ['police', 10752, 'patrol-showers'],
   ['bulldozer', 5376, 'debris-south'],
-].filter(([, , id]) => !process.env.JOB_FILTER || process.env.JOB_FILTER.split(',').includes(id));
+  ['police', 1, 'patrol-main'],
+].filter(([, , id]) => process.env.JOB_FILTER
+  ? process.env.JOB_FILTER.split(',').includes(id)
+  : id !== 'patrol-main');
 const harness = createDriveHarness({ alignAttemptLimit: 45, brakeFrameLimit: 220, defaultMaxBursts: 480 });
 const { readGameState: state, driveToCoordinate, driveAlongWorldAxis, brakeVehicle, pulseWorldAxis } = harness;
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
