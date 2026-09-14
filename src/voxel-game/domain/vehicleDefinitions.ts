@@ -126,7 +126,7 @@ export const VEHICLE_DEFINITIONS = [
       movingResponse: 7.6,
       yawClamp: 5.4,
     },
-    visualBounds: { offset: [0, 0.9, 0], scale: [2.64, 2.04, 3.84] },
+    visualBounds: { offset: [0, 0.96, 0], scale: [2.64, 2.16, 3.12] },
   },
 ] as const satisfies readonly VehicleDefinition[];
 

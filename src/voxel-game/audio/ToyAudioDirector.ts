@@ -73,6 +73,7 @@ const ACTION_ATTACK_DURATION_SECONDS = 0.14;
 /** user activation、固定graph、mission cue、振動をReact外で所有する。 */
 export class ToyAudioDirector {
   private actionAttackStartedAtSeconds = -1;
+  private primaryActionStartedAtSeconds = -1;
   private backend: ToyAudioBackend | null = null;
   private contextState: ToyAudioContextState;
   private cueCount = 0;
@@ -197,6 +198,11 @@ export class ToyAudioDirector {
 
   /** 最新telemetry入力をpure mixへ変換し、生成済みgraphだけへ適用する。 */
   public update(input: ToyAudioFrameInput): void {
+    if (input.primaryAction && (!this.lastFrameInput.primaryAction || input.vehicleId !== this.lastFrameInput.vehicleId)) {
+      this.primaryActionStartedAtSeconds = Number.isFinite(input.elapsedSeconds) ? Math.max(0, input.elapsedSeconds) : -1;
+    } else if (!input.primaryAction) {
+      this.primaryActionStartedAtSeconds = -1;
+    }
     const canStartAttack = this.enabled && this.desiredVisible && this.contextState === 'running';
     if (canStartAttack && input.primaryAction && !this.previousPrimaryAction) {
       this.actionAttackStartedAtSeconds = Number.isFinite(input.elapsedSeconds)
@@ -280,6 +286,8 @@ export class ToyAudioDirector {
       && attackAgeSeconds < ACTION_ATTACK_DURATION_SECONDS;
     this.lastMix = createToyAudioMixFrame({
       ...this.lastFrameInput,
+      actionElapsedSeconds: this.primaryActionStartedAtSeconds >= 0
+        ? Math.max(0, elapsedSeconds - this.primaryActionStartedAtSeconds) : 0,
       actionAttackAgeSeconds: actionPressed ? attackAgeSeconds : ACTION_ATTACK_DURATION_SECONDS,
       actionPressed,
       enabled: this.enabled && this.desiredVisible && this.contextState === 'running',

@@ -47,37 +47,17 @@ describe('waterFlow', () => {
     expect(moved.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('quadratic Bézier上の複数stream slot位置を固定する', () => {
+  it('保持中はノズルから先端まで水粒が均等につながり、周期の継ぎ目に穴が空かない', () => {
     const frame = createWaterFlowFrame({
       ...baseInput,
-      path: {
-        controlX: 1,
-        controlY: 2,
-        controlZ: -2,
-        endX: 3,
-        endY: 0,
-        endZ: -4,
-        startX: 0,
-        startY: 0,
-        startZ: 0,
-      },
+      sprayElapsedSeconds: 1.7,
     });
-
-    expect(frame.instances[0]?.position).toEqual([
-      1.5879017013232515,
-      0.841730447468437,
-      -2.4347826086956523,
-    ]);
-    expect(frame.instances[7]?.position).toEqual([
-      0.9991500945179584,
-      0.9605314013427197,
-      -1.6556521739130434,
-    ]);
-    expect(frame.instances[20]?.position).toEqual([
-      0.10706994328922485,
-      0.16855992898092925,
-      -0.20869565217391287,
-    ]);
+    const stream = frame.instances.filter(({ kind, active }) => kind === 'stream' && active);
+    expect(stream).toHaveLength(24);
+    const positions = [-2, ...stream.map(({ position }) => position[2]), 4].sort((a, b) => a - b);
+    for (let i = 1; i < positions.length; i += 1) {
+      expect(positions[i] - positions[i - 1]).toBeLessThanOrEqual(0.251);
+    }
   });
 
   it('全stream粒を斜めのnozzleからvisible endの間へ収め、横ずれを制限する', () => {
@@ -123,13 +103,15 @@ describe('waterFlow', () => {
     }
   });
 
-  it('targeted中だけ飛沫を出し、220ms終端でscaleを0へ戻す', () => {
+  it('対象の飛沫は専用時刻で出し、自由放水は地面へ到達してから飛沫を出す', () => {
     const untargeted = createWaterFlowFrame(baseInput);
     const targeted = createWaterFlowFrame({ ...baseInput, splashElapsedSeconds: 0.1, targeted: true });
     const expired = createWaterFlowFrame({ ...baseInput, splashElapsedSeconds: 0.22, targeted: true });
     expect(untargeted.instances.some(({ active, kind }) => active && kind === 'splash')).toBe(false);
     expect(targeted.instances.some(({ active, kind }) => active && kind === 'splash')).toBe(true);
     expect(expired.instances.filter(({ kind }) => kind === 'splash').every(({ scale }) => scale === 0)).toBe(true);
+    const landed = createWaterFlowFrame({ ...baseInput, sprayElapsedSeconds: 0.9 });
+    expect(landed.instances.filter(({ kind, active }) => kind === 'splash' && active)).toHaveLength(8);
   });
 
   it('停止中は全slotをinactiveかつscale 0にし、splash slotを24から31へ固定する', () => {
@@ -170,12 +152,12 @@ describe('waterFlow', () => {
     expect(path.endZ).toBeCloseTo(-3.56, 12);
   });
 
-  it('非targeted pathは既存方向へ6unitの直線を保つ', () => {
+  it('自由放水は前方6unitを維持し、弧を描いて地面へ落ちる', () => {
     expect(createWaterFlowPath({
       initialDirection: [0, 0, -1],
       nozzleOrigin: [3, 2, 4],
       targetPosition: [12.9, 1.45, -9.1],
       targeted: false,
-    })).toEqual(straightPath);
+    })).toEqual({ ...straightPath, controlY: 2.45, endY: 0.12 });
   });
 });

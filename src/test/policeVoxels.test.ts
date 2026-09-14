@@ -31,49 +31,53 @@ describe('POLICE_VOXELS', () => {
     expect(POLICE_RENDER_PLAN.drawCalls).toBeLessThanOrEqual(7);
   });
 
-  it('救急車より低い白黒パトカーの外形を持つ', () => {
+  it('大きなタイヤに対して肩と車室の高さを確保した外形を持つ', () => {
     expect(calculateVoxelBounds(POLICE_VOXELS)).toEqual({
-      center: { x: 0, y: 3, z: 0 },
-      max: { x: 5, y: 6, z: 6 },
+      center: { x: 0, y: 4, z: 0 },
+      max: { x: 5, y: 8, z: 6 },
       min: { x: -5, y: 0, z: -6 },
-      size: { x: 11, y: 7, z: 13 },
+      size: { x: 11, y: 9, z: 13 },
     });
   });
 
   it('左右車輪、青緑窓、黒帯、赤青灯を実データに持つ', () => {
     expect(paletteAt(-5, 0, -4)).toBe('wheel');
     expect(paletteAt(-5, 2, -4)).toBe('darkGray');
-    expect(paletteAt(-2, 4, -2)).toBe('window');
+    expect(paletteAt(-2, 5, -2)).toBe('window');
+    expect(paletteAt(-2, 6, -2)).toBe('window');
+    expect(paletteAt(-4, 4, 0)).toBe('white');
     expect(paletteAt(-4, 3, 0)).toBe('black');
-    expect(paletteAt(-1, 6, 0)).toBe('redBeacon');
-    expect(paletteAt(1, 6, 0)).toBe('blueBeacon');
+    expect(paletteAt(-1, 8, 0)).toBe('redBeacon');
+    expect(paletteAt(1, 8, 0)).toBe('blueBeacon');
   });
 
-  it('サイレン中だけ赤青灯を交互に明滅させる', () => {
+  it('サイレン中も灯火の形と位置を変えない', () => {
     expect(getPoliceBeaconScales(false, 0.1)).toEqual({ blue: 1, red: 1 });
     const first = getPoliceBeaconScales(true, 0.1);
     const second = getPoliceBeaconScales(true, 0.6);
-    expect(first.red).not.toBe(first.blue);
-    expect(second.red).toBeCloseTo(first.blue, 5);
-    expect(second.blue).toBeCloseTo(first.red, 5);
+    expect(first).toEqual({ blue: 1, red: 1 });
+    expect(second).toEqual(first);
   });
 
-  it('押下直後に赤青灯が大きくburstし、hold中は2Hz以下で交互点灯する', () => {
+  it('押下直後から明るさで応答し、hold中は0.5秒ごとに赤青が交互点灯する', () => {
     const press = getPoliceActionPose(true, 0.08);
     const firstHold = getPoliceActionPose(true, 0.3);
     const secondHold = getPoliceActionPose(true, 0.8);
 
     expect(press.phase).toBe('press');
-    expect(Math.max(press.redScale, press.blueScale)).toBeGreaterThan(1.16);
-    expect(press.redScale).not.toBe(press.blueScale);
+    expect(press.redGlow).toBeGreaterThan(press.blueGlow);
+    expect(press.redScale).toBe(1);
+    expect(press.blueScale).toBe(1);
     expect(firstHold.phase).toBe('hold');
     expect(firstHold.flashHz).toBeLessThanOrEqual(2);
-    expect(secondHold.redScale).toBeCloseTo(firstHold.blueScale, 5);
-    expect(secondHold.blueScale).toBeCloseTo(firstHold.redScale, 5);
+    expect(secondHold.redGlow).toBeCloseTo(firstHold.blueGlow, 5);
+    expect(secondHold.blueGlow).toBeCloseTo(firstHold.redGlow, 5);
   });
 
   it('非押下と不正時刻ではneutral poseへ戻る', () => {
     const neutral = {
+      blueGlow: 0.38,
+      redGlow: 0.34,
       blueScale: 1,
       flashHz: 0,
       phase: 'idle',

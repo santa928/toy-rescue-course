@@ -76,14 +76,14 @@ describe('vehicle definitions', () => {
     });
   });
 
-  it('パトカーへ巡回向けの軽快な物理、低い外接、サイレン操作を割り当てる', () => {
+  it('パトカーへ巡回向けの物理、車室を高くした外接、サイレン操作を割り当てる', () => {
     expect(getVehicleDefinition('police')).toMatchObject({
       action: { ariaLabel: 'サイレンを鳴らす', label: 'サイレン' },
       collider: { halfExtents: [1.48, 0.92, 1.62], offset: [0, 0.92, 0] },
       label: 'パトカー',
       missionId: 'patrol',
       physics: { idleResponse: 4.9, mass: 1.45, movingResponse: 7.6, yawClamp: 5.4 },
-      visualBounds: { offset: [0, 0.9, 0], scale: [2.64, 2.04, 3.84] },
+      visualBounds: { offset: [0, 0.96, 0], scale: [2.64, 2.16, 3.12] },
     });
   });
 

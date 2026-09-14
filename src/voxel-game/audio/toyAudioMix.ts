@@ -5,6 +5,7 @@ export type ToyAudioActionKind = 'water' | 'blade' | 'bucket' | 'care' | 'siren'
 
 /** 1 audio frameを決定するframework非依存の入力。 */
 export interface ToyAudioMixInput {
+  readonly actionElapsedSeconds?: number;
   readonly actionAttackAgeSeconds?: number;
   readonly actionPressed: boolean;
   readonly elapsedSeconds: number;
@@ -161,7 +162,7 @@ function createActionMix(
   }
 
   if (actionKind === 'care') {
-    const alternate = Math.floor(elapsedSeconds / 0.34) % 2;
+    const alternate = Math.floor(elapsedSeconds / 0.7) % 2;
     return {
       actionFrequencyA: alternate === 0 ? 523.25 : 659.25,
       actionFrequencyB: alternate === 0 ? 659.25 : 783.99,
@@ -171,7 +172,7 @@ function createActionMix(
     };
   }
 
-  const redBlueStep = Math.floor(elapsedSeconds / 0.28) % 2;
+  const redBlueStep = Math.floor(elapsedSeconds / 0.5) % 2;
   return {
     actionFrequencyA: redBlueStep === 0 ? 622.25 : 830.61,
     actionFrequencyB: redBlueStep === 0 ? 783.99 : 659.25,
@@ -191,7 +192,10 @@ export function createToyAudioMixFrame(input: ToyAudioMixInput): ToyAudioMixFram
   const stepProgress = (elapsedSeconds % BGM_STEP_SECONDS) / BGM_STEP_SECONDS;
   const actionKind = ACTION_KIND_BY_VEHICLE[input.vehicleId];
   const enabled = input.enabled;
-  const action = createActionMix(actionKind, elapsedSeconds, enabled && input.primaryAction);
+  const actionTime = clampFinite(input.actionElapsedSeconds ?? elapsedSeconds, 0, Number.MAX_SAFE_INTEGER, 0);
+  const action = createActionMix(actionKind,
+    actionKind === 'siren' || actionKind === 'care' ? actionTime : elapsedSeconds,
+    enabled && input.primaryAction);
   const engineBase = ENGINE_BASE_FREQUENCY[input.vehicleId];
   const attackAge = clampFinite(
     input.actionAttackAgeSeconds ?? 0,

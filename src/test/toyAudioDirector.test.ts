@@ -57,6 +57,25 @@ function frameInput() {
 }
 
 describe('ToyAudioDirector', () => {
+  it('消音中から押したまま音を有効にしても、attackを再発火せずサイレンの周期が進む', async () => {
+    const backend = new FakeToyAudioBackend();
+    const director = new ToyAudioDirector({ available: true, backendFactory: () => backend });
+    director.update({ ...frameInput(), elapsedSeconds: 0.9 });
+    await director.setEnabled(true);
+    director.update({ ...frameInput(), elapsedSeconds: 1 });
+    const first = backend.frames.at(-1)!;
+    director.update({ ...frameInput(), elapsedSeconds: 1.5 });
+    const second = backend.frames.at(-1)!;
+    expect(first.actionAttackGain).toBe(0);
+    expect(second.actionAttackGain).toBe(0);
+    expect(first.actionFrequencyA).not.toBe(second.actionFrequencyA);
+    await director.setVisible(false);
+    await director.setVisible(true);
+    director.update({ ...frameInput(), elapsedSeconds: 2 });
+    expect(backend.frames.at(-1)?.actionAttackGain).toBe(0);
+    expect(backend.frames.at(-1)?.actionFrequencyA).toBe(first.actionFrequencyA);
+  });
+
   it('ユーザーが有効化するまでbackendを作らない', () => {
     const backendFactory = vi.fn(() => new FakeToyAudioBackend());
     const director = new ToyAudioDirector({ available: true, backendFactory });
