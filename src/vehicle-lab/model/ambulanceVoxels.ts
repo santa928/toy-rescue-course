@@ -75,6 +75,7 @@ function addWheel(voxels: MutableVoxelMap, x: number, zCenter: number): void {
     }
   }
   setVoxel(voxels, x, 2, zCenter, 'darkGray');
+  setVoxel(voxels, x, 3, zCenter, 'darkGray'); // 回転が見える短いスポーク
 }
 
 /** 白い箱形、赤帯、両側赤十字、青緑窓、赤色灯を持つ純voxel救急車を生成する。 */

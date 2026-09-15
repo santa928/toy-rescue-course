@@ -76,6 +76,7 @@ function addWheel(voxels: MutableVoxelMap, x: number, zCenter: number): void {
     }
   }
   setVoxel(voxels, x, 2, zCenter, 'silver');
+  setVoxel(voxels, x, 3, zCenter, 'silver'); // 回転が見える短いスポーク
 }
 
 /** 運転席・低い機器室・開いた梯子の輪郭で消防車を識別できる造形。 */

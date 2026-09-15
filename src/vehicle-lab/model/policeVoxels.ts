@@ -75,6 +75,7 @@ function addWheel(voxels: MutableVoxelMap, x: number, zCenter: number): void {
     }
   }
   setVoxel(voxels, x, 2, zCenter, 'darkGray');
+  setVoxel(voxels, x, 3, zCenter, 'darkGray'); // 回転が見える短いスポーク
 }
 
 /** 肩まで高さのある白黒車体、二段の窓、屋根の赤青灯を持つ玩具パトカーを作る。 */

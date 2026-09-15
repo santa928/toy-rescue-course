@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
@@ -15,6 +15,8 @@ import {
   type VoxelRenderBatch,
 } from '../model/voxelRenderPlan';
 import { resolveVehiclePaintColor } from '../model/vehiclePaint';
+import { useVoxelTrackAnimation } from './useVoxelTrackAnimation';
+import type { TrackTravel } from '../model/vehicleTrackMotion';
 
 const VOXEL_SIZE = 0.24;
 const VOXEL_EDGE = VOXEL_SIZE * 0.94;
@@ -41,11 +43,13 @@ const EXCAVATOR_STATIC_BATCHES = EXCAVATOR_RENDER_PLAN.batches.filter(
 );
 
 interface VoxelBatchProps {
+  readonly trackTravelRef?: RefObject<TrackTravel>;
   readonly batch: VoxelRenderBatch<ExcavatorPaletteId>;
   readonly paintColor: string | null;
 }
 
 export type VoxelExcavatorProps = ThreeElements['group'] & {
+  readonly trackTravelRef?: RefObject<TrackTravel>;
   readonly actionActiveRef?: RefObject<boolean>;
   readonly paintColor?: string | null;
 };
@@ -121,21 +125,11 @@ export function advanceExcavatorArmOffset(
 }
 
 /** 同色voxelを1つのInstancedMeshとして描画する。 */
-function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
+function VoxelBatch({ batch, paintColor, trackTravelRef }: VoxelBatchProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const material = EXCAVATOR_PALETTE[batch.paletteId];
 
-  useLayoutEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const matrix = new THREE.Matrix4();
-    batch.positions.forEach(([x, y, z], index) => {
-      matrix.makeTranslation(x, y, z);
-      mesh.setMatrixAt(index, matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [batch.positions]);
+  useVoxelTrackAnimation(meshRef, batch, 'excavator', trackTravelRef);
 
   return (
     <instancedMesh
@@ -161,6 +155,7 @@ function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
 
 /** 純voxelショベルカーをpalette別batchで描画し、主操作でarmとbucketを下げる。 */
 export function VoxelExcavator({
+  trackTravelRef,
   actionActiveRef,
   paintColor = null,
   ...groupProps
@@ -187,7 +182,7 @@ export function VoxelExcavator({
     <group {...groupProps}>
       <group position={EXCAVATOR_RENDER_PLAN.offset}>
         {EXCAVATOR_STATIC_BATCHES.map((batch) => (
-          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
+          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} trackTravelRef={trackTravelRef} />
         ))}
         <group ref={armGroupRef}>
           {EXCAVATOR_ARM_BATCHES.map((batch) => (

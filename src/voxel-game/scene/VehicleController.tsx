@@ -18,6 +18,8 @@ import type { DriveCommand } from '../input/controlState';
 import { VEHICLE_GARAGE_POSITION, WORLD_BOUNDS } from './worldLayout';
 import { WORLD_FRAME_UPDATE_PRIORITIES } from './worldFrameUpdatePriorities';
 import { resolveScreenRelativeMovement, shortestAngleDelta } from './screenRelativeMovement';
+import { advanceWheelAngle } from '../../vehicle-lab/model/vehicleWheelMotion';
+import { advanceTrackTravel, type TrackTravel } from '../../vehicle-lab/model/vehicleTrackMotion';
 
 export interface VehicleTelemetry {
   readonly forward: readonly [number, number, number];
@@ -26,6 +28,8 @@ export interface VehicleTelemetry {
   readonly position: readonly [number, number, number];
   readonly resetCount: number;
   readonly speed: number;
+  /** タイヤ式3車種の回転角。キャタピラ車では未設定。 */
+  readonly wheelRotationRadians?: number;
 }
 
 export type VehicleTelemetryRef = React.MutableRefObject<VehicleTelemetry>;
@@ -106,6 +110,7 @@ function updateTelemetry(
   direction: THREE.Vector3,
   mass: number,
   speed: number,
+  wheelRotationRadians: number,
 ): void {
   telemetryRef.current = {
     forward: [direction.x, direction.y, direction.z],
@@ -114,33 +119,40 @@ function updateTelemetry(
     position: [position.x, position.y, position.z],
     resetCount: telemetryRef.current.resetCount,
     speed,
+    wheelRotationRadians: telemetryRef.current.id === 'bulldozer' || telemetryRef.current.id === 'excavator'
+      ? undefined
+      : wheelRotationRadians,
   };
 }
 
 /** 選択IDに対応する純voxel車体を1台だけ描画する。 */
 function SelectedVehicleModel({
   actionActiveRef,
+  wheelAngleRef,
+  trackTravelRef,
   paintColor,
   vehicleId,
 }: {
   readonly actionActiveRef: RefObject<boolean>;
+  readonly wheelAngleRef: RefObject<number>;
+  readonly trackTravelRef: RefObject<TrackTravel>;
   readonly paintColor: string | null;
   readonly vehicleId: VehicleId;
 }): ReactElement {
-  if (vehicleId === 'fire-truck') return <VoxelFireTruck paintColor={paintColor} />;
+  if (vehicleId === 'fire-truck') return <VoxelFireTruck paintColor={paintColor} wheelAngleRef={wheelAngleRef} />;
   if (vehicleId === 'bulldozer') {
-    return <VoxelBulldozer actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+    return <VoxelBulldozer actionActiveRef={actionActiveRef} paintColor={paintColor} trackTravelRef={trackTravelRef} />;
   }
   if (vehicleId === 'excavator') {
-    return <VoxelExcavator actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+    return <VoxelExcavator actionActiveRef={actionActiveRef} paintColor={paintColor} trackTravelRef={trackTravelRef} />;
   }
   if (vehicleId === 'ambulance') {
-    return <VoxelAmbulance actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+    return <VoxelAmbulance actionActiveRef={actionActiveRef} paintColor={paintColor} wheelAngleRef={wheelAngleRef} />;
   }
-  return <VoxelPolice actionActiveRef={actionActiveRef} paintColor={paintColor} />;
+  return <VoxelPolice actionActiveRef={actionActiveRef} paintColor={paintColor} wheelAngleRef={wheelAngleRef} />;
 }
 
-/** 入力refを毎frame読み、消防車の速度・旋回・resetをRapierへ反映する。 */
+/** 入力refで車両を動かし、実変位からタイヤの回転角を同期する。 */
 export const VehicleController = forwardRef<VehicleControllerHandle, VehicleControllerProps>(
   function VehicleController({
     commandRef,
@@ -152,12 +164,19 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
   }, ref): ReactElement {
     const bodyRef = useRef<RapierRigidBody>(null);
     const actionActiveRef = useRef(false);
+    const wheelAngleRef = useRef(0);
+    const trackTravelRef = useRef<TrackTravel>({ left: 0, right: 0 });
+    const previousYawRef = useRef<number | null>(null);
     const visualRootRef = useRef<THREE.Group>(null);
     const config = resolveVehicleControllerConfig(vehicleId);
 
     /** 剛体とtelemetryを車庫の初期状態へ戻す。 */
     const resetVehicle = useCallback((): void => {
       onReset?.();
+      wheelAngleRef.current = 0;
+      trackTravelRef.current.left = 0;
+      trackTravelRef.current.right = 0;
+      previousYawRef.current = null;
       const body = bodyRef.current;
       telemetryRef.current = {
         forward: [0, 0, 1],
@@ -203,6 +222,17 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
       quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, yaw);
       forward.copy(BASE_FORWARD).applyQuaternion(quaternion).normalize();
 
+      // 入力速度ではなく物理step後の実変位を使い、壁押し・停止中の空転を防ぐ。
+      const previousPosition = telemetryRef.current.position;
+      const signedDistance = (position.x - previousPosition[0]) * forward.x
+        + (position.z - previousPosition[2]) * forward.z;
+      wheelAngleRef.current = advanceWheelAngle(wheelAngleRef.current, signedDistance);
+      if (vehicleId === 'bulldozer' || vehicleId === 'excavator') {
+        const yawDelta = previousYawRef.current === null ? 0 : shortestAngleDelta(previousYawRef.current, yaw);
+        advanceTrackTravel(trackTravelRef.current, signedDistance, yawDelta, vehicleId);
+      }
+      previousYawRef.current = yaw;
+
       const command = commandRef.current;
       const movement = resolveScreenRelativeMovement(command);
       const velocity = body.linvel();
@@ -220,7 +250,7 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
 
       body.setLinvel({ x: nextVelocityX, y: velocity.y, z: nextVelocityZ }, true);
       body.setAngvel({ x: 0, y: targetYawVelocity, z: 0 }, true);
-      updateTelemetry(telemetryRef, position, forward, body.mass(), Math.hypot(nextVelocityX, nextVelocityZ));
+      updateTelemetry(telemetryRef, position, forward, body.mass(), Math.hypot(nextVelocityX, nextVelocityZ), wheelAngleRef.current);
     }, WORLD_FRAME_UPDATE_PRIORITIES.vehicleVisualSync);
 
     return (
@@ -240,6 +270,8 @@ export const VehicleController = forwardRef<VehicleControllerHandle, VehicleCont
         <group ref={visualRootRef} rotation={[0, Math.PI, 0]}>
           <SelectedVehicleModel
             actionActiveRef={actionActiveRef}
+            wheelAngleRef={wheelAngleRef}
+            trackTravelRef={trackTravelRef}
             paintColor={paintColor}
             vehicleId={config.vehicleId}
           />

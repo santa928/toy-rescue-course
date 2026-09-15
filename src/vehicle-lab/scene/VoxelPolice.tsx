@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
@@ -15,6 +15,7 @@ import {
   type VoxelRenderBatch,
 } from '../model/voxelRenderPlan';
 import { resolveVehiclePaintColor } from '../model/vehiclePaint';
+import { useVoxelWheelAnimation } from './useVoxelWheelAnimation';
 
 const VOXEL_SIZE = 0.24;
 const VOXEL_EDGE = VOXEL_SIZE * 0.94;
@@ -37,12 +38,14 @@ const POLICE_STATIC_BATCHES = POLICE_RENDER_PLAN.batches.filter(
 );
 
 interface VoxelBatchProps {
+  readonly wheelAngleRef?: RefObject<number>;
   readonly batch: VoxelRenderBatch<PolicePaletteId>;
   readonly paintColor: string | null;
   readonly glowMaterialRef?: RefObject<THREE.MeshLambertMaterial | null>;
 }
 
 export type VoxelPoliceProps = ThreeElements['group'] & {
+  readonly wheelAngleRef?: RefObject<number>;
   readonly actionActiveRef?: RefObject<boolean>;
   readonly paintColor?: string | null;
 };
@@ -94,21 +97,11 @@ export function getPoliceBeaconScales(
 }
 
 /** 同色voxelを1つのInstancedMeshとして描画する。 */
-function VoxelBatch({ batch, paintColor, glowMaterialRef }: VoxelBatchProps): ReactElement {
+function VoxelBatch({ batch, paintColor, glowMaterialRef, wheelAngleRef }: VoxelBatchProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const material = POLICE_PALETTE[batch.paletteId];
 
-  useLayoutEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const matrix = new THREE.Matrix4();
-    batch.positions.forEach(([x, y, z], index) => {
-      matrix.makeTranslation(x, y, z);
-      mesh.setMatrixAt(index, matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [batch.positions]);
+  useVoxelWheelAnimation(meshRef, batch, 'police', wheelAngleRef);
 
   return (
     <instancedMesh
@@ -135,6 +128,7 @@ function VoxelBatch({ batch, paintColor, glowMaterialRef }: VoxelBatchProps): Re
 
 /** 純voxelパトカーを7 palette batchで描画し、サイレン中だけ赤青灯を交互に明滅させる。 */
 export function VoxelPolice({
+  wheelAngleRef,
   actionActiveRef,
   paintColor = null,
   ...groupProps
@@ -158,7 +152,7 @@ export function VoxelPolice({
     <group {...groupProps}>
       <group position={POLICE_RENDER_PLAN.offset}>
         {POLICE_STATIC_BATCHES.map((batch) => (
-          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
+          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} wheelAngleRef={wheelAngleRef} />
         ))}
         {POLICE_RED_BEACON_BATCH ? (
           <group>
