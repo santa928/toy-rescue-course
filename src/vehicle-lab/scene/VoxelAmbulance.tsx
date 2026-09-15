@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
@@ -15,6 +15,7 @@ import {
   type VoxelRenderBatch,
 } from '../model/voxelRenderPlan';
 import { resolveVehiclePaintColor } from '../model/vehiclePaint';
+import { useVoxelWheelAnimation } from './useVoxelWheelAnimation';
 
 const VOXEL_SIZE = 0.24;
 const VOXEL_EDGE = VOXEL_SIZE * 0.94;
@@ -37,12 +38,14 @@ const AMBULANCE_STATIC_BATCHES = AMBULANCE_RENDER_PLAN.batches.filter(
 );
 
 interface VoxelBatchProps {
+  readonly wheelAngleRef?: RefObject<number>;
   readonly batch: VoxelRenderBatch<AmbulancePaletteId>;
   readonly paintColor: string | null;
   readonly glowMaterialRef?: RefObject<THREE.MeshLambertMaterial | null>;
 }
 
 export type VoxelAmbulanceProps = ThreeElements['group'] & {
+  readonly wheelAngleRef?: RefObject<number>;
   readonly actionActiveRef?: RefObject<boolean>;
   readonly paintColor?: string | null;
 };
@@ -93,21 +96,11 @@ export function getAmbulanceCarePulseScale(
 }
 
 /** 同色voxelを1つのInstancedMeshとして描画する。 */
-function VoxelBatch({ batch, paintColor, glowMaterialRef }: VoxelBatchProps): ReactElement {
+function VoxelBatch({ batch, paintColor, glowMaterialRef, wheelAngleRef }: VoxelBatchProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const material = AMBULANCE_PALETTE[batch.paletteId];
 
-  useLayoutEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const matrix = new THREE.Matrix4();
-    batch.positions.forEach(([x, y, z], index) => {
-      matrix.makeTranslation(x, y, z);
-      mesh.setMatrixAt(index, matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [batch.positions]);
+  useVoxelWheelAnimation(meshRef, batch, 'ambulance', wheelAngleRef);
 
   return (
     <instancedMesh
@@ -134,6 +127,7 @@ function VoxelBatch({ batch, paintColor, glowMaterialRef }: VoxelBatchProps): Re
 
 /** 純voxel救急車を7 palette batchで描画し、手当て中だけ赤十字と灯火を脈動させる。 */
 export function VoxelAmbulance({
+  wheelAngleRef,
   actionActiveRef,
   paintColor = null,
   ...groupProps
@@ -157,7 +151,7 @@ export function VoxelAmbulance({
     <group {...groupProps}>
       <group position={AMBULANCE_RENDER_PLAN.offset}>
         {AMBULANCE_STATIC_BATCHES.map((batch) => (
-          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
+          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} wheelAngleRef={wheelAngleRef} />
         ))}
         <group>
           {AMBULANCE_CROSS_BATCHES.map((batch) => (

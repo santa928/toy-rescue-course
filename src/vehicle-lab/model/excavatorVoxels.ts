@@ -103,6 +103,11 @@ function buildExcavatorVoxels(): readonly VoxelCell<ExcavatorPaletteId>[] {
     voxels.delete(`${x},2,${z}`);
   }
 
+  // 上下を循環する踏み板へ明るい筋を入れ、走行中の履帯の動きを見せる。
+  for (const x of [-5, -4, 5, 6]) for (const y of [0, 2]) for (const z of [-1, 2]) {
+    setVoxel(voxels, x, y, z, 'darkGray');
+  }
+
   return [...voxels.values()].sort(
     (left, right) => left.y - right.y || left.z - right.z || left.x - right.x,
   );

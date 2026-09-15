@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef } from 'react';
-import type { ReactElement } from 'react';
+import { useRef } from 'react';
+import type { ReactElement, RefObject } from 'react';
 import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
@@ -14,6 +14,7 @@ import {
   type VoxelRenderBatch,
 } from '../model/voxelRenderPlan';
 import { resolveVehiclePaintColor } from '../model/vehiclePaint';
+import { useVoxelWheelAnimation } from './useVoxelWheelAnimation';
 
 const VOXEL_SIZE = 0.24;
 const VOXEL_EDGE = VOXEL_SIZE * 0.94;
@@ -27,33 +28,22 @@ export const FIRE_TRUCK_RENDER_PLAN = createVoxelRenderPlan(
 );
 
 interface VoxelBatchProps {
+  readonly wheelAngleRef?: RefObject<number>;
   readonly batch: VoxelRenderBatch<FireTruckPaletteId>;
   readonly paintColor: string | null;
 }
 
 type VoxelFireTruckProps = ThreeElements['group'] & {
+  readonly wheelAngleRef?: RefObject<number>;
   readonly paintColor?: string | null;
 };
 
 /** 同色ボクセルを1つのInstancedMeshとして描画する。 */
-function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
+function VoxelBatch({ batch, paintColor, wheelAngleRef }: VoxelBatchProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const material = FIRE_TRUCK_PALETTE[batch.paletteId];
 
-  useLayoutEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) {
-      return;
-    }
-
-    const matrix = new THREE.Matrix4();
-    batch.positions.forEach(([x, y, z], index) => {
-      matrix.makeTranslation(x, y, z);
-      mesh.setMatrixAt(index, matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [batch.positions]);
+  useVoxelWheelAnimation(meshRef, batch, 'fire-truck', wheelAngleRef);
 
   return (
     <instancedMesh
@@ -79,6 +69,7 @@ function VoxelBatch({ batch, paintColor }: VoxelBatchProps): ReactElement {
 
 /** 純ボクセル消防車を色別instanceバッチで描画する。 */
 export function VoxelFireTruck({
+  wheelAngleRef,
   paintColor = null,
   ...groupProps
 }: VoxelFireTruckProps): ReactElement {
@@ -88,7 +79,7 @@ export function VoxelFireTruck({
     <group {...groupProps}>
       <group position={FIRE_TRUCK_RENDER_PLAN.offset}>
         {FIRE_TRUCK_RENDER_PLAN.batches.map((batch) => (
-          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} />
+          <VoxelBatch batch={batch} key={batch.paletteId} paintColor={paintColor} wheelAngleRef={wheelAngleRef} />
         ))}
       </group>
     </group>
