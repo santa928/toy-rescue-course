@@ -3,6 +3,7 @@ import type { RefObject } from 'react';
 import {
   createControlState,
   setDigitalAction,
+  setGamepadCommand as applyGamepadCommand,
   setPointerPrimaryAction,
   setButtonKeyboardPrimaryAction,
   setTouchStick as applyTouchStick,
@@ -15,6 +16,7 @@ import { isNativeActivationTarget, isNativeKeyboardEvent } from './keyboardFocus
 export interface VoxelGameControls {
   readonly commandRef: RefObject<DriveCommand>;
   readonly reset: () => void;
+  readonly setGamepadCommand: (command: DriveCommand) => void;
   readonly setPrimaryAction: (pressed: boolean, source?: 'pointer' | 'keyboard') => void;
   readonly subscribeReset: (listener: () => void) => () => void;
   readonly setTouchStick: (x: number, y: number) => void;
@@ -142,6 +144,14 @@ export function useVoxelGameControls(enabled = true): VoxelGameControls {
     commit(setDigitalAction(stateRef.current, action, pressed));
   }, [commit]);
 
+  /** RAF由来のpad入力を独立sourceへ保存し、同一frame値では更新しない。 */
+  const setGamepadCommand = useCallback((command: DriveCommand) => {
+    const current = stateRef.current.gamepad;
+    if (current.moveX === command.moveX && current.moveY === command.moveY
+      && current.primaryAction === command.primaryAction) return;
+    commit(applyGamepadCommand(stateRef.current, command));
+  }, [commit]);
+
   /** タッチスティック位置を正規化して更新する。 */
   const setTouchStick = useCallback((x: number, y: number) => {
     commit(applyTouchStick(stateRef.current, x, y));
@@ -171,7 +181,8 @@ export function useVoxelGameControls(enabled = true): VoxelGameControls {
     primaryActionPressed,
     reset,
     setPrimaryAction,
+    setGamepadCommand,
     setTouchStick,
     subscribeReset,
-  }), [primaryActionPressed, reset, setPrimaryAction, setTouchStick, subscribeReset]);
+  }), [primaryActionPressed, reset, setGamepadCommand, setPrimaryAction, setTouchStick, subscribeReset]);
 }

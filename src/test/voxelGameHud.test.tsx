@@ -18,6 +18,7 @@ function createControls(): VoxelGameControls {
     primaryActionPressed: false,
     reset: vi.fn(),
     setPrimaryAction: vi.fn(),
+    setGamepadCommand: vi.fn(),
     setTouchStick: vi.fn(),
     subscribeReset: () => () => undefined,
   };
