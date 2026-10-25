@@ -1339,3 +1339,45 @@ button {
     flex-direction: column-reverse;
   }
 }
+
+/* パッド選択中の候補は、現在乗っている車のaria-pressedと区別する。 */
+.vehicle-selector__button[data-gamepad-highlighted='true'] {
+  outline: 4px solid #18718b;
+  outline-offset: 3px;
+}
+
+.gamepad-hint {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 16px);
+  left: 50%;
+  width: min(560px, calc(100vw - 300px));
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 12px;
+  color: #473423;
+  background: #fffaf0ed;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .gamepad-hint {
+    bottom: calc(env(safe-area-inset-bottom) + 148px);
+    left: calc(env(safe-area-inset-left) + 14px);
+    width: calc(100vw - 152px);
+    padding: 6px;
+    font-size: 11px;
+    transform: none;
+  }
+}
+
+@media (min-width: 960px) and (min-height: 600px) {
+  .gamepad-hint {
+    position: static;
+    width: 100%;
+    transform: none;
+  }
+}

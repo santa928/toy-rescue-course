@@ -9,6 +9,7 @@ import {
   VEHICLE_DEFINITIONS,
   type VehicleId,
 } from '../domain/vehicleDefinitions';
+import { useGamepadControls } from '../input/useGamepadControls';
 import type { VoxelGameControls } from '../input/useVoxelGameControls';
 import type { VehicleTelemetryRef } from '../scene/VehicleController';
 import { FullscreenDrivePad } from './FullscreenDrivePad';
@@ -59,6 +60,14 @@ export function VoxelGameHud({
   telemetryRef,
 }: VoxelGameHudProps): ReactElement {
   const vehicleDefinition = getVehicleDefinition(selectedVehicleId);
+  const gamepad = useGamepadControls(controls, { canSwitchVehicle, selectedVehicleId }, onSelectVehicle);
+  const gamepadHint = gamepad.status === 'waiting' ? 'パッドは つないで ボタンを おしてね'
+    : gamepad.status === 'disconnected' ? 'パッドが はずれたよ · つなぎなおしてね'
+    : gamepad.status === 'unsupported' ? 'このパッドの ならびは 未対応です · タッチで あそべます'
+    : gamepad.status === 'unavailable' ? 'このブラウザで パッドは 使えません · タッチで あそべます'
+    : gamepad.status === 'release' ? '左スティックと ボタンを いちど はなしてね'
+    : gamepad.menuVehicleId ? '左スティック / 十字で えらぶ · 右の下ボタンで きめる · 右の右ボタンで もどる'
+    : `左スティック / 十字で うごく · 右の下ボタンを おしつづけて どうぐ${canSwitchVehicle ? ' · ＋ / Startで くるま' : ''}`;
   const activeActionPointerRef = useRef<number | null>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const heldActionKeysRef = useRef(new Set<string>());
@@ -195,6 +204,8 @@ export function VoxelGameHud({
               aria-label={`${definition.label}をえらぶ`}
               aria-pressed={definition.id === selectedVehicleId}
               className="vehicle-selector__button"
+              aria-current={definition.id === gamepad.menuVehicleId ? 'true' : undefined}
+              data-gamepad-highlighted={definition.id === gamepad.menuVehicleId}
               data-vehicle={definition.id}
               key={definition.id}
               onClick={(event) => {
@@ -248,6 +259,10 @@ export function VoxelGameHud({
             <span>{colorEffectLabel}</span>
           </p>
         )}
+      <p aria-live="polite" className="gamepad-hint" data-gamepad-status={gamepad.status} data-gamepad-menu={gamepad.menuVehicleId !== null}>
+        {gamepad.menuVehicleId ? <strong>{getVehicleDefinition(gamepad.menuVehicleId).label}を えらぶ<br /></strong> : null}
+        {gamepadHint}
+      </p>
       </div>
       <div className="hud-utilities">
       <button

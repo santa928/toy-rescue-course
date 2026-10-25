@@ -5,6 +5,7 @@ export type DigitalAction = 'forward' | 'backward' | 'left' | 'right' | 'primary
 export interface ControlState {
   readonly digital: Readonly<Record<DigitalAction, boolean>>;
   readonly touchStick: readonly [number, number] | null;
+  readonly gamepad: DriveCommand;
   readonly pointerPrimaryAction: boolean;
   readonly buttonKeyboardPrimaryAction: boolean;
 }
@@ -23,6 +24,7 @@ export function createControlState(): ControlState {
   return {
     digital: { backward: false, forward: false, left: false, primaryAction: false, right: false },
     touchStick: null,
+    gamepad: { moveX: 0, moveY: 0, primaryAction: false },
     pointerPrimaryAction: false,
     buttonKeyboardPrimaryAction: false,
   };
@@ -67,6 +69,9 @@ export function toDriveCommand(state: ControlState): DriveCommand {
   if (state.touchStick) {
     moveX = state.touchStick[0];
     moveY = -state.touchStick[1];
+  } else if (moveX === 0 && moveY === 0) {
+    moveX = state.gamepad.moveX;
+    moveY = state.gamepad.moveY;
   } else {
     const digitalLength = Math.hypot(moveX, moveY);
     if (digitalLength > 1) {
@@ -74,5 +79,15 @@ export function toDriveCommand(state: ControlState): DriveCommand {
       moveY = Math.sign(moveY) * Math.SQRT1_2;
     }
   }
-  return { moveX, moveY, primaryAction: state.digital.primaryAction || state.pointerPrimaryAction || state.buttonKeyboardPrimaryAction };
+  return {
+    moveX,
+    moveY,
+    primaryAction: state.digital.primaryAction || state.pointerPrimaryAction
+      || state.buttonKeyboardPrimaryAction || state.gamepad.primaryAction,
+  };
+}
+
+/** pad由来の入力を独立sourceへ保存する。 */
+export function setGamepadCommand(state: ControlState, command: DriveCommand): ControlState {
+  return { ...state, gamepad: command };
 }
