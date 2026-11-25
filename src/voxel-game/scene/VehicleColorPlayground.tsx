@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { ReactElement } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { applyVoxelSurface } from './voxelSurface';
 import type { VehicleColorId } from './productionWorldMap';
 import {
   COLOR_PLAY_TOTAL_CUBE_COUNT,
@@ -117,7 +118,7 @@ export function VehicleColorPlayground(): ReactElement {
         args={[instanceColorsRef.current, 3]}
         attach="instanceColor"
       />
-      <meshLambertMaterial color="#ffffff" />
+      <meshLambertMaterial color="#ffffff" onBeforeCompile={applyVoxelSurface} />
     </instancedMesh>
   );
 }

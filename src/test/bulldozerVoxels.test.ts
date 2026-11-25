@@ -33,10 +33,10 @@ describe('BULLDOZER_VOXELS', () => {
 
   it('幅広く短いブルドーザーの外形を持つ', () => {
     expect(calculateVoxelBounds(BULLDOZER_VOXELS)).toEqual({
-      center: { x: 0.5, y: 3.5, z: -1 },
-      max: { x: 7, y: 7, z: 5 },
+      center: { x: 0.5, y: 4, z: -1 },
+      max: { x: 7, y: 8, z: 5 },
       min: { x: -6, y: 0, z: -7 },
-      size: { x: 14, y: 8, z: 13 },
+      size: { x: 14, y: 9, z: 13 },
     });
   });
 
@@ -44,7 +44,7 @@ describe('BULLDOZER_VOXELS', () => {
     expect(paletteAt(-6, 1, -7)).toBe('blade');
     expect(paletteAt(-5, 0, 0)).toBe('track');
     expect(paletteAt(0, 5, 0)).toBe('window');
-    expect(paletteAt(0, 7, 2)).toBe('beacon');
+    expect(paletteAt(0, 8, 2)).toBe('beacon');
   });
 
   it('車体中心X=0.5に対して左右の履帯cellが鏡像になる', () => {

@@ -1,3 +1,4 @@
+import { VOXEL_EDGE, VOXEL_SIZE } from '../../voxelGrid';
 import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -9,7 +10,7 @@ import {
   POLICE_VOXELS,
   type PolicePaletteId,
 } from '../model/policeVoxels';
-import { assertValidVoxelModel, calculateVoxelBounds } from '../model/voxelModel';
+import { calculateVoxelBounds } from '../model/voxelModel';
 import {
   createVoxelRenderPlan,
   type VoxelRenderBatch,
@@ -17,8 +18,6 @@ import {
 import { resolveVehiclePaintColor } from '../model/vehiclePaint';
 import { useVoxelWheelAnimation } from './useVoxelWheelAnimation';
 
-const VOXEL_SIZE = 0.24;
-const VOXEL_EDGE = VOXEL_SIZE * 0.94;
 const VOXEL_GEOMETRY = new THREE.BoxGeometry(VOXEL_EDGE, VOXEL_EDGE, VOXEL_EDGE);
 
 export const POLICE_RENDER_PLAN = createVoxelRenderPlan(
@@ -136,7 +135,6 @@ export function VoxelPolice({
   const redMaterialRef = useRef<THREE.MeshLambertMaterial>(null);
   const blueMaterialRef = useRef<THREE.MeshLambertMaterial>(null);
   const actionElapsedSecondsRef = useRef(0);
-  assertValidVoxelModel(POLICE_VOXELS, POLICE_PALETTE_IDS);
 
   useFrame((_state, delta) => {
     const actionActive = actionActiveRef?.current === true;

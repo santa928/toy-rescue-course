@@ -1,3 +1,5 @@
+import { VOXEL_SIZE } from '../../voxelGrid';
+import { voxelPartsAt } from './propVoxels';
 import type { WorldBoxDefinition, WorldPoint } from './productionWorldMap';
 
 const WOOD = '#86552f';
@@ -10,6 +12,38 @@ const BLUE = '#3b82f6';
 function part(id: string, color: string, position: WorldPoint, scale: WorldPoint,
   solid = false, rotation?: WorldPoint): WorldBoxDefinition {
   return { id, color, position, scale, solid, ...(rotation ? { rotation } : {}) };
+}
+
+/** 角を一段ずつ落とした樹冠。公園はりんご、街路には淡い花をつける。 */
+export function createTreeCrown(id: string, x: number, z: number, kind: 'apple' | 'blossom'): WorldBoxDefinition[] {
+  const leaf = voxelPartsAt(id, [x - VOXEL_SIZE / 2, 2.16, z - VOXEL_SIZE / 2]);
+  const apple = kind === 'apple';
+  const shade = apple ? '#579759' : '#d98988';
+  const middle = apple ? '#7ab362' : '#efa2a0';
+  const light = apple ? '#a0c972' : '#f8bcb0';
+  const fruit = apple ? '#ec6249' : '#ffe4c4';
+  const pieces = [
+    leaf('', shade, [-2, 0, -2], [5, 1, 5]),
+    // 段ごとに幅の異なる帯を合わせ、葉の四隅に丸みをつける。
+    leaf('lower', shade, [-4, 1, -2], [9, 2, 5]),
+    leaf('middle', middle, [-5, 3, -2], [11, 3, 5]),
+    leaf('upper', middle, [-4, 6, -2], [9, 1, 5]),
+    leaf('cap', light, [-2, 7, -2], [5, 1, 5]),
+    leaf('new-growth', light, [-1, 8, -1], [3, 1, 3]),
+  ];
+  for (const side of [-1, 1]) {
+    pieces.push(
+      leaf(`lower-${side}`, shade, [-2, 1, side < 0 ? -4 : 3], [5, 2, 2]),
+      leaf(`middle-${side}`, middle, [-3, 3, side < 0 ? -4 : 3], [7, 3, 2]),
+      leaf(`edge-${side}`, middle, [-2, 3, side < 0 ? -5 : 5], [5, 3, 1]),
+      leaf(`upper-${side}`, middle, [-2, 6, side < 0 ? -4 : 3], [5, 1, 2]),
+    );
+  }
+  return [...pieces,
+    leaf('fruit-front', fruit, [-2, 3, 6], [2, 2, 1]),
+    leaf('fruit-right', fruit, [6, 4, 0], [1, 2, 2]),
+    leaf('fruit-back', fruit, [1, 4, -6], [2, 2, 1]),
+  ];
 }
 
 /** 屋外用の一体型ベンチ・板張り天板と、低い市松敷物・開いたかごを作る。 */
@@ -33,7 +67,8 @@ export function createParkPicnicCorner(): readonly WorldBoxDefinition[] {
     ...Array.from({ length: 24 }, (_, i) => {
       const column = i % 6;
       const row = Math.floor(i / 6);
-      return part(`park-blanket-check-${i}`, (column + row) % 2 ? RED : CREAM,
+      const color = [CREAM, '#efa2a0', RED][column % 2 + row % 2];
+      return part(`park-blanket-check-${i}`, color,
         [4.8 + column * 0.4, 0.13, -17.775 + row * 0.45], [0.395, 0.02, 0.445]);
     }),
     part('park-picnic-basket', '#6f4327', [6.4, 0.22, -17.35], [0.9, 0.15, 0.75]),
@@ -75,16 +110,30 @@ export function createSeesawDetails(beam: WorldBoxDefinition): readonly WorldBox
   ];
 }
 
-/** 水面を敷物と区別する、低い石縁・波紋・葦。通行判定は増やさない。 */
+/** 段差のある石縁と葦、くちばしのついた小さなあひるを水面に並べる。 */
 export function createPondDetails(pond: WorldBoxDefinition): readonly WorldBoxDefinition[] {
-  const [x, , z] = pond.position;
+  const [x, y, z] = pond.position;
+  const rim = voxelPartsAt(pond.id, [x, y + pond.scale[1] / 2, z]);
+  const stone = '#aaa997';
+  const reed = '#669255';
   return [
     ...[-1, 1].flatMap(side => [
-      part(`park-pond-rim-x-${side}`, '#a9adb3', [x + side * 1.16, 0.18, z], [0.22, 0.2, 1.5]),
-      part(`park-pond-rim-z-${side}`, '#a9adb3', [x, 0.18, z + side * 0.96], [1.9, 0.2, 0.22]),
-      part(`park-pond-wave-${side}`, '#aed5e9', [x + side * 0.35, 0.17, z + side * 0.27], [0.65, 0.02, 0.09]),
+      rim(`rim-x-${side}`, stone, [side < 0 ? -6 : 5, 0, -3], [1, 1, 6]),
+      rim(`rim-z-${side}`, stone, [-4, 0, side < 0 ? -5 : 4], [8, 1, 1]),
+      ...[-1, 1].map(end => rim(`corner-${side}-${end}`, '#bcb9a2',
+        [side < 0 ? -5 : 4, 0, end < 0 ? -4 : 3], [1, 1, 1])),
     ]),
-    ...[0, 1, 2].map(i => part(`park-pond-reed-${i}`, '#3f7f3a',
-      [x - 0.8 + i * 0.14, 0.4 + i * 0.06, z - 0.7], [0.09, 0.55 + i * 0.12, 0.09])),
+    rim('reed-left', reed, [-4, 0, -3], [1, 3, 1]),
+    rim('reed-right', reed, [-2, 0, -3], [1, 2, 1]),
+    rim('reed-tip', WOOD, [-4, 3, -3], [1, 1, 1]),
+    rim('duck-body', '#ffd46c', [-3, 0, -1], [5, 1, 3]),
+    rim('duck-back', '#ffd46c', [-3, 1, -1], [5, 1, 2]),
+    rim('duck-tail', '#ffe294', [-4, 1, -1], [1, 1, 2]),
+    rim('duck-cheek', '#ffe294', [0, 2, -1], [3, 1, 2]),
+    rim('duck-nape', '#ffe294', [0, 3, -1], [1, 1, 2]),
+    rim('duck-eyes', '#654c39', [1, 3, -1], [1, 1, 2]),
+    rim('duck-face', '#ffe294', [2, 3, -1], [1, 1, 2]),
+    rim('duck-crown', '#ffe294', [0, 4, -1], [3, 1, 2]),
+    rim('duck-bill', '#ec8d49', [3, 2, -1], [1, 1, 2]),
   ];
 }

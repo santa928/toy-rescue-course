@@ -1,3 +1,4 @@
+import { VOXEL_SIZE } from '../../voxelGrid';
 import { useLayoutEffect, useMemo } from 'react';
 import type { RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -29,7 +30,7 @@ export function useVoxelWheelAnimation(
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
     // タイヤの回転で変わる外接分を一度だけ拡げ、毎frameの全instance走査を避ける。
-    if (wheels.length && mesh.boundingSphere) mesh.boundingSphere.radius += 0.24;
+    if (wheels.length && mesh.boundingSphere) mesh.boundingSphere.radius += VOXEL_SIZE;
   }, [batch.positions, matrix, meshRef, wheels]);
 
   useFrame(() => {

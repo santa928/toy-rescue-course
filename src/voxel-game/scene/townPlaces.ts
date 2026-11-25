@@ -1,3 +1,5 @@
+import { VOXEL_SIZE } from '../../voxelGrid';
+import { voxelPartsAt } from './propVoxels';
 import { createParkPicnicCorner } from './parkScenery';
 import type { WorldBoxDefinition, WorldDecorationClusterDefinition, WorldPoint } from './productionWorldMap';
 
@@ -24,13 +26,38 @@ function bench(id: string, x: number, z: number): readonly WorldBoxDefinition[] 
 
 /** 花は鉢・茎・花びらで表現し、単色の積み木との混同を避ける。 */
 function flowers(id: string, x: number, z: number): readonly WorldBoxDefinition[] {
+  const bloom = voxelPartsAt(id, [x - VOXEL_SIZE / 2, 0.06, z - VOXEL_SIZE / 2]);
   return [
-    box(`${id}-pot`, WOOD, [x, 0.25, z], [1.5, 0.35, 0.7]),
-    ...[-0.45, 0.45].flatMap((dx, index) => [
-      box(`${id}-stem-${index}`, '#3f7f3a', [x + dx, 0.6, z], [0.12, 0.4, 0.12]),
-      box(`${id}-petals-${index}`, index === 0 ? RED : GOLD,
-        [x + dx, 0.87, z], [0.5, 0.25, 0.5]),
-      box(`${id}-center-${index}`, CREAM, [x + dx, 1.01, z], [0.18, 0.08, 0.18]),
+    bloom('pot', WOOD, [-3, 0, -1], [7, 1, 3]),
+    bloom('rim', '#a86f3f', [-3, 1, -1], [7, 1, 3]),
+    ...[-2, 2].flatMap((stem, i) => {
+      const petals = i === 0 ? RED : GOLD;
+      return [
+        bloom(`stem-${i}`, '#579759', [stem, 2, 0], [1, 2, 1]),
+        bloom(`leaf-${i}`, '#7ab362', [stem + (i === 0 ? 1 : -1), 3, 0], [1, 1, 1]),
+        bloom(`petals-top-${i}`, petals, [stem, 6, 0], [1, 1, 1]),
+        bloom(`petals-bottom-${i}`, petals, [stem, 4, 0], [1, 1, 1]),
+        bloom(`petals-left-${i}`, petals, [stem - 1, 5, 0], [1, 1, 1]),
+        bloom(`petals-right-${i}`, petals, [stem + 1, 5, 0], [1, 1, 1]),
+        bloom(`center-${i}`, CREAM, [stem, 5, 0], [1, 1, 2]),
+      ];
+    }),
+  ];
+}
+
+/** 両側の送水口と上部の角ナットが読める赤い消火栓。 */
+function hydrant(): readonly WorldBoxDefinition[] {
+  const fixture = voxelPartsAt('fire-hydrant', [16 - VOXEL_SIZE / 2, 0.06, -12 - VOXEL_SIZE / 2]);
+  return [
+    fixture('body', RED, [-1, 1, -1], [3, 4, 3], true),
+    fixture('foot', '#c83e34', [-2, 0, -2], [5, 1, 5]),
+    fixture('cap', RED, [-2, 5, -1], [5, 1, 3]),
+    fixture('cap-top', RED, [-1, 6, -1], [3, 1, 3]),
+    fixture('nut', GOLD, [0, 7, 0], [1, 1, 1]),
+    fixture('outlet', CREAM, [0, 2, 2], [1, 2, 1]),
+    ...[-1, 1].flatMap(side => [
+      fixture(`collar-${side}`, RED, [side < 0 ? -2 : 2, 2, -1], [1, 2, 3]),
+      fixture(`valve-${side}`, GOLD, [side < 0 ? -3 : 3, 2, 0], [1, 2, 1]),
     ]),
   ];
 }
@@ -51,13 +78,7 @@ export function createTownPlaces(): readonly WorldDecorationClusterDefinition[] 
     },
     {
       id: 'fire-entry-hydrant', districtId: 'fire', purpose: 'service',
-      boxes: [
-        box('fire-hydrant-body', RED, [16, 0.65, -12], [0.8, 1.2, 0.8], true),
-        box('fire-hydrant-foot', RED, [16, 0.17, -12], [1.1, 0.24, 1.1]),
-        box('fire-hydrant-cap', GOLD, [16, 1.35, -12], [1.05, 0.25, 1.05]),
-        box('fire-hydrant-outlet', CREAM, [16, 0.85, -11.5], [0.4, 0.4, 0.28]),
-        box('fire-hydrant-valve', WOOD, [16, 0.85, -11.32], [0.2, 0.2, 0.12]),
-      ],
+      boxes: hydrant(),
     },
     {
       id: 'fire-flower-garden', districtId: 'fire', purpose: 'landmark',

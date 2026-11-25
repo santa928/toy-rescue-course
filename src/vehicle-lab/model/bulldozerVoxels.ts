@@ -2,13 +2,13 @@ import type { VoxelCell } from './voxelModel';
 
 /** 玩具ブルドーザーを構成する7色の共有material定義。 */
 export const BULLDOZER_PALETTE = {
-  yellow: { color: '#f2b90f', roughness: 0.72 },
-  track: { color: '#171b22', roughness: 0.84 },
-  blade: { color: '#aeb7c2', roughness: 0.6 },
-  window: { color: '#5caed1', roughness: 0.42 },
+  yellow: { color: '#ffc449', roughness: 0.72 },
+  track: { color: '#29384a', roughness: 0.84 },
+  blade: { color: '#a7c2cb', roughness: 0.6 },
+  window: { color: '#8acfd7', roughness: 0.42 },
   beacon: { color: '#ff8a18', emissive: '#9b3500', emissiveIntensity: 0.22, roughness: 0.55 },
-  darkGray: { color: '#505761', roughness: 0.76 },
-  silver: { color: '#d0d5da', roughness: 0.58 },
+  darkGray: { color: '#5b6e80', roughness: 0.76 },
+  silver: { color: '#fff0cc', roughness: 0.58 },
 } as const;
 
 export type BulldozerPaletteId = keyof typeof BULLDOZER_PALETTE;
@@ -85,16 +85,22 @@ function buildBulldozerVoxels(): readonly VoxelCell<BulldozerPaletteId>[] {
   fillBox(voxels, [-3, 5, 1], [-3, 6, 3], 'window');
   fillBox(voxels, [4, 5, 1], [4, 6, 3], 'window');
   fillBox(voxels, [-1, 5, 4], [2, 6, 4], 'window');
-  fillBox(voxels, [0, 7, 1], [1, 7, 2], 'beacon');
-  fillBox(voxels, [3, 6, -1], [3, 7, -1], 'darkGray');
+  // ひさしの下に目を並べ、ブレードの奥に小さな顔を作る。
+  for (const x of [-1, 2]) setVoxel(voxels, x, 5, 0, 'track');
+  fillBox(voxels, [-3, 7, -1], [2, 7, -1], 'yellow');
+  for (const x of [-2, 3]) setVoxel(voxels, x, 4, -4, 'silver');
+  fillBox(voxels, [0, 8, 1], [1, 8, 2], 'beacon');
+  fillBox(voxels, [4, 5, 4], [4, 8, 4], 'darkGray');
 
   // ボンネットの吸気口と履帯の端を刻み、箱と黒板の輪郭を分ける。
-  for (const x of [-1, 1, 3]) setVoxel(voxels, x, 4, -4, 'darkGray');
+  for (const x of [-1, 1]) setVoxel(voxels, x, 4, -4, 'darkGray');
   for (const x of [-5, -4, 5, 6]) for (const z of [-3, 5]) {
     voxels.delete(`${x},0,${z}`);
     voxels.delete(`${x},2,${z}`);
   }
   fillBox(voxels, [-6, 0, -7], [7, 2, -7], 'blade');
+  // 両端を折り返したスクープと一段高い耳。
+  for (const x of [-6, 7]) fillBox(voxels, [x, 1, -6], [x, 3, -6], 'blade');
   fillBox(voxels, [-5, 0, -6], [6, 1, -6], 'blade');
   fillBox(voxels, [-4, 1, -5], [-4, 3, -4], 'silver');
   fillBox(voxels, [5, 1, -5], [5, 3, -4], 'silver');

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Box3, Euler, Matrix4, Quaternion, Ray, Vector3 } from 'three';
+import { VOXEL_SIZE } from '../voxelGrid';
 import { PRODUCTION_WORLD_MAP } from '../voxel-game/scene/productionWorldMap';
 import { WORLD_SOLID_BOXES } from '../voxel-game/scene/worldCollisionLayout';
 import { VEHICLE_DEFINITIONS } from '../voxel-game/domain/vehicleDefinitions';
@@ -31,6 +32,7 @@ describe('玩具街の造形と通行', () => {
     const plans = [FIRE_TRUCK_RENDER_PLAN, BULLDOZER_RENDER_PLAN, EXCAVATOR_RENDER_PLAN, AMBULANCE_RENDER_PLAN, POLICE_RENDER_PLAN];
     for (const [index, plan] of plans.entries()) {
       const definition = VEHICLE_DEFINITIONS[index];
+      expect(plan.voxelSize, definition.id).toBe(VOXEL_SIZE);
       const halfEdge = plan.voxelSize * 0.94 / 2;
       for (const batch of plan.batches) for (const position of batch.positions) {
         for (const axis of [0, 1, 2]) {

@@ -1,3 +1,4 @@
+import { createTreeCrown } from './parkScenery';
 import { addTownDetails, createRescueDepot } from './toyTownArchitecture';
 import { createTownPlaces } from './townPlaces';
 import { validateWorldStreetscape } from './worldStreetscape';
@@ -337,9 +338,9 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#86552f', id: 'tree-trunk-1', position: [-7, 1.25, -28], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#86552f', id: 'tree-trunk-2', position: [-7, 1.25, -20], scale: [0.7, 2.2, 0.7], solid: true },
     { color: '#86552f', id: 'tree-trunk-3', position: [7, 1.25, -20], scale: [0.7, 2.2, 0.7], solid: true },
-    { color: '#3f7f3a', id: 'tree-crown-1', position: [-7, 2.85, -28], scale: [2.2, 1.4, 2.2], solid: false },
-    { color: '#3f7f3a', id: 'tree-crown-2', position: [-7, 2.85, -20], scale: [2.2, 1.4, 2.2], solid: false },
-    { color: '#3f7f3a', id: 'tree-crown-3', position: [7, 2.85, -20], scale: [2.2, 1.4, 2.2], solid: false },
+    ...createTreeCrown('tree-crown-1', -7, -28, 'apple'),
+    ...createTreeCrown('tree-crown-2', -7, -20, 'apple'),
+    ...createTreeCrown('tree-crown-3', 7, -20, 'apple'),
     { color: '#e24b3f', id: 'playground-plank', position: [3.1, 1.05, -28.8], rotation: [0.3, 0, 0], scale: [0.7, 0.28, 2.4], solid: true },
     { color: '#f2c94c', id: 'playground-support', position: [3.1, 0.55, -28.8], scale: [0.36, 1, 0.36], solid: true },
     ...createRescueDepot(),
@@ -359,11 +360,11 @@ const PRODUCTION_WORLD_MAP_DEFINITION = {
     { color: '#f1efe6', id: 'town-house-white-body', position: [31, 1.5, 37], scale: [6, 2.8, 5], solid: true },
     { color: '#c83e34', id: 'town-house-white-roof', position: [31, 3.1, 37], scale: [6.8, 0.4, 5.8], solid: false },
     { color: '#86552f', id: 'town-tree-trunk-a', position: [22, 1.25, 34], scale: [0.7, 2.2, 0.7], solid: true },
-    { color: '#3f7f3a', id: 'town-tree-crown-a', position: [22, 2.85, 34], scale: [2.2, 1.4, 2.2], solid: false },
+    ...createTreeCrown('town-tree-crown-a', 22, 34, 'blossom'),
     { color: '#86552f', id: 'town-tree-trunk-b', position: [40, 1.25, 33], scale: [0.7, 2.2, 0.7], solid: true },
-    { color: '#3f7f3a', id: 'town-tree-crown-b', position: [40, 2.85, 33], scale: [2.2, 1.4, 2.2], solid: false },
+    ...createTreeCrown('town-tree-crown-b', 40, 33, 'blossom'),
     { color: '#86552f', id: 'town-tree-trunk-c', position: [24, 1.25, 40], scale: [0.7, 2.2, 0.7], solid: true },
-    { color: '#3f7f3a', id: 'town-tree-crown-c', position: [24, 2.85, 40], scale: [2.2, 1.4, 2.2], solid: false },
+    ...createTreeCrown('town-tree-crown-c', 24, 40, 'blossom'),
   ]),
 } as const satisfies ProductionWorldMapDefinition;
 

@@ -1,3 +1,4 @@
+import { VOXEL_EDGE, VOXEL_SIZE } from '../../voxelGrid';
 import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -9,7 +10,7 @@ import {
   BULLDOZER_VOXELS,
   type BulldozerPaletteId,
 } from '../model/bulldozerVoxels';
-import { assertValidVoxelModel, calculateVoxelBounds } from '../model/voxelModel';
+import { calculateVoxelBounds } from '../model/voxelModel';
 import {
   createVoxelRenderPlan,
   type VoxelRenderBatch,
@@ -18,8 +19,6 @@ import { resolveVehiclePaintColor } from '../model/vehiclePaint';
 import { useVoxelTrackAnimation } from './useVoxelTrackAnimation';
 import type { TrackTravel } from '../model/vehicleTrackMotion';
 
-const VOXEL_SIZE = 0.24;
-const VOXEL_EDGE = VOXEL_SIZE * 0.94;
 const BLADE_LOWERED_Y = -0.12;
 const BLADE_RESPONSE = 12;
 const BLADE_ACTION_CYCLE_SECONDS = 0.55;
@@ -160,7 +159,6 @@ export function VoxelBulldozer({
   const bladeGroupRef = useRef<THREE.Group>(null);
   const bodyVisualGroupRef = useRef<THREE.Group>(null);
   const actionElapsedSecondsRef = useRef(0);
-  assertValidVoxelModel(BULLDOZER_VOXELS, BULLDOZER_PALETTE_IDS);
 
   useFrame((_state, delta) => {
     const bladeGroup = bladeGroupRef.current;

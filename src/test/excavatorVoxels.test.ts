@@ -46,7 +46,7 @@ describe('EXCAVATOR_VOXELS', () => {
     expect(paletteAt(-3, 5, 2)).toBe('window');
     expect(paletteAt(2, 10, -5)).toBe('arm');
     expect(paletteAt(0, 1, -9)).toBe('bucket');
-    expect(paletteAt(-1, 7, 3)).toBe('beacon');
+    expect(paletteAt(-1, 8, 3)).toBe('beacon');
   });
 
   it('主操作中だけarmとbucketを下げ、解除後は元位置へ戻す', () => {

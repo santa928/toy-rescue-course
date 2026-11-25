@@ -1,3 +1,4 @@
+import { VOXEL_EDGE, VOXEL_SIZE } from '../../voxelGrid';
 import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -9,7 +10,7 @@ import {
   AMBULANCE_VOXELS,
   type AmbulancePaletteId,
 } from '../model/ambulanceVoxels';
-import { assertValidVoxelModel, calculateVoxelBounds } from '../model/voxelModel';
+import { calculateVoxelBounds } from '../model/voxelModel';
 import {
   createVoxelRenderPlan,
   type VoxelRenderBatch,
@@ -17,8 +18,6 @@ import {
 import { resolveVehiclePaintColor } from '../model/vehiclePaint';
 import { useVoxelWheelAnimation } from './useVoxelWheelAnimation';
 
-const VOXEL_SIZE = 0.24;
-const VOXEL_EDGE = VOXEL_SIZE * 0.94;
 const VOXEL_GEOMETRY = new THREE.BoxGeometry(VOXEL_EDGE, VOXEL_EDGE, VOXEL_EDGE);
 
 export const AMBULANCE_RENDER_PLAN = createVoxelRenderPlan(
@@ -135,7 +134,6 @@ export function VoxelAmbulance({
   const beaconMaterialRef = useRef<THREE.MeshLambertMaterial>(null);
   const crossMaterialRef = useRef<THREE.MeshLambertMaterial>(null);
   const actionElapsedSecondsRef = useRef(0);
-  assertValidVoxelModel(AMBULANCE_VOXELS, AMBULANCE_PALETTE_IDS);
 
   useFrame((_state, delta) => {
     const actionActive = actionActiveRef?.current === true;

@@ -1,3 +1,4 @@
+import { VOXEL_EDGE, VOXEL_SIZE } from '../../voxelGrid';
 import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import type { ThreeElements } from '@react-three/fiber';
@@ -8,7 +9,7 @@ import {
   FIRE_TRUCK_VOXELS,
   type FireTruckPaletteId,
 } from '../model/fireTruckVoxels';
-import { assertValidVoxelModel, calculateVoxelBounds } from '../model/voxelModel';
+import { calculateVoxelBounds } from '../model/voxelModel';
 import {
   createVoxelRenderPlan,
   type VoxelRenderBatch,
@@ -16,8 +17,6 @@ import {
 import { resolveVehiclePaintColor } from '../model/vehiclePaint';
 import { useVoxelWheelAnimation } from './useVoxelWheelAnimation';
 
-const VOXEL_SIZE = 0.24;
-const VOXEL_EDGE = VOXEL_SIZE * 0.94;
 const VOXEL_GEOMETRY = new THREE.BoxGeometry(VOXEL_EDGE, VOXEL_EDGE, VOXEL_EDGE);
 
 export const FIRE_TRUCK_RENDER_PLAN = createVoxelRenderPlan(
@@ -73,8 +72,6 @@ export function VoxelFireTruck({
   paintColor = null,
   ...groupProps
 }: VoxelFireTruckProps): ReactElement {
-  assertValidVoxelModel(FIRE_TRUCK_VOXELS, FIRE_TRUCK_PALETTE_IDS);
-
   return (
     <group {...groupProps}>
       <group position={FIRE_TRUCK_RENDER_PLAN.offset}>

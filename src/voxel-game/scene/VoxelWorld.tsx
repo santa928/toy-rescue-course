@@ -7,6 +7,7 @@ import {
   type WorldSurfaceTileDefinition,
 } from './productionWorldMap';
 import { flattenDecorationBoxes } from './worldStreetscape';
+import { applyVoxelSurface } from './voxelSurface';
 import { createRoadMarkings } from './worldRoadMarkings';
 import {
   WORLD_GROUND_BOX,
@@ -24,6 +25,7 @@ interface BoxInstance {
 
 interface InstancedBoxesProps {
   readonly boxes: readonly BoxInstance[];
+  readonly showCells?: boolean;
   readonly color: string;
 }
 
@@ -37,7 +39,7 @@ const WORLD_RENDER_BOXES = [
 
 
 /** 個別色をinstance属性へ格納し、街の固定部品を1 draw callへまとめる。 */
-function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
+function InstancedBoxes({ boxes, color, showCells }: InstancedBoxesProps): ReactElement {
   const meshRef = useRef<THREE.InstancedMesh>(null);
 
   useLayoutEffect(() => {
@@ -70,7 +72,8 @@ function InstancedBoxes({ boxes, color }: InstancedBoxesProps): ReactElement {
   return (
     <instancedMesh args={[undefined, undefined, boxes.length]} ref={meshRef}>
       <boxGeometry args={[1, 1, 1]} />
-      <meshLambertMaterial color={color} />
+      {showCells ? <meshLambertMaterial color={color} onBeforeCompile={applyVoxelSurface} />
+        : <meshLambertMaterial color={color} />}
     </instancedMesh>
   );
 }
@@ -139,7 +142,7 @@ export function VoxelWorld(): ReactElement {
       <InstancedSurfaceTiles tiles={PRODUCTION_WORLD_MAP.surfaceTiles} />
       <InstancedBoxes boxes={WORLD_ROAD_RENDER_BOXES} color="#3f4248" />
       <InstancedBoxes boxes={ROAD_MARKING_BOXES} color="#f0c94a" />
-      <InstancedBoxes boxes={WORLD_RENDER_BOXES} color="#ffffff" />
+      <InstancedBoxes boxes={WORLD_RENDER_BOXES} color="#ffffff" showCells />
       <WorldSolidColliders />
     </group>
   );

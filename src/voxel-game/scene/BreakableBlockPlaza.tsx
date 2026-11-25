@@ -11,6 +11,7 @@ import {
   type RapierRigidBody,
 } from '@react-three/rapier';
 import * as THREE from 'three';
+import { applyVoxelSurface } from './voxelSurface';
 import type { BreakablePhase, VoxelGameSnapshot, VoxelGameRuntime } from '../domain/VoxelGameRuntime';
 import {
   CHIP_BURST_SIZE,
@@ -900,7 +901,7 @@ export function BreakableBlockPlaza({
           />
           <mesh ref={intactMeshRefCallbacks[index]}>
             <boxGeometry args={[1.5, 1.5, 1.5]} />
-            <meshLambertMaterial color={block.color} />
+            <meshLambertMaterial color={block.color} onBeforeCompile={applyVoxelSurface} />
           </mesh>
         </RigidBody>
       ))}
@@ -924,7 +925,7 @@ export function BreakableBlockPlaza({
             visible={false}
           >
             <boxGeometry args={slot.scale} />
-            <meshLambertMaterial color={slot.color} />
+            <meshLambertMaterial color={slot.color} onBeforeCompile={applyVoxelSurface} />
           </mesh>
         </RigidBody>
       ))}

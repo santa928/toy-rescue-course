@@ -2,13 +2,13 @@ import type { VoxelCell } from './voxelModel';
 
 /** 玩具ショベルカーを構成する7色の共有material定義。 */
 export const EXCAVATOR_PALETTE = {
-  orange: { color: '#ed8b16', roughness: 0.72 },
-  track: { color: '#171b22', roughness: 0.84 },
-  window: { color: '#5caed1', roughness: 0.42 },
-  arm: { color: '#f2b90f', roughness: 0.7 },
-  bucket: { color: '#9ba5b1', roughness: 0.62 },
+  orange: { color: '#f18b42', roughness: 0.72 },
+  track: { color: '#29384a', roughness: 0.84 },
+  window: { color: '#88ced4', roughness: 0.42 },
+  arm: { color: '#ffca5b', roughness: 0.7 },
+  bucket: { color: '#99b7c2', roughness: 0.62 },
   beacon: { color: '#ff8a18', emissive: '#9b3500', emissiveIntensity: 0.22, roughness: 0.55 },
-  darkGray: { color: '#505761', roughness: 0.76 },
+  darkGray: { color: '#596e80', roughness: 0.76 },
 } as const;
 
 export type ExcavatorPaletteId = keyof typeof EXCAVATOR_PALETTE;
@@ -85,8 +85,15 @@ function buildExcavatorVoxels(): readonly VoxelCell<ExcavatorPaletteId>[] {
   fillBox(voxels, [-3, 5, 1], [-3, 6, 4], 'window');
   fillBox(voxels, [1, 5, 1], [1, 6, 4], 'window');
   fillBox(voxels, [-2, 5, 5], [0, 6, 5], 'window');
-  setVoxel(voxels, -1, 7, 3, 'beacon');
-  setVoxel(voxels, 0, 7, 3, 'beacon');
+  // 小柄な片側キャブの目と、バケットの反対側に張り出す後部ウェイト。
+  for (const x of [-2, 0]) setVoxel(voxels, x, 5, 0, 'track');
+  fillBox(voxels, [-3, 7, -1], [1, 7, -1], 'orange');
+  fillBox(voxels, [2, 4, 1], [4, 4, 4], 'orange');
+  fillBox(voxels, [2, 5, 2], [4, 5, 3], 'orange');
+  setVoxel(voxels, 3, 5, 2, 'darkGray');
+  setVoxel(voxels, 3, 5, 3, 'darkGray');
+  setVoxel(voxels, -1, 8, 3, 'beacon');
+  setVoxel(voxels, 0, 8, 3, 'beacon');
 
   // キャブ横から立ち上がるブーム、肘、下向きのディッパーを接続する。
   fillBox(voxels, [2, 4, -2], [3, 6, 0], 'arm');

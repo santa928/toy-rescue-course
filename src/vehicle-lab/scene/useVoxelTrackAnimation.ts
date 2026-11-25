@@ -1,3 +1,4 @@
+import { VOXEL_SIZE } from '../../voxelGrid';
 import { useLayoutEffect, useMemo } from 'react';
 import type { RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -27,7 +28,7 @@ export function useVoxelTrackAnimation(
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-    if (links.length && mesh.boundingSphere) mesh.boundingSphere.radius += 0.24;
+    if (links.length && mesh.boundingSphere) mesh.boundingSphere.radius += VOXEL_SIZE;
   }, [batch.positions, links, matrix, meshRef]);
 
   useFrame(() => {

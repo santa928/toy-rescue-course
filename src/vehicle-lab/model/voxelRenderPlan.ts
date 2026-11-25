@@ -1,4 +1,5 @@
 import {
+  assertValidVoxelModel,
   calculateModelOffset,
   groupVoxelsByPalette,
   type VoxelBounds,
@@ -25,6 +26,7 @@ export function createVoxelRenderPlan<PaletteId extends string>(
   bounds: VoxelBounds,
   voxelSize: number,
 ): VoxelRenderPlan<PaletteId> {
+  assertValidVoxelModel(cells, paletteIds);
   const groups = groupVoxelsByPalette(cells, paletteIds);
   const batches = [...groups.entries()].map(([paletteId, paletteCells]) => ({
     paletteId,

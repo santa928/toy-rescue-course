@@ -84,7 +84,7 @@ export const VEHICLE_DEFINITIONS = [
       movingResponse: 6.8,
       yawClamp: 4.8,
     },
-    visualBounds: { offset: [0, 0.76, 0], scale: [3.36, 2.12, 3.12] },
+    visualBounds: { offset: [0, 0.88, 0], scale: [3.36, 2.36, 3.12] },
   },
   {
     action: { ariaLabel: 'バケットを動かす', label: 'バケット' },

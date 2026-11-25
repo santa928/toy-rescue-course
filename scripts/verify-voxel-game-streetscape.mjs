@@ -353,7 +353,7 @@ function assertWorldBudgets(state, viewport, districtId) {
     `${viewport.name}: expected ${districtId}, received ${state.world.currentDistrict}: ${JSON.stringify(state.vehicle)}.`);
   assert.equal(state.world.surfaceTileCount, 19);
   assert.equal(state.world.decorationClusterCount, 7);
-  assert.equal(state.world.decorationBoxCount, 94);
+  assert.equal(state.world.decorationBoxCount, 126);
   assert.equal(state.world.staticColliderCount, 24);
   assert.equal(state.visualLayout.worldSolids.length, 24);
   assert(state.renderer.rendererCalls > 0 && state.renderer.rendererCalls <= 34,

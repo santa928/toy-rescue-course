@@ -314,9 +314,9 @@ export function VoxelGameScene({
         telemetryRef={telemetryRef}
         vehicleId={vehicleId}
       />
-      <ambientLight intensity={1.5} />
-      <directionalLight intensity={2.1} position={[20, 34, 18]} />
-      <directionalLight color="#cbe0ff" intensity={0.75} position={[-18, 20, -14]} />
+      <hemisphereLight args={['#fff5e4', '#e1c5a7', 1.55]} />
+      <directionalLight color="#fff2da" intensity={2.0} position={[-12, 30, 20]} />
+      <directionalLight color="#ddefff" intensity={0.68} position={[20, 16, -14]} />
       <Physics gravity={[0, -18, 0]} updatePriority={WORLD_FRAME_UPDATE_PRIORITIES.physics}>
         <VoxelWorld />
         <VehicleColorPlayground />

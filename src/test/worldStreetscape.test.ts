@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { VOXEL_SIZE } from '../voxelGrid';
 import {
   PRODUCTION_WORLD_MAP,
   type ProductionWorldMapDefinition,
@@ -63,6 +64,26 @@ describe('world streetscape', () => {
       town: 2,
     });
     expect(PRODUCTION_WORLD_MAP.decorationClusters).toHaveLength(7);
+  });
+
+  it('樹冠・あひる・花・消火栓の継ぎ目と寸法が車と同じ格子に乗る', () => {
+    const allParts = [
+      ...PRODUCTION_WORLD_MAP.visualBoxes,
+      ...flattenDecorationBoxes(PRODUCTION_WORLD_MAP.decorationClusters),
+    ];
+    for (const prefix of ['tree-crown-1', 'town-tree-crown-a', 'park-pond-duck',
+      'fire-planter', 'town-west-flowers', 'fire-hydrant']) {
+      const parts = allParts.filter(box => box.id === prefix || box.id.startsWith(`${prefix}-`));
+      expect(parts.length, prefix).toBeGreaterThan(1);
+      const first = parts[0];
+      for (const part of parts) for (const axis of [0, 1, 2]) {
+        const cellCount = part.scale[axis] / VOXEL_SIZE;
+        const origin = first.position[axis] - first.scale[axis] / 2;
+        const cellStart = (part.position[axis] - part.scale[axis] / 2 - origin) / VOXEL_SIZE;
+        expect(cellCount, part.id).toBeCloseTo(Math.round(cellCount), 8);
+        expect(cellStart, part.id).toBeCloseTo(Math.round(cellStart), 8);
+      }
+    }
   });
 
   it('装飾boxを一意なcanonical列へ平坦化し、硬い大物だけを追加solidにする', () => {

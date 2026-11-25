@@ -2,12 +2,12 @@ import type { VoxelCell } from './voxelModel';
 
 /** 玩具救急車を構成する7色の共有material定義。 */
 export const AMBULANCE_PALETTE = {
-  white: { color: '#f5f1e8', roughness: 0.76 },
-  red: { color: '#d92d24', roughness: 0.7 },
-  cross: { color: '#e53935', emissive: '#8e1714', emissiveIntensity: 0.16, roughness: 0.62 },
-  window: { color: '#57b7c7', roughness: 0.4 },
-  wheel: { color: '#171b22', roughness: 0.84 },
-  darkGray: { color: '#505761', roughness: 0.76 },
+  white: { color: '#fff3de', roughness: 0.76 },
+  red: { color: '#ee675b', roughness: 0.7 },
+  cross: { color: '#ea4b57', emissive: '#8e1714', emissiveIntensity: 0.16, roughness: 0.62 },
+  window: { color: '#82d2d5', roughness: 0.4 },
+  wheel: { color: '#28344a', roughness: 0.84 },
+  darkGray: { color: '#647288', roughness: 0.76 },
   beacon: { color: '#f04438', emissive: '#9e1813', emissiveIntensity: 0.28, roughness: 0.5 },
 } as const;
 
@@ -91,7 +91,10 @@ function buildAmbulanceVoxels(): readonly VoxelCell<AmbulancePaletteId>[] {
     addWheel(voxels, x, 4);
   }
 
-  fillBox(voxels, [-3, 4, -5], [3, 4, -5], 'window');
+  // 丸みを一段ずつ付けたキャブと、背の高いガラス面。
+  fillBox(voxels, [-3, 6, -4], [3, 6, -2], 'white');
+  fillBox(voxels, [-3, 4, -5], [3, 5, -5], 'window');
+  for (const x of [-2, 2]) setVoxel(voxels, x, 4, -5, 'wheel');
   fillBox(voxels, [-4, 4, -4], [-4, 4, -2], 'window');
   fillBox(voxels, [4, 4, -4], [4, 4, -2], 'window');
 
@@ -106,7 +109,12 @@ function buildAmbulanceVoxels(): readonly VoxelCell<AmbulancePaletteId>[] {
   fillBox(voxels, [-1, 4, 5], [1, 6, 5], 'cross');
   fillBox(voxels, [-2, 5, 5], [2, 5, 5], 'cross');
 
+  // 上からも救急車を見つけられるよう屋根にも十字を編み込む。
+  fillBox(voxels, [0, 6, 2], [0, 6, 4], 'cross');
+  fillBox(voxels, [-1, 6, 3], [1, 6, 3], 'cross');
+  fillBox(voxels, [-2, 7, 1], [2, 7, 1], 'white');
   fillBox(voxels, [-1, 7, 1], [1, 7, 1], 'beacon');
+  fillBox(voxels, [-1, 3, -5], [1, 3, -5], 'darkGray');
   setVoxel(voxels, -3, 2, -6, 'red');
   setVoxel(voxels, 3, 2, -6, 'red');
 

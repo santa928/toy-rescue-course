@@ -1,3 +1,4 @@
+import { VOXEL_EDGE, VOXEL_SIZE } from '../../voxelGrid';
 import { useRef } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -9,7 +10,7 @@ import {
   EXCAVATOR_VOXELS,
   type ExcavatorPaletteId,
 } from '../model/excavatorVoxels';
-import { assertValidVoxelModel, calculateVoxelBounds } from '../model/voxelModel';
+import { calculateVoxelBounds } from '../model/voxelModel';
 import {
   createVoxelRenderPlan,
   type VoxelRenderBatch,
@@ -18,12 +19,10 @@ import { resolveVehiclePaintColor } from '../model/vehiclePaint';
 import { useVoxelTrackAnimation } from './useVoxelTrackAnimation';
 import type { TrackTravel } from '../model/vehicleTrackMotion';
 
-const VOXEL_SIZE = 0.24;
-const VOXEL_EDGE = VOXEL_SIZE * 0.94;
 const ARM_LOWERED_Y = -0.2;
 const ARM_RESPONSE = 9;
 const EXCAVATOR_ACTION_CYCLE_SECONDS = 0.9;
-const BUCKET_PIVOT = [0.12, 0.72, -1.92] as const;
+const BUCKET_PIVOT = [0.5 * VOXEL_SIZE, 3 * VOXEL_SIZE, -8 * VOXEL_SIZE] as const;
 const VOXEL_GEOMETRY = new THREE.BoxGeometry(VOXEL_EDGE, VOXEL_EDGE, VOXEL_EDGE);
 
 export const EXCAVATOR_RENDER_PLAN = createVoxelRenderPlan(
@@ -163,7 +162,6 @@ export function VoxelExcavator({
   const armGroupRef = useRef<THREE.Group>(null);
   const bucketPivotRef = useRef<THREE.Group>(null);
   const actionElapsedSecondsRef = useRef(0);
-  assertValidVoxelModel(EXCAVATOR_VOXELS, EXCAVATOR_PALETTE_IDS);
 
   useFrame((_state, delta) => {
     const armGroup = armGroupRef.current;

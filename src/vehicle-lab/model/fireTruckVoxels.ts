@@ -1,13 +1,13 @@
 import type { VoxelCell } from './voxelModel';
 
 export const FIRE_TRUCK_PALETTE = {
-  red: { color: '#d92d24', roughness: 0.72 },
-  white: { color: '#f3eee3', roughness: 0.78 },
-  black: { color: '#171b22', roughness: 0.82 },
-  silver: { color: '#aab1b9', roughness: 0.58 },
-  blue: { color: '#1769ff', roughness: 0.42, emissive: '#0d47c7', emissiveIntensity: 0.35 },
-  amber: { color: '#ffad19', roughness: 0.58, emissive: '#a95800', emissiveIntensity: 0.15 },
-  darkGray: { color: '#4a515a', roughness: 0.7 },
+  red: { color: '#e84942', roughness: 0.72 },
+  white: { color: '#fff1d6', roughness: 0.78 },
+  black: { color: '#28344a', roughness: 0.82 },
+  silver: { color: '#abc5cd', roughness: 0.58 },
+  blue: { color: '#51b4e2', roughness: 0.42, emissive: '#174f86', emissiveIntensity: 0.35 },
+  amber: { color: '#ffcb55', roughness: 0.58, emissive: '#a95800', emissiveIntensity: 0.15 },
+  darkGray: { color: '#54647a', roughness: 0.7 },
 } as const;
 
 export type FireTruckPaletteId = keyof typeof FIRE_TRUCK_PALETTE;
@@ -88,11 +88,20 @@ function buildFireTruckVoxels(): readonly VoxelCell<FireTruckPaletteId>[] {
   fillBox(voxels, [-3, 4, -6], [2, 5, -6], 'blue');
   fillBox(voxels, [-4, 4, -5], [-4, 5, -3], 'blue');
   fillBox(voxels, [3, 4, -5], [3, 5, -3], 'blue');
+  // 大きなひさしと一粒ずつの目。車庫の俯瞰でも進行方向が読める。
+  fillBox(voxels, [-3, 6, -7], [2, 6, -7], 'white');
+  for (const x of [-2, 1]) setVoxel(voxels, x, 4, -6, 'black');
   for (const x of [-5, 4]) {
+    // 手前の車軸を運転席とタイヤの間につなぐ。
+    fillBox(voxels, [x, 2, -5], [x, 2, -3], 'darkGray');
+    fillBox(voxels, [x, 5, -5], [x, 5, -3], 'red');
     fillBox(voxels, [x, 3, 0], [x, 3, 6], 'white');
     fillBox(voxels, [x, 2, 4], [x, 4, 5], 'silver');
     for (const [y, z] of [[2, 2], [3, 1], [4, 2], [3, 3]]) setVoxel(voxels, x, y, z, 'white');
   }
+  // 荷台の後ろには、クリーム色のステップと左右一対の尾灯。
+  fillBox(voxels, [-4, 2, 6], [3, 2, 6], 'white');
+  for (const x of [-3, 2]) setVoxel(voxels, x, 3, 6, 'amber');
   fillBox(voxels, [-4, 1, -7], [3, 1, -7], 'white');
   fillBox(voxels, [-2, 2, -7], [1, 2, -7], 'silver');
   setVoxel(voxels, -4, 2, -7, 'amber');
@@ -103,6 +112,7 @@ function buildFireTruckVoxels(): readonly VoxelCell<FireTruckPaletteId>[] {
   for (const z of [-1, 2, 5]) fillBox(voxels, [-2, 7, z], [2, 7, z], 'silver');
   fillBox(voxels, [-3, 7, -5], [-2, 7, -5], 'blue');
   fillBox(voxels, [1, 7, -5], [2, 7, -5], 'blue');
+  fillBox(voxels, [-1, 7, -5], [0, 7, -5], 'white');
 
   return [...voxels.values()].sort(
     (left, right) => left.y - right.y || left.z - right.z || left.x - right.x,

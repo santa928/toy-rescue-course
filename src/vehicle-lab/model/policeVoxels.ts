@@ -2,11 +2,11 @@ import type { VoxelCell } from './voxelModel';
 
 /** 玩具パトカーを構成する7色の共有material定義。 */
 export const POLICE_PALETTE = {
-  white: { color: '#f5f1e8', roughness: 0.76 },
-  black: { color: '#222833', roughness: 0.8 },
-  window: { color: '#57b7c7', roughness: 0.4 },
-  wheel: { color: '#151922', roughness: 0.86 },
-  darkGray: { color: '#535b66', roughness: 0.76 },
+  white: { color: '#fff4dc', roughness: 0.76 },
+  black: { color: '#344866', roughness: 0.8 },
+  window: { color: '#83cbd4', roughness: 0.4 },
+  wheel: { color: '#253349', roughness: 0.86 },
+  darkGray: { color: '#637486', roughness: 0.76 },
   redBeacon: { color: '#f04438', emissive: '#a51b16', emissiveIntensity: 0.34, roughness: 0.46 },
   blueBeacon: { color: '#2780ff', emissive: '#0d3b98', emissiveIntensity: 0.38, roughness: 0.44 },
 } as const;
@@ -94,6 +94,14 @@ function buildPoliceVoxels(): readonly VoxelCell<PolicePaletteId>[] {
   fillBox(voxels, [-3, 5, -1], [-3, 6, 1], 'window');
   fillBox(voxels, [3, 5, -1], [3, 6, 1], 'window');
 
+  for (const x of [-1, 1]) setVoxel(voxels, x, 5, -2, 'black');
+  // ボンネットを段々に絞り、先端にネイビーの小さな盾を描く。
+  fillBox(voxels, [-3, 3, -6], [3, 3, -6], 'white');
+  fillBox(voxels, [-1, 4, -4], [1, 4, -4], 'black');
+  setVoxel(voxels, 0, 4, -5, 'black');
+  for (const x of [-3, 3]) setVoxel(voxels, x, 3, -6, 'window');
+  fillBox(voxels, [-2, 3, -6], [2, 3, -6], 'darkGray');
+
   fillBox(voxels, [-2, 5, 2], [2, 6, 2], 'window');
   fillBox(voxels, [-3, 2, -6], [3, 2, -6], 'white');
 
@@ -104,6 +112,8 @@ function buildPoliceVoxels(): readonly VoxelCell<PolicePaletteId>[] {
   setVoxel(voxels, -3, 2, 6, 'redBeacon');
   setVoxel(voxels, 3, 2, 6, 'redBeacon');
 
+  // 後端を絞ったトランクと、上からも見える二色の灯火。
+  fillBox(voxels, [-2, 3, 6], [2, 3, 6], 'white');
   fillBox(voxels, [-2, 8, 0], [-1, 8, 0], 'redBeacon');
   fillBox(voxels, [1, 8, 0], [2, 8, 0], 'blueBeacon');
   setVoxel(voxels, 0, 8, 0, 'darkGray');
