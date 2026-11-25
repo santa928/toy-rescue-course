@@ -49,11 +49,34 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.retry.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy GitHub Pages
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v5.0.0
+
+      # deploy-pages sets page_url immediately after Pages accepts the request.
+      # An accepted deployment that later fails must retain its failure status.
+      - name: Check whether Pages accepted the deployment
+        if: steps.deployment.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          if [[ -n "$PAGE_URL" ]]; then
+            echo "::error::Pages accepted the deployment but did not finish publishing it."
+            exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/pages" --jq '{html_url, build_type, source}' ||
+            echo "::warning::Could not read Pages settings for diagnostics."
+          echo "::notice::Pages did not return a deployment URL. Retrying the same artifact in two minutes."
+          sleep 120
+
+      - name: Retry deployment of the existing artifact
+        if: success() && steps.deployment.outcome == 'failure'
+        id: retry
         uses: actions/deploy-pages@v5.0.0
